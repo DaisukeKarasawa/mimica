@@ -1,0 +1,150 @@
+import "@esotericsoftware/spine-pixi-v8";
+import { Spine } from "@esotericsoftware/spine-pixi-v8";
+import { Physics } from "@esotericsoftware/spine-core";
+import type { AvatarState, CharacterMetadata, MotionMap } from "@mimica/shared";
+import { Application, Assets } from "pixi.js";
+import { CharacterDirector } from "./CharacterDirector.js";
+import { hideHomeSceneSlots } from "./homeSceneSlots.js";
+
+export interface SpineStageConfig {
+  /** e.g. `mimica-asset://local/` — must end with `/` or will be normalized */
+  assetBaseUrl: string;
+  metadata: CharacterMetadata;
+  motionMap: MotionMap;
+}
+
+const ATLAS_SCALE = 0.61;
+const STAGE_PADDING = 0.06;
+
+export class SpineStageController {
+  private app: Application | null = null;
+  private spine: Spine | null = null;
+  private motionMap: MotionMap | null = null;
+  private readonly director = new CharacterDirector();
+  private readonly trackIndex = 0;
+  private disposed = false;
+
+  async mount(host: HTMLElement, config: SpineStageConfig): Promise<void> {
+    if (this.disposed) throw new Error("SpineStageController is disposed");
+    this.motionMap = config.motionMap;
+
+    const app = new Application();
+    await app.init({
+      backgroundAlpha: 0,
+      resizeTo: host,
+      antialias: true,
+      resolution: window.devicePixelRatio || 1,
+      autoDensity: true,
+    });
+    host.replaceChildren(app.canvas);
+    this.app = app;
+
+    const base = config.assetBaseUrl.endsWith("/") ? config.assetBaseUrl : `${config.assetBaseUrl}/`;
+    const skelKey = "mimica-skel";
+    const atlasKey = "mimica-atlas";
+    Assets.add({ alias: skelKey, src: `${base}${config.metadata.skelFile}` });
+    Assets.add({ alias: atlasKey, src: `${base}${config.metadata.atlasFile}` });
+    await Assets.load([skelKey, atlasKey]);
+
+    const spine = Spine.from({
+      skeleton: skelKey,
+      atlas: atlasKey,
+      scale: ATLAS_SCALE,
+      autoUpdate: true,
+    });
+    hideHomeSceneSlots(spine);
+    app.stage.addChild(spine);
+    this.spine = spine;
+    this.fitSpineToStage();
+
+    const resizeObserver = new ResizeObserver(() => {
+      this.fitSpineToStage();
+    });
+    resizeObserver.observe(host);
+    (host as HTMLElement & { __mimicaResizeObserver?: ResizeObserver }).__mimicaResizeObserver =
+      resizeObserver;
+
+    this.setAvatarState("idle");
+  }
+
+  setAvatarState(state: AvatarState): void {
+    this.director.setState(state, true);
+    this.playState(state);
+  }
+
+  getAvatarState(): AvatarState {
+    return this.director.getState();
+  }
+
+  destroy(): void {
+    this.disposed = true;
+    const host = this.app?.canvas.parentElement;
+    if (host && (host as HTMLElement & { __mimicaResizeObserver?: ResizeObserver }).__mimicaResizeObserver) {
+      (host as HTMLElement & { __mimicaResizeObserver?: ResizeObserver }).__mimicaResizeObserver?.disconnect();
+    }
+    this.spine?.destroy({ children: true });
+    this.spine = null;
+    if (this.app) {
+      this.app.destroy(true, { children: true, texture: true });
+      this.app = null;
+    }
+  }
+
+  /** ステージ矩形に収まるよう等倍スケールで中央配置（canvas は resizeTo で歪めない） */
+  private fitSpineToStage(): void {
+    const app = this.app;
+    const spine = this.spine;
+    if (!app || !spine) return;
+
+    const w = app.screen.width;
+    const h = app.screen.height;
+    if (w <= 0 || h <= 0) return;
+
+    spine.skeleton.setToSetupPose();
+    hideHomeSceneSlots(spine);
+    spine.position.set(0, 0);
+    spine.scale.set(ATLAS_SCALE);
+    spine.skeleton.updateWorldTransform(Physics.update);
+
+    const bounds = spine.getLocalBounds();
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      spine.position.set(w / 2, h / 2);
+      return;
+    }
+
+    const padW = w * STAGE_PADDING;
+    const padH = h * STAGE_PADDING;
+    const fitScale = Math.min((w - padW * 2) / bounds.width, (h - padH * 2) / bounds.height);
+    const totalScale = ATLAS_SCALE * fitScale;
+
+    spine.scale.set(totalScale);
+    spine.skeleton.updateWorldTransform(Physics.update);
+
+    const fitted = spine.getLocalBounds();
+    const pivotX = fitted.x + fitted.width / 2;
+    const pivotY = fitted.y + fitted.height / 2;
+    spine.pivot.set(pivotX, pivotY);
+    spine.position.set(w / 2, h / 2);
+  }
+
+  private playState(state: AvatarState): void {
+    const spine = this.spine;
+    const motionMap = this.motionMap;
+    if (!spine || !motionMap) return;
+
+    const names = this.director.resolveAnimations(state, motionMap);
+    const animName = names[0];
+    if (!animName) return;
+
+    const entry = motionMap[state];
+    const loop = entry?.loop ?? true;
+    const track = spine.state.setAnimation(this.trackIndex, animName, loop);
+
+    if (!loop && entry?.returnTo) {
+      const returnTo = entry.returnTo;
+      track.listener = {
+        complete: () => this.setAvatarState(returnTo),
+      };
+    }
+  }
+}
