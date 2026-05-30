@@ -62,7 +62,14 @@ export function registerAssetProtocol(): void {
 
 export function setupAssetProtocolHandler(): void {
   const { protocol, net } = apis();
-  assetRoot = resolveContainedPath(DEFAULT_SETTINGS.characterAssetRoot, homedir());
+  let realRootNorm: string;
+  try {
+    assetRoot = resolveContainedPath(DEFAULT_SETTINGS.characterAssetRoot, homedir());
+    realRootNorm = `${realpathSync(assetRoot)}/`;
+  } catch {
+    console.error("[mimica] Character asset root is unavailable; mimica-asset:// requests will 404");
+    return;
+  }
   protocol.handle(CHARACTER_ASSET_SCHEME, (request: Request) => {
     const url = new URL(request.url);
     const rel = decodeURIComponent(url.pathname).replace(/^\/+/, "");
@@ -73,7 +80,6 @@ export function setupAssetProtocolHandler(): void {
     } catch {
       return new Response("Not Found", { status: 404 });
     }
-    const realRootNorm = `${realpathSync(assetRoot)}/`;
     if (!realPath.startsWith(realRootNorm)) {
       return new Response("Forbidden", { status: 403 });
     }

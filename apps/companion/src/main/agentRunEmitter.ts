@@ -24,6 +24,7 @@ export class AgentRunEmitter {
   }
 
   delta(content: string): void {
+    if (!this.isActive()) return;
     emitAgentEvent(this.wc, {
       type: "agent_delta",
       sessionId: this.sessionId,
@@ -33,6 +34,7 @@ export class AgentRunEmitter {
   }
 
   tool(name: string, detail?: string): void {
+    if (!this.isActive()) return;
     emitAgentEvent(this.wc, {
       type: "agent_tool",
       sessionId: this.sessionId,

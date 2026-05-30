@@ -7,7 +7,11 @@ import "./styles/stage.css";
 import "./styles/stage-placeholder.css";
 import "./styles/chat.css";
 
-createRoot(document.getElementById("root")!).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element #root not found");
+}
+createRoot(rootElement).render(
   <StrictMode>
     <App />
   </StrictMode>,

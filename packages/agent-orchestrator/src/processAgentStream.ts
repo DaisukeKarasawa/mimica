@@ -23,8 +23,8 @@ export async function processAgentStream(params: {
   let sawToolCall = false;
   let preToolText = "";
   let postToolText = "";
-  let preToolVisibleLen = 0;
-  let postToolVisibleLen = 0;
+  let preToolVisible = "";
+  let postToolVisible = "";
 
   const blockWriteTool = async (name: string): Promise<void> => {
     if (writeToolBlocked) return;
@@ -75,12 +75,12 @@ export async function processAgentStream(params: {
 
       if (!sawToolCall) {
         preToolText += block.text;
-        const streamed = streamVisibleText(preToolText, preToolVisibleLen, callbacks.onDelta);
-        preToolVisibleLen = streamed.visibleLen;
+        const streamed = streamVisibleText(preToolText, preToolVisible, callbacks.onDelta);
+        preToolVisible = streamed.visible;
       } else {
         postToolText += block.text;
-        const streamed = streamVisibleText(postToolText, postToolVisibleLen, callbacks.onDelta);
-        postToolVisibleLen = streamed.visibleLen;
+        const streamed = streamVisibleText(postToolText, postToolVisible, callbacks.onDelta);
+        postToolVisible = streamed.visible;
       }
     }
   }

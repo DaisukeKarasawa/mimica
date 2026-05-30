@@ -14,19 +14,26 @@ export async function createCursorAgent(
     name: "Mimica",
   };
 
+  const localBase = {
+    cwd: params.workspacePath,
+    settingSources: ["project"] as ("project")[],
+  };
+
   try {
     return await Agent.create({
       ...base,
-      local: {
-        cwd: params.workspacePath,
-        settingSources: [] as const,
-        sandboxOptions: { enabled: true },
-      },
+      local: { ...localBase, sandboxOptions: { enabled: true } },
     });
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const sandboxUnsupported = /sandbox/i.test(message);
+    if (!sandboxUnsupported) throw err;
+    console.warn(
+      "[mimica] sandboxOptions unsupported in this Cursor SDK build; creating agent without sandbox",
+    );
     return await Agent.create({
       ...base,
-      local: { cwd: params.workspacePath, settingSources: [] as const },
+      local: localBase,
     });
   }
 }

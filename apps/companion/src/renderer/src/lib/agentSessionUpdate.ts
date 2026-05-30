@@ -101,9 +101,14 @@ export function reduceAgentEvent(
   switch (event.type) {
     case "agent_delta": {
       const streamId = streamMessageId(event.runId, stream.streamId);
-      const content = stream.content + event.content;
       return {
-        sessions: applyAgentDelta(sessions, event.sessionId, event.runId, streamId, content),
+        sessions: applyAgentDelta(
+          sessions,
+          event.sessionId,
+          event.runId,
+          streamId,
+          stream.content,
+        ),
         sideEffect: { type: "none" },
       };
     }

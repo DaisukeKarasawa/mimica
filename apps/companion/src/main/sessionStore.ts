@@ -96,7 +96,13 @@ export class SessionStore {
     if (!safeId) return;
     this.sessions.delete(safeId);
     const path = join(sessionsDir(), `${safeId}.json`);
-    if (existsSync(path)) unlinkSync(path);
+    if (existsSync(path)) {
+      try {
+        unlinkSync(path);
+      } catch (err) {
+        console.error(`Failed to delete session file: ${path}`, err);
+      }
+    }
   }
 
   setSaveChatHistory(enabled: boolean): void {

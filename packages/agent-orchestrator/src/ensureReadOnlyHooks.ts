@@ -26,7 +26,7 @@ function bundledDeniedToolsPath(): string {
 }
 
 function mimicaHookEntries(scriptPath: string): HooksConfig["hooks"] {
-  const command = `node ${scriptPath}`;
+  const command = `${process.execPath} ${JSON.stringify(scriptPath)}`;
   const base = { command, failClosed: true };
   return {
     preToolUse: [{ ...base, matcher: "Write|Delete|Shell|Task|Edit|ApplyPatch|Create" }],
