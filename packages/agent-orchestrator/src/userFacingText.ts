@@ -15,11 +15,34 @@ export function isMetaNarrationParagraph(paragraph: string): boolean {
   return false;
 }
 
+function isStructuralMarkdownLine(line: string): boolean {
+  const t = line.trim();
+  if (/^```/.test(t)) return true;
+  if (/^\|/.test(t)) return true;
+  if (/^#{1,6}\s/.test(t)) return true;
+  if (/^[-*+]\s/.test(t)) return true;
+  if (/^\d+\.\s/.test(t)) return true;
+  return false;
+}
+
+function isMetaContentLine(line: string): boolean {
+  const t = line.trim();
+  return isMetaNarrationParagraph(t) || META_LINE.test(t);
+}
+
 function stripMetaLines(block: string): string {
-  const kept = block
-    .split("\n")
-    .filter((line) => !isMetaNarrationParagraph(line.trim()));
-  return kept.join("\n").trim();
+  const trimmed = block.trim();
+  if (!trimmed) return "";
+
+  const nonEmptyLines = trimmed.split("\n").filter((line) => line.trim().length > 0);
+  if (nonEmptyLines.length === 0) return "";
+
+  const entireBlockIsMeta = nonEmptyLines.every((line) => {
+    if (isStructuralMarkdownLine(line)) return false;
+    return isMetaContentLine(line);
+  });
+
+  return entireBlockIsMeta ? "" : trimmed;
 }
 
 /** ツール呼び出し前の assistant 本文からはユーザー向け段落だけ残す（全体がメタだけなら空） */
