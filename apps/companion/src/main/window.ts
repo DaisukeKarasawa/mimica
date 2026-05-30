@@ -1,0 +1,88 @@
+import { join } from "node:path";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import type { BrowserWindow as BrowserWindowType } from "electron";
+import { electron } from "./electron.js";
+import { userDataJoin } from "./userDataPaths.js";
+
+const MIN_WIDTH = 960;
+const MIN_HEIGHT = 640;
+
+interface WindowState {
+  width: number;
+  height: number;
+  x?: number;
+  y?: number;
+}
+
+function windowStatePath(): string {
+  return userDataJoin("window-state.json");
+}
+
+function loadWindowState(): WindowState {
+  try {
+    const path = windowStatePath();
+    if (existsSync(path)) {
+      return JSON.parse(readFileSync(path, "utf8")) as WindowState;
+    }
+  } catch {
+    /* use defaults */
+  }
+  return { width: 1280, height: 800 };
+}
+
+function saveWindowState(win: BrowserWindowType): void {
+  const bounds = win.getBounds();
+  const path = windowStatePath();
+  const dir = join(path, "..");
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    path,
+    JSON.stringify({ width: bounds.width, height: bounds.height, x: bounds.x, y: bounds.y }),
+  );
+}
+
+export function createMainWindow(): BrowserWindowType {
+  const { BrowserWindow, screen } = electron();
+  const state = loadWindowState();
+  const display = screen.getPrimaryDisplay().workAreaSize;
+  const width = Math.min(state.width, display.width);
+  const height = Math.min(state.height, display.height);
+
+  const win = new BrowserWindow({
+    width,
+    height,
+    x: state.x,
+    y: state.y,
+    minWidth: MIN_WIDTH,
+    minHeight: MIN_HEIGHT,
+    title: "Mimica",
+    backgroundColor: "#0d0c0c",
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  const devServerUrl =
+    process.env.ELECTRON_RENDERER_URL ?? process.env.VITE_DEV_SERVER_URL;
+
+  if (devServerUrl) {
+    void win.loadURL(devServerUrl);
+  } else {
+    void win.loadFile(join(__dirname, "../renderer/index.html"));
+  }
+
+  win.on("close", () => saveWindowState(win));
+
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return;
+    const mod = process.platform === "darwin" ? input.meta : input.control;
+    if (mod && !input.alt && !input.shift && input.key?.toLowerCase() === "w") {
+      event.preventDefault();
+    }
+  });
+
+  return win;
+}

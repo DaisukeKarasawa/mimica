@@ -1,0 +1,110 @@
+import { randomBytes } from "node:crypto";
+import { WebSocketServer, WebSocket } from "ws";
+import type { ClientMessage, EditorContext, ServerMessage } from "@mimica/shared";
+
+function resolveBridgeToken(): string {
+  const fromEnv = process.env.MIMICA_BRIDGE_TOKEN?.trim();
+  if (fromEnv) return fromEnv;
+  return randomBytes(24).toString("hex");
+}
+
+function isEditorContext(value: unknown): value is EditorContext {
+  if (!value || typeof value !== "object") return false;
+  const ctx = value as Record<string, unknown>;
+  return typeof ctx.workspacePath === "string" && ctx.workspacePath.length > 0;
+}
+
+function parseClientMessage(data: unknown, token: string): ClientMessage | null {
+  if (!data || typeof data !== "object") return null;
+  const msg = data as Record<string, unknown>;
+  if (msg.token !== token || typeof msg.type !== "string") return null;
+
+  switch (msg.type) {
+    case "ping":
+      return { type: "ping", token };
+    case "companion_ready":
+      return { type: "companion_ready", token };
+    case "context_update":
+      if (!isEditorContext(msg.context)) return null;
+      return { type: "context_update", context: msg.context, token };
+    default:
+      return null;
+  }
+}
+
+export class CursorBridgeServer {
+  private wss: WebSocketServer | null = null;
+  private client: WebSocket | null = null;
+  readonly bridgeToken: string;
+
+  constructor(
+    private readonly port: number,
+    private readonly onContext: (context: EditorContext) => void,
+    bridgeToken?: string,
+  ) {
+    this.bridgeToken = bridgeToken ?? resolveBridgeToken();
+  }
+
+  async start(): Promise<void> {
+    this.wss = new WebSocketServer({ host: "127.0.0.1", port: this.port });
+    this.wss.on("connection", (ws) => {
+      if (this.client && this.client !== ws && this.client.readyState === WebSocket.OPEN) {
+        this.client.close(1000, "replaced");
+      }
+      this.client = ws;
+
+      const ack: ServerMessage = {
+        type: "connection_ack",
+        port: this.port,
+        token: this.bridgeToken,
+      };
+      ws.send(JSON.stringify(ack));
+
+      ws.on("message", (data) => {
+        try {
+          const msg = parseClientMessage(JSON.parse(String(data)), this.bridgeToken);
+          if (!msg) {
+            ws.close(1008, "invalid message");
+            return;
+          }
+          this.handleMessage(msg, ws);
+        } catch {
+          ws.close(1008, "invalid message");
+        }
+      });
+
+      ws.on("close", () => {
+        if (this.client === ws) this.client = null;
+      });
+    });
+  }
+
+  stop(): void {
+    this.client?.close();
+    this.wss?.close();
+    this.wss = null;
+    this.client = null;
+  }
+
+  hasClient(): boolean {
+    return this.client?.readyState === WebSocket.OPEN;
+  }
+
+  private handleMessage(msg: ClientMessage, ws: WebSocket): void {
+    switch (msg.type) {
+      case "ping": {
+        const pong: ServerMessage = { type: "pong" };
+        ws.send(JSON.stringify(pong));
+        break;
+      }
+      case "context_update": {
+        this.onContext(msg.context);
+        const ack: ServerMessage = { type: "context_ack", context: msg.context };
+        ws.send(JSON.stringify(ack));
+        break;
+      }
+      case "companion_ready":
+        break;
+    }
+  }
+}
