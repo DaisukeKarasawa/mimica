@@ -1,0 +1,31 @@
+{
+  "idle": {
+    "loop": true,
+    "animations": ["Start_Idle_01"]
+  },
+  "thinking": {
+    "loop": true,
+    "animations": ["Look_01_M"],
+    "fallback": ["Start_Idle_01"]
+  },
+  "waiting": {
+    "loop": true,
+    "animations": ["LookEnd_01_M"],
+    "fallback": ["Start_Idle_01"]
+  },
+  "talking": {
+    "loop": true,
+    "animations": ["Talk_01_M", "Talk_02_M", "Talk_03_M", "Talk_04_M", "Talk_05_M"],
+    "fallback": ["Look_01_M", "Start_Idle_01"]
+  },
+  "success": {
+    "loop": false,
+    "animations": ["Pat_01_A", "PatEnd_01_A"],
+    "returnTo": "idle"
+  },
+  "error": {
+    "loop": false,
+    "animations": ["LookEnd_01_A"],
+    "returnTo": "idle"
+  }
+}
