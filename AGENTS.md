@@ -132,6 +132,8 @@ When changing how Mimica loads or maps Spine assets:
 - For `/commit` work, include post-commit signing commands in the final report, especially `git commit --amend -S --no-edit` for the latest commit and `git rebase --exec 'git commit --amend --no-edit -S' HEAD~N` for multiple recent commits.
 - For commit-message history cleanup on unpushed work, preserve commit granularity and commit trees unless the user explicitly asks to squash or change content.
 - Prefer project-local, shared sources of truth over hidden global references when codifying repository behavior; avoid keeping duplicate commit-message rule sources.
+- When a path should clearly not be committed (e.g. `__pycache__/`, `*.py[cod]`), add the matching `.gitignore` entry directly instead of asking whether to add it.
+- Keep mimica dev-repo Cursor hooks focused on supply-chain and execution security (package installs, remote-to-shell, risky MCP), not MVP read-only Agent policy.
 
 ## Learned Workspace Facts
 
@@ -151,3 +153,9 @@ When changing how Mimica loads or maps Spine assets:
   defaults to `~/MimicaAssets/characters/rio/persona/SKILL.md`.
 - Validation defaults: `pnpm typecheck`, `pnpm build`, and `pnpm security` when
   touching runtime or dependency surfaces.
+- Dev-repo Cursor hooks: `.cursor/hooks.json` + `.cursor/hooks/security-guard.mjs`
+  gate `beforeShellExecution` / `beforeMCPExecution` (deny remote-to-shell patterns;
+  ask on package installs and risky MCP). Do not put MVP read-only guard here.
+- MVP read-only Agent enforcement is Companion-only: `ensureReadOnlyHooks()` injects
+  `packages/agent-orchestrator/hooks/mimica-read-only-guard.mjs` into the target
+  workspace at agent run time.

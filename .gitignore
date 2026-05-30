@@ -13,6 +13,13 @@ apps/companion/release/
 apps/cursor-extension/*.vsix
 .vscode-test/
 
+# Python
+__pycache__/
+*.py[cod]
+
+# Cursor hook runtime state
+.cursor/hooks/state/
+
 # Spine / extracted game assets (local only — see docs/spine-asset-guide.md)
 *.skel
 *.skel.bytes
