@@ -18,7 +18,7 @@ export type ClientMessage =
 
 export type ServerMessage =
   | { type: "pong" }
-  | { type: "connection_ack"; port: number; token: string }
+  | { type: "connection_ack"; port: number }
   | { type: "context_ack"; context: EditorContext };
 
 export type CompanionMessage =
@@ -48,6 +48,7 @@ export function mapAgentRunToAvatar(state: AgentRunState): AvatarState {
     case "failed":
       return "error";
     case "cancelled":
+      return "cancelled";
     case "idle":
     default:
       return "idle";

@@ -1,17 +1,29 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import type { ClientMessage, EditorContext, ServerMessage } from "@mimica/shared";
+import { resolveWorkspacePath } from "./paths.js";
 
 function resolveBridgeToken(): string {
   const fromEnv = process.env.MIMICA_BRIDGE_TOKEN?.trim();
   if (fromEnv) return fromEnv;
-  return randomBytes(24).toString("hex");
+  const generated = randomBytes(24).toString("hex");
+  console.warn(
+    "[mimica] MIMICA_BRIDGE_TOKEN is not set; set it in .env so the Cursor extension can authenticate.",
+  );
+  console.warn(`[mimica] Generated bridge token (dev only, not sent over WebSocket): ${generated}`);
+  return generated;
 }
 
 function isEditorContext(value: unknown): value is EditorContext {
   if (!value || typeof value !== "object") return false;
   const ctx = value as Record<string, unknown>;
-  return typeof ctx.workspacePath === "string" && ctx.workspacePath.length > 0;
+  if (typeof ctx.workspacePath !== "string" || ctx.workspacePath.length === 0) return false;
+  try {
+    resolveWorkspacePath(ctx.workspacePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function parseClientMessage(data: unknown, token: string): ClientMessage | null {
@@ -61,7 +73,6 @@ export class CursorBridgeServer {
       const ack: ServerMessage = {
         type: "connection_ack",
         port: this.port,
-        token: this.bridgeToken,
       };
       ws.send(JSON.stringify(ack));
 

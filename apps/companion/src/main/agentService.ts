@@ -68,7 +68,7 @@ export class AgentService {
         ? allMessages.slice(0, -1)
         : allMessages;
 
-    const cwd = resolveWorkspacePath(context.workspacePath ?? payload.workspacePath);
+    const cwd = resolveWorkspacePath(session?.workspacePath ?? payload.workspacePath);
 
     try {
       await runner.runChat({

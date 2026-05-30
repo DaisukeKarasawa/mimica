@@ -123,8 +123,8 @@ function waitForBridge(maxMs = 15000): Promise<void> {
 function handleServerMessage(raw: unknown): void {
   if (!raw || typeof raw !== "object") return;
   const msg = raw as ServerMessage;
-  if (msg.type === "connection_ack" && msg.token) {
-    bridgeToken = msg.token;
+  if (msg.type === "connection_ack") {
+    /* token is never sent over WebSocket; use MIMICA_BRIDGE_TOKEN from env */
   }
 }
 
@@ -132,6 +132,11 @@ async function connectBridge(): Promise<void> {
   if (isShuttingDown) return;
   if (wsClient?.readyState === WebSocket.OPEN && bridgeToken) return;
   if (pendingConnect) return pendingConnect;
+  if (!bridgeToken) {
+    throw new Error(
+      "MIMICA_BRIDGE_TOKEN is required. Set it in .env to match the Companion process.",
+    );
+  }
 
   pendingConnect = (async () => {
     wsClient?.close();
@@ -143,8 +148,8 @@ async function connectBridge(): Promise<void> {
       });
       wsClient!.once("message", (data) => {
         try {
-          handleServerMessage(JSON.parse(String(data)));
-          if (bridgeToken) {
+          const parsed = JSON.parse(String(data)) as ServerMessage;
+          if (parsed.type === "connection_ack") {
             clearTimeout(timeout);
             resolve();
           }

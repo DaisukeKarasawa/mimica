@@ -1,3 +1,4 @@
+import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, normalize, relative, resolve } from "node:path";
 
@@ -28,8 +29,12 @@ export function resolveContainedPath(path: string, baseDir: string): string {
 
 export function resolveWorkspacePath(raw: string): string {
   const resolved = resolveExpandedPath(raw);
-  if (raw.startsWith("~/")) {
-    assertContained(resolved, homedir());
+  assertContained(resolved, homedir());
+  if (!existsSync(resolved)) {
+    throw new Error(`Workspace path does not exist: ${raw}`);
+  }
+  if (!statSync(resolved).isDirectory()) {
+    throw new Error(`Workspace path is not a directory: ${raw}`);
   }
   return resolved;
 }
