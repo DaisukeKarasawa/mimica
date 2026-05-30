@@ -31,11 +31,19 @@ def to_bytes(script) -> bytes:
     return bytes(script)
 
 
+def sanitize_asset_name(name: str, fallback: str) -> str:
+    basename = Path(name).name
+    if not basename or basename in (".", ".."):
+        return fallback
+    return basename
+
+
 def export_object(obj, base: Path) -> None:
     typ = obj.type.name
     if typ == "TextAsset":
         data = obj.read()
-        name = data.m_Name or f"textasset_{obj.path_id}"
+        fallback = f"textasset_{obj.path_id}"
+        name = sanitize_asset_name(data.m_Name, fallback) if data.m_Name else fallback
         out_name = name if Path(name).suffix else f"{name}.bytes"
         out = base / "TextAsset" / out_name
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -43,7 +51,8 @@ def export_object(obj, base: Path) -> None:
         print(f"  TextAsset: {out.name}")
     elif typ == "Texture2D":
         data = obj.read()
-        name = data.m_Name or f"texture_{obj.path_id}"
+        fallback = f"texture_{obj.path_id}"
+        name = sanitize_asset_name(data.m_Name, fallback) if data.m_Name else fallback
         out = base / "Texture2D" / f"{name}.png"
         out.parent.mkdir(parents=True, exist_ok=True)
         data.image.save(out)
@@ -62,13 +71,16 @@ def main() -> None:
         sys.exit(1)
 
     dst.mkdir(parents=True, exist_ok=True)
-    bundles = [p for p in src.rglob("*") if p.is_file()]
-    print(f"走査: {len(bundles)} ファイル")
+    file_count = sum(1 for p in src.rglob("*") if p.is_file())
+    print(f"走査: {file_count} ファイル")
 
-    for bundle in bundles:
+    for bundle in src.rglob("*"):
+        if not bundle.is_file():
+            continue
         try:
             env = UnityPy.load(str(bundle))
-        except Exception:
+        except Exception as exc:
+            print(f"skip bundle {bundle}: {exc}", file=sys.stderr)
             continue
         print(f"\n[{bundle.name}]")
         for obj in env.objects:

@@ -62,7 +62,7 @@ mkdir -p ~/MimicaAssets/characters/rio/textures
 mkdir -p ~/MimicaAssets/characters/rio/persona
 
 # Mimica リポジトリのテンプレートをコピー
-cd /Users/daisuke/dev/mimica   # リポジトリパス
+cd /path/to/mimica   # リポジトリパス（clone 先に合わせて変更）
 cp templates/assets/metadata.json ~/MimicaAssets/characters/rio/
 cp templates/assets/motion-map.json ~/MimicaAssets/characters/rio/
 ```
@@ -144,7 +144,7 @@ pip install UnityPy Pillow
 ### 4-2. Mimica 付属スクリプトで一括抽出
 
 ```bash
-cd /Users/daisuke/dev/mimica
+cd /path/to/mimica
 python scripts/extract-spine-bundles.py \
   ~/Downloads/mimica-ba-rio/bundles \
   ~/Downloads/mimica-ba-extracted
@@ -280,8 +280,10 @@ pnpm --filter @mimica/character-runtime extract-animations ~/MimicaAssets/charac
 
 素材配置完了を開発側に共有後:
 
+`/path/to/mimica` はローカルの Mimica リポジトリ clone 先に読み替えてください。
+
 ```bash
-cd /Users/daisuke/dev/mimica
+cd /path/to/mimica   # リポジトリパス（clone 先に合わせて変更）
 pnpm dev:companion
 ```
 
