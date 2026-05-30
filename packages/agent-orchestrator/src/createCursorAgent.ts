@@ -20,7 +20,7 @@ export async function createCursorAgent(
     mode: sdkMode,
     local: {
       cwd: params.workspacePath,
-      settingSources: ["project"] as ("project")[],
+      settingSources: ["project"] as "project"[],
     },
   });
 }

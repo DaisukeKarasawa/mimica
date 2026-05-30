@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { AgentMode, AvatarState, ChatMessage, ChatSession, EditorContext } from "@mimica/shared";
+import type {
+  AgentMode,
+  AvatarState,
+  ChatMessage,
+  ChatSession,
+  EditorContext,
+} from "@mimica/shared";
 import { AGENT_DISPLAY_NAME, DEFAULT_SETTINGS, avatarStatusLabel } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import type { CharacterAssetStatus } from "../../preload/index";

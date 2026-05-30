@@ -67,7 +67,9 @@ export function setupAssetProtocolHandler(): void {
     assetRoot = resolveContainedPath(DEFAULT_SETTINGS.characterAssetRoot, homedir());
     realRootNorm = `${realpathSync(assetRoot)}/`;
   } catch {
-    console.error("[mimica] Character asset root is unavailable; mimica-asset:// requests will 404");
+    console.error(
+      "[mimica] Character asset root is unavailable; mimica-asset:// requests will 404",
+    );
     return;
   }
   protocol.handle(CHARACTER_ASSET_SCHEME, (request: Request) => {

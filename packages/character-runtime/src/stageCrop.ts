@@ -210,9 +210,12 @@ export function computeInscribedStageCrop(
   const grid = new Uint8Array(gw * gh);
 
   for (let t = 0; t < tris.length; t += 6) {
-    const x0 = tris[t], y0 = tris[t + 1];
-    const x1 = tris[t + 2], y1 = tris[t + 3];
-    const x2 = tris[t + 4], y2 = tris[t + 5];
+    const x0 = tris[t],
+      y0 = tris[t + 1];
+    const x1 = tris[t + 2],
+      y1 = tris[t + 3];
+    const x2 = tris[t + 4],
+      y2 = tris[t + 5];
     const area = edge(x0, y0, x1, y1, x2, y2);
     if (area === 0) continue;
     const sign = area > 0 ? 1 : -1;
@@ -242,10 +245,7 @@ export function computeInscribedStageCrop(
   };
 }
 
-export function resolveStageCrop(
-  skeleton: Skeleton,
-  metadataCrop?: StageCropRect,
-): StageCropRect {
+export function resolveStageCrop(skeleton: Skeleton, metadataCrop?: StageCropRect): StageCropRect {
   return (
     metadataCrop ??
     computeInscribedStageCrop(skeleton) ??

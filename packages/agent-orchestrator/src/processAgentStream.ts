@@ -50,11 +50,7 @@ export async function processAgentStream(params: {
     }
 
     if (event.type === "tool_call") {
-      if (
-        enforceReadOnly &&
-        isWriteTool(event.name) &&
-        isBlockedToolCallStatus(event.status)
-      ) {
+      if (enforceReadOnly && isWriteTool(event.name) && isBlockedToolCallStatus(event.status)) {
         await blockWriteTool(event.name);
         break;
       }

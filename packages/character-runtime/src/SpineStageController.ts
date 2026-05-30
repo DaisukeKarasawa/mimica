@@ -168,9 +168,7 @@ export class SpineStageController {
     stripViewportLetterbox(spine.skeleton);
     spine.skeleton.updateWorldTransform(Physics.update);
     this.cachedCrop =
-      this.metadata?.stageCrop ??
-      this.measureCropFromRender() ??
-      resolveStageCrop(spine.skeleton);
+      this.metadata?.stageCrop ?? this.measureCropFromRender() ?? resolveStageCrop(spine.skeleton);
   }
 
   /**
@@ -261,10 +259,7 @@ export class SpineStageController {
     w: number,
     h: number,
   ): void {
-    const fitScale = Math.max(
-      w / (crop.width * ATLAS_SCALE),
-      h / (crop.height * ATLAS_SCALE),
-    );
+    const fitScale = Math.max(w / (crop.width * ATLAS_SCALE), h / (crop.height * ATLAS_SCALE));
     const totalScale = ATLAS_SCALE * fitScale;
     const scaledW = crop.width * totalScale;
     const scaledH = crop.height * totalScale;
