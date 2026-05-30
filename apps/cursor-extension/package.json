@@ -1,0 +1,53 @@
+{
+  "name": "@mimica/cursor-extension",
+  "displayName": "Mimica",
+  "description": "Cursor Agent Companion — launch Mimica external window",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "mimica-local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mimica.openCompanion",
+        "title": "Mimica: Open Companion"
+      },
+      {
+        "command": "mimica.askAboutSelection",
+        "title": "Mimica: Ask About Selection"
+      },
+      {
+        "command": "mimica.askAboutCurrentFile",
+        "title": "Mimica: Ask About Current File"
+      },
+      {
+        "command": "mimica.reloadCharacter",
+        "title": "Mimica: Reload Character"
+      },
+      {
+        "command": "mimica.openSettings",
+        "title": "Mimica: Open Settings"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@mimica/shared": "workspace:*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.7.2"
+  }
+}
