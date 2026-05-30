@@ -2,11 +2,11 @@ import "@esotericsoftware/spine-pixi-v8";
 import { Spine } from "@esotericsoftware/spine-pixi-v8";
 import { Physics } from "@esotericsoftware/spine-core";
 import type { AvatarState, CharacterMetadata, MotionMap, StageCropRect } from "@mimica/shared";
-import { Application, Assets, Container, Graphics } from "pixi.js";
+import { Application, Assets, Container, Graphics, RenderTexture } from "pixi.js";
 import { ATLAS_SCALE } from "./atlasScale.js";
 import { applyFitPose, stripViewportLetterbox } from "./homeSceneSlots.js";
 import { resolveAvatarAnimations } from "./resolveAnimations.js";
-import { resolveStageCrop } from "./stageCrop.js";
+import { computeStageCropRect, maximalOpaqueRect, resolveStageCrop } from "./stageCrop.js";
 
 export interface SpineStageConfig {
   /** e.g. `mimica-asset://local/` — must end with `/` or will be normalized */
@@ -167,7 +167,69 @@ export class SpineStageController {
     applyFitPose(spine.skeleton, fitAnimation);
     stripViewportLetterbox(spine.skeleton);
     spine.skeleton.updateWorldTransform(Physics.update);
-    this.cachedCrop = resolveStageCrop(spine.skeleton, this.metadata?.stageCrop);
+    this.cachedCrop =
+      this.metadata?.stageCrop ??
+      this.measureCropFromRender() ??
+      resolveStageCrop(spine.skeleton);
+  }
+
+  /**
+   * Ground-truth crop: render the posed scene to an offscreen texture and find the
+   * largest fully-opaque axis-aligned rectangle of the *composited* result. Unlike
+   * geometry/per-attachment-alpha estimates, this matches exactly what the GPU draws,
+   * so dark-but-opaque art (e.g. window frames) counts and the rect never spans a
+   * transparent corner. Returns null if rendering/readback is unavailable (headless).
+   */
+  private measureCropFromRender(): StageCropRect | null {
+    const app = this.app;
+    const spine = this.spine;
+    if (!app || !spine) return null;
+
+    const outer = computeStageCropRect(spine.skeleton);
+    if (!outer || outer.width <= 0 || outer.height <= 0) return null;
+
+    const s = 512 / outer.width;
+    const tw = Math.max(1, Math.round(outer.width * s));
+    const th = Math.max(1, Math.round(outer.height * s));
+
+    const saved = {
+      sx: spine.scale.x,
+      sy: spine.scale.y,
+      px: spine.position.x,
+      py: spine.position.y,
+    };
+    const rt = RenderTexture.create({ width: tw, height: th, resolution: 1 });
+    try {
+      spine.pivot.set(0, 0);
+      spine.scale.set(s);
+      spine.position.set(-outer.x * s, -outer.y * s);
+      stripViewportLetterbox(spine.skeleton);
+      spine.skeleton.updateWorldTransform(Physics.update);
+      app.renderer.render({ container: spine, target: rt, clear: true });
+
+      // RenderTexture is flipY=true so extracted row 0 == content top (outer.y).
+      const { pixels, width, height } = app.renderer.extract.pixels(rt);
+      const opaque = new Uint8Array(width * height);
+      for (let i = 0; i < width * height; i++) opaque[i] = pixels[i * 4 + 3] >= 200 ? 1 : 0;
+
+      const rect = maximalOpaqueRect(opaque, width, height, 1);
+      if (!rect) return null;
+      const crop: StageCropRect = {
+        x: outer.x + rect.x0 / s,
+        y: outer.y + rect.y0 / s,
+        width: (rect.x1 - rect.x0 + 1) / s,
+        height: (rect.y1 - rect.y0 + 1) / s,
+      };
+      // Reject implausibly small results (broken render/readback) → geometry fallback.
+      if (crop.width * crop.height < outer.width * outer.height * 0.25) return null;
+      return crop;
+    } catch {
+      return null;
+    } finally {
+      rt.destroy(true);
+      spine.scale.set(saved.sx, saved.sy);
+      spine.position.set(saved.px, saved.py);
+    }
   }
 
   /** シーン crop 矩形をステージいっぱいに cover フィット */

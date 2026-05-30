@@ -124,6 +124,35 @@ function edge(ax: number, ay: number, bx: number, by: number, px: number, py: nu
   return (px - ax) * (by - ay) - (py - ay) * (bx - ax);
 }
 
+/** Erode a binary grid by `radius` cells (4-neighbour); drops AA-fringe boundary. */
+function erodeGrid(grid: Uint8Array, gw: number, gh: number, radius: number): Uint8Array {
+  let src = grid;
+  for (let it = 0; it < radius; it++) {
+    const out = new Uint8Array(gw * gh);
+    for (let y = 1; y < gh - 1; y++) {
+      for (let x = 1; x < gw - 1; x++) {
+        const i = y * gw + x;
+        if (src[i] && src[i - 1] && src[i + 1] && src[i - gw] && src[i + gw]) out[i] = 1;
+      }
+    }
+    src = out;
+  }
+  return src;
+}
+
+/**
+ * Largest all-filled axis-aligned rectangle in a binary grid, after eroding the
+ * grid by `erode` cells (safety margin so the rect stays strictly inside).
+ */
+export function maximalOpaqueRect(
+  grid: Uint8Array,
+  gw: number,
+  gh: number,
+  erode = 0,
+): { x0: number; y0: number; x1: number; y1: number } | null {
+  return maximalRectangle(erode > 0 ? erodeGrid(grid, gw, gh, erode) : grid, gw, gh);
+}
+
 /** Largest all-filled axis-aligned rectangle in a binary grid (histogram method). */
 function maximalRectangle(
   grid: Uint8Array,
