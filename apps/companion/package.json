@@ -5,7 +5,7 @@
   "description": "Mimica Electron Companion App",
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "node scripts/run-electron-vite.mjs dev",
+    "dev": "pnpm --filter @mimica/character-runtime build && node scripts/run-electron-vite.mjs dev",
     "build": "node scripts/run-electron-vite.mjs build",
     "preview": "node scripts/run-electron-vite.mjs preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -10,7 +10,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:companion": "pnpm --filter @mimica/companion dev",
+    "dev:companion": "pnpm --filter @mimica/character-runtime build && pnpm --filter @mimica/companion dev",
     "dev:extension": "pnpm --filter @mimica/cursor-extension dev",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
@@ -26,11 +26,5 @@
     "turbo": "^2.3.3",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.2"
-  },
-  "pnpm": {
-    "overrides": {
-      "tar": ">=7.5.10",
-      "undici": ">=6.24.0"
-    }
   }
 }
