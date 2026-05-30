@@ -143,12 +143,21 @@ export class SpineStageController {
 
     const entry = motionMap[state];
     const loop = entry?.loop ?? true;
+
+    const existingTrack = spine.state.getCurrent(this.trackIndex);
+    if (existingTrack) existingTrack.listener = {};
+
     const track = spine.state.setAnimation(this.trackIndex, animName, loop);
 
     if (!loop && entry?.returnTo) {
       const returnTo = entry.returnTo;
+      const expectedState = state;
       track.listener = {
-        complete: () => this.setAvatarState(returnTo),
+        complete: () => {
+          if (this.currentState === expectedState) {
+            this.setAvatarState(returnTo);
+          }
+        },
       };
     }
   }

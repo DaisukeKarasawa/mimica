@@ -11,7 +11,7 @@
     "Deploy path (default): ~/MimicaAssets/characters/rio/motion-map.json",
     "List skeleton animations: pnpm --filter @mimica/character-runtime extract-animations -- <path>.skel",
     "",
-    "Top-level keys = AvatarState: idle | thinking | talking | waiting | success | error",
+    "Top-level keys = AvatarState: idle | thinking | talking | waiting | success | error | cancelled",
     "Each value is a MotionMapEntry:",
     "",
     "State transition semantics (CharacterDirector.setState → SpineStageController.playState):",
@@ -82,6 +82,11 @@
     "returnTo": "idle"
   },
   "error": {
+    "loop": false,
+    "animations": ["LookEnd_01_A"],
+    "returnTo": "idle"
+  },
+  "cancelled": {
     "loop": false,
     "animations": ["LookEnd_01_A"],
     "returnTo": "idle"

@@ -10,6 +10,7 @@ export const AVATAR_STATE_LABELS: Record<AvatarState, { status: string; badge: s
   success: { status: "完了", badge: "完了" },
   error: { status: "エラー", badge: "エラー" },
   waiting: { status: "確認待ち", badge: "確認待ち" },
+  cancelled: { status: "中断", badge: "中断" },
 };
 
 export function avatarStatusLabel(state: AvatarState): string {
