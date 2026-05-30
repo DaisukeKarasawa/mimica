@@ -32,7 +32,8 @@ export type AgentEventMessage =
   | { type: "agent_delta"; sessionId: string; runId: string; content: string }
   | { type: "agent_tool"; sessionId: string; runId: string; name: string; detail?: string }
   | { type: "agent_complete"; sessionId: string; runId: string; content: string }
-  | { type: "agent_error"; sessionId: string; runId: string; message: string };
+  | { type: "agent_error"; sessionId: string; runId: string; message: string }
+  | { type: "agent_warning"; sessionId: string; message: string };
 
 export function mapAgentRunToAvatar(state: AgentRunState): AvatarState {
   switch (state) {

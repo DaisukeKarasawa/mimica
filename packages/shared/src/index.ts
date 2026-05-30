@@ -17,6 +17,9 @@ export {
   type MotionMap,
   type MotionMapEntry,
   type CharacterMetadata,
+  AVATAR_STATE_LABELS,
+  avatarStatusLabel,
+  avatarBadgeLabel,
 } from "./avatar.js";
 
 export {
