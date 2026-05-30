@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mimica UI Mock</title>
+  <style>
+    :root {
+      /* Kanagawa Dragon-inspired application chrome.
+         The memorial-lobby/character stage should keep its own asset colors. */
+      --bg: #0d0c0c;
+      --bg-soft: #12120f;
+      --surface: #1D1C19;
+      --surface-2: #282727;
+      --surface-3: #393836;
+      --line: rgba(98, 94, 90, .54);
+      --text: #c5c9c5;
+      --muted: #9e9b93;
+      --subtle: #7a8382;
+      --accent: #87a987;
+      --accent-2: #8ba4b0;
+      --accent-3: #c4b28a;
+      --ok: #87a987;
+      --warn: #c4b28a;
+      --error: #c4746e;
+      --bubble-user: rgba(138, 154, 123, .18);
+      --bubble-agent: rgba(40, 39, 39, .78);
+      --panel: rgba(29, 28, 25, .82);
+      --panel-strong: rgba(18, 18, 15, .94);
+      --shadow: 0 24px 80px rgba(0,0,0,.56);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 18% 16%, rgba(135, 169, 135, .15), transparent 34%),
+        radial-gradient(circle at 66% 8%, rgba(196, 178, 138, .10), transparent 36%),
+        radial-gradient(circle at 88% 76%, rgba(142, 164, 162, .11), transparent 34%),
+        linear-gradient(135deg, #0d0c0c 0%, #12120f 50%, #181616 100%);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .app {
+      width: 100vw;
+      height: 100vh;
+      padding: 18px;
+      display: grid;
+      grid-template-rows: 54px 1fr;
+      gap: 14px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(18, 18, 15, .76);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .orb {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-3));
+      box-shadow: 0 0 34px rgba(135, 169, 135, .34);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1;
+      letter-spacing: .04em;
+    }
+
+    .brand span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .02em;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(197, 201, 197, .055);
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--ok);
+      box-shadow: 0 0 18px var(--ok);
+    }
+
+    .main {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 32vw);
+      gap: 14px;
+    }
+
+    .stage {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.02)),
+        radial-gradient(circle at 45% 16%, rgba(255,255,255,.20), transparent 18%),
+        linear-gradient(135deg, #16234a 0%, #172f56 42%, #24345f 58%, #10182f 100%);
+      box-shadow: var(--shadow);
+    }
+
+    .stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: radial-gradient(circle at center, black 30%, transparent 82%);
+      opacity: .62;
+    }
+
+    .window-glow {
+      position: absolute;
+      left: 8%;
+      top: 8%;
+      width: 48%;
+      height: 32%;
+      border-radius: 38px;
+      background: linear-gradient(135deg, rgba(198, 232, 255, .35), rgba(160, 205, 255, .05));
+      filter: blur(.2px);
+      border: 1px solid rgba(255,255,255,.12);
+      transform: rotate(-3deg);
+    }
+
+    .desk {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -3%;
+      height: 30%;
+      background: linear-gradient(180deg, rgba(9, 16, 30, .1), rgba(9, 16, 30, .72));
+      border-top: 1px solid rgba(255,255,255,.12);
+    }
+
+    .character {
+      position: absolute;
+      left: 50%;
+      bottom: 3%;
+      width: min(58vw, 680px);
+      height: min(76vh, 820px);
+      transform: translateX(-50%);
+      filter: drop-shadow(0 28px 60px rgba(0,0,0,.45));
+      animation: idle 4.8s ease-in-out infinite;
+      transform-origin: 50% 82%;
+    }
+
+    @keyframes idle {
+      0%, 100% { transform: translateX(-50%) translateY(0) rotate(-.3deg); }
+      50% { transform: translateX(-50%) translateY(-9px) rotate(.35deg); }
+    }
+
+    .halo {
+      position: absolute;
+      left: 50%;
+      top: 6%;
+      width: 170px;
+      height: 26px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      border: 5px solid rgba(155, 220, 255, .78);
+      box-shadow: 0 0 34px rgba(133,215,255,.55), inset 0 0 24px rgba(133,215,255,.36);
+    }
+
+    .hair {
+      position: absolute;
+      left: 50%;
+      top: 10%;
+      width: 270px;
+      height: 300px;
+      transform: translateX(-50%);
+      border-radius: 48% 48% 44% 44%;
+      background: linear-gradient(135deg, #263b6f, #17213e 56%, #0c1125);
+    }
+
+    .head {
+      position: absolute;
+      left: 50%;
+      top: 17%;
+      width: 210px;
+      height: 230px;
+      transform: translateX(-50%);
+      border-radius: 46% 46% 48% 48%;
+      background: linear-gradient(180deg, #ffe2d8, #f7bfb0);
+      border: 1px solid rgba(255,255,255,.30);
+      overflow: hidden;
+    }
+
+    .eye {
+      position: absolute;
+      top: 92px;
+      width: 36px;
+      height: 18px;
+      border-radius: 999px;
+      background: #23324f;
+      box-shadow: inset 0 -4px 0 rgba(133,215,255,.35);
+    }
+
+    .eye.left { left: 52px; }
+    .eye.right { right: 52px; }
+
+    .mouth {
+      position: absolute;
+      left: 50%;
+      top: 154px;
+      width: 34px;
+      height: 13px;
+      transform: translateX(-50%);
+      border-radius: 0 0 999px 999px;
+      border-bottom: 4px solid rgba(82, 32, 48, .55);
+      animation: talk 1.2s ease-in-out infinite;
+    }
+
+    @keyframes talk {
+      0%, 35%, 100% { height: 9px; opacity: .78; }
+      55% { height: 19px; opacity: 1; }
+    }
+
+    .body {
+      position: absolute;
+      left: 50%;
+      top: 40%;
+      width: 330px;
+      height: 390px;
+      transform: translateX(-50%);
+      border-radius: 42% 42% 20% 20%;
+      background: linear-gradient(135deg, #e7efff 0 22%, #495f9d 22% 55%, #1e2a4d 55% 100%);
+      border: 1px solid rgba(255,255,255,.18);
+    }
+
+    .arm {
+      position: absolute;
+      top: 47%;
+      width: 90px;
+      height: 300px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #e3ebff, #283b70);
+    }
+
+    .arm.left {
+      left: calc(50% - 245px);
+      transform: rotate(14deg);
+    }
+
+    .arm.right {
+      right: calc(50% - 245px);
+      transform: rotate(-14deg);
+    }
+
+    .status-card {
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: min(520px, calc(100% - 36px));
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(18, 18, 15, .68);
+      backdrop-filter: blur(20px);
+    }
+
+    .status-card strong {
+      display: block;
+      font-size: 13px;
+    }
+
+    .status-card span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pulse {
+      width: 38px;
+      height: 38px;
+      border-radius: 13px;
+      background: linear-gradient(135deg, rgba(135,169,135,.92), rgba(196,178,138,.88));
+      box-shadow: 0 0 28px rgba(135,169,135,.28);
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(.98); opacity: .82; }
+      50% { transform: scale(1.04); opacity: 1; }
+    }
+
+    .chat {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: var(--panel);
+      backdrop-filter: blur(22px);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .chat-head {
+      padding: 16px 16px 10px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(197, 201, 197, .045);
+    }
+
+    .chat-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .chat-title h2 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: .02em;
+    }
+
+    .small-button {
+      border: 1px solid var(--line);
+      color: var(--text);
+      background: rgba(197, 201, 197, .065);
+      border-radius: 10px;
+      padding: 7px 10px;
+      font-size: 12px;
+      cursor: default;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .tab {
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      background: rgba(197, 201, 197, .055);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .tab.active {
+      color: var(--text);
+      border-color: rgba(135,169,135,.44);
+      background: rgba(135,169,135,.16);
+    }
+
+    .context {
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--line);
+      overflow: hidden;
+    }
+
+    .chip {
+      padding: 6px 9px;
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(197, 201, 197, .055);
+      border: 1px solid rgba(98,94,90,.34);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .messages {
+      min-height: 0;
+      overflow: auto;
+      padding: 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .msg {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .msg.user {
+      justify-content: flex-end;
+    }
+
+    .agent-icon {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      border-radius: 14px;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 30%, #c5c9c5 0 22%, transparent 23%),
+        radial-gradient(circle at 50% 70%, #8a9a7b 0 32%, transparent 33%),
+        linear-gradient(135deg, var(--accent), var(--accent-3));
+      border: 1px solid rgba(255,255,255,.22);
+      box-shadow: 0 0 20px rgba(135,169,135,.20);
+    }
+
+    .agent-icon::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 4px;
+      width: 22px;
+      height: 5px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      border: 2px solid rgba(197, 201, 197, .86);
+      box-shadow: 0 0 10px rgba(135,169,135,.40);
+    }
+
+    .agent-icon::after {
+      content: "";
+      position: absolute;
+      right: 4px;
+      bottom: 3px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--ok);
+      border: 2px solid rgba(14, 23, 44, .9);
+    }
+
+    .agent-icon.configurable {
+      cursor: default;
+    }
+
+    .agent-name-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .icon-label {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 10px;
+    }
+
+    .bubble {
+      max-width: 88%;
+      padding: 12px 13px;
+      border-radius: 18px;
+      border: 1px solid rgba(98,94,90,.34);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .agent .bubble {
+      background: var(--bubble-agent);
+      border-bottom-left-radius: 6px;
+    }
+
+    .user .bubble {
+      background: var(--bubble-user);
+      border-bottom-right-radius: 6px;
+    }
+
+    .bubble .meta {
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .tool-card {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 13px;
+      border: 1px solid rgba(98,94,90,.42);
+      background: rgba(13,12,12,.28);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    pre {
+      margin: 9px 0 0;
+      padding: 10px;
+      border-radius: 12px;
+      overflow: auto;
+      background: rgba(13,12,12,.42);
+      color: #c5c9c5;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .composer {
+      padding: 14px;
+      border-top: 1px solid var(--line);
+      background: rgba(197, 201, 197, .045);
+    }
+
+    .runbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 10px 11px;
+      border-radius: 15px;
+      background: rgba(135,169,135,.12);
+      border: 1px solid rgba(135,169,135,.24);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .cancel {
+      border: 1px solid rgba(196,116,110,.46);
+      color: #d9b2ad;
+      background: rgba(196,116,110,.14);
+      border-radius: 10px;
+      padding: 6px 9px;
+      font-size: 12px;
+    }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 46px;
+      max-height: 120px;
+      resize: none;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      color: var(--text);
+      background: rgba(13,12,12,.38);
+      outline: none;
+      font: inherit;
+      font-size: 13px;
+    }
+
+    .send {
+      width: 54px;
+      border: 0;
+      border-radius: 16px;
+      color: #0d0c0c;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent-3));
+      box-shadow: 0 10px 28px rgba(135,169,135,.22);
+    }
+
+    @media (max-width: 960px) {
+      .main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 52vh 1fr;
+      }
+
+      .chat {
+        border-radius: 22px;
+      }
+
+      .top-actions .pill:nth-child(2) {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="orb"></div>
+        <div>
+          <h1>Mimica</h1>
+          <span>Cursor Agent Companion UI Mock</span>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="pill"><span class="dot"></span> Connected to Cursor</div>
+        <div class="pill">Mode: Agent</div>
+        <div class="pill">Model: Auto</div>
+        <div class="pill">Theme: Kanagawa Dragon</div>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="stage" aria-label="Character stage, memorial lobby area keeps asset colors">
+        <div class="window-glow"></div>
+        <div class="desk"></div>
+
+        <div class="character" aria-hidden="true">
+          <div class="halo"></div>
+          <div class="hair"></div>
+          <div class="head">
+            <div class="eye left"></div>
+            <div class="eye right"></div>
+            <div class="mouth"></div>
+          </div>
+          <div class="arm left"></div>
+          <div class="arm right"></div>
+          <div class="body"></div>
+        </div>
+
+        <div class="status-card">
+          <div class="pulse"></div>
+          <div>
+            <strong>回答中: talking animation</strong>
+            <span>src/components/EditorShell.tsx を確認しながら、修正方針を説明しています。</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="chat" aria-label="Chat side panel">
+        <div class="chat-head">
+          <div class="chat-title">
+            <h2>Agent Chat</h2>
+            <button class="small-button">+ New</button>
+          </div>
+          <div class="context" style="padding:0 0 12px;border-bottom:0;">
+            <div class="chip">Agent Icon: character configurable</div>
+            <div class="chip">User Icon: hidden</div>
+          </div>
+          <div class="tabs">
+            <div class="tab active">#1 実装相談</div>
+            <div class="tab">#2 バグ調査</div>
+            <div class="tab">#3 レビュー</div>
+          </div>
+        </div>
+
+        <div class="context">
+          <div class="chip">Workspace: private-editor</div>
+          <div class="chip">Current: EditorShell.tsx</div>
+          <div class="chip">Selection: 42 lines</div>
+        </div>
+
+        <div class="messages">
+          <!-- User messages intentionally have no icon/avatar. -->
+          <div class="msg user">
+            <div class="bubble">
+              Cursor標準チャットみたいに、このコンポーネントの状態管理を整理して修正案まで出して。
+            </div>
+          </div>
+
+          <div class="msg agent">
+            <div class="agent-icon configurable" title="Character chat icon"></div>
+            <div class="bubble">
+              <div class="agent-name-row"><span class="meta">Mimica · searching</span><span class="icon-label">character icon</span></div>
+              まず現在の状態管理の流れを確認します。イベント購読、UI状態、Agent実行状態が同じstoreに混ざっているので、責務分離した方が良さそうです。
+              <div class="tool-card">tool: read_file · src/components/EditorShell.tsx</div>
+            </div>
+          </div>
+
+          <div class="msg agent">
+            <div class="agent-icon configurable" title="Character chat icon"></div>
+            <div class="bubble">
+              <div class="agent-name-row"><span class="meta">Mimica · coding</span><span class="icon-label">character icon</span></div>
+              修正方針は3つです。UI状態、Agent run状態、Character stateを分けます。差分は確認してから適用できる形にします。
+              <pre>type AgentRunState =
+  | "idle"
+  | "thinking"
+  | "streaming"
+  | "waiting_approval"
+  | "failed";</pre>
+            </div>
+          </div>
+
+          <div class="msg user">
+            <div class="bubble">
+              その方針で差分を出して。自動適用はまだしないで。
+            </div>
+          </div>
+
+          <div class="msg agent">
+            <div class="agent-icon configurable" title="Character chat icon"></div>
+            <div class="bubble">
+              <div class="agent-name-row"><span class="meta">Mimica · talking</span><span class="icon-label">character icon</span></div>
+              了解です。確認付きのpatchとして生成します。適用前に変更対象ファイルと要点を表示します。
+              <div class="tool-card">pending approval: 2 files changed · Accept / Reject</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="runbar">
+            <span>Agent is streaming… Character state: talking</span>
+            <button class="cancel">Cancel</button>
+          </div>
+          <div class="input-row">
+            <textarea placeholder="キャラクターに相談する…"></textarea>
+            <button class="send">↵</button>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>
