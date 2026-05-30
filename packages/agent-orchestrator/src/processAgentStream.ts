@@ -109,7 +109,7 @@ export async function handleSendToolDelta(params: {
   signal?: AbortSignal;
   blockWriteTool: (name: string) => Promise<void>;
 }): Promise<boolean> {
-  const { update, writeToolBlocked, isCancelled, signal, blockWriteTool } = params;
+  const { update, writeToolBlocked, isCancelled, signal } = params;
   if (writeToolBlocked || isCancelled() || signal?.aborted) return true;
   if (update.type !== "tool-call-started" && update.type !== "partial-tool-call") {
     return false;

@@ -87,8 +87,7 @@ export class AgentRunner {
         params.callbacks.onError(READ_ONLY_TOOL_ERROR(name));
       };
 
-      let run!: Run;
-      run = await agent.send(fullPrompt, {
+      const run = await agent.send(fullPrompt, {
         onDelta: async ({ update }) => {
           const blocked = await handleSendToolDelta({
             update,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { AgentEventMessage, AvatarState, ChatSession } from "@mimica/shared";
+import type { AgentEventMessage, ChatSession } from "@mimica/shared";
 import { avatarStatusLabel, mapAgentRunToAvatar } from "@mimica/shared";
 import type { CharacterDirector } from "@mimica/character-runtime";
 import { reduceAgentEvent } from "../lib/agentSessionUpdate";
