@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Cursor Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/apps/cursor-extension"],
+      "outFiles": ["${workspaceFolder}/apps/cursor-extension/dist/**/*.js"],
+      "preLaunchTask": "build-extension"
+    }
+  ]
+}

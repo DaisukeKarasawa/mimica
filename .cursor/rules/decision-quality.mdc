@@ -1,0 +1,50 @@
+---
+description: Improve decision quality with adaptive depth, explicit assumptions, and evidence-calibrated recommendations.
+alwaysApply: true
+---
+
+# Decision Quality
+
+Use decision quality as a lightweight posture, not a mandatory template. Keep
+the weakest element from silently governing the result: frame, alternatives,
+information, values, reasoning, or commitment to action.
+
+## Default posture
+
+- Start from the target outcome, success criteria, constraints, output shape,
+  and stop conditions.
+- Separate `Fact`, `Assumption`, `Recommendation`, `Unknown`, and verification
+  status when those distinctions affect the answer.
+- Prefer concise rationale over visible process. Add structure only when it
+  makes the decision easier to inspect or reuse.
+- Use absolute words like `always`, `never`, and `must` only for true
+  invariants. For judgment calls, write decision rules.
+- Ask only for decision-critical missing information that repo inspection,
+  provided context, docs, or tools cannot recover.
+
+## Material decisions
+
+Make decision quality explicit for architecture, design trade-offs, irreversible
+changes, security or cost impact, broad refactors, unclear acceptance criteria,
+or source-backed guidance.
+
+- Frame the real decision before optimizing a solution.
+- Name the dominant value axis for this decision, such as fit to purpose,
+  constraints, feasibility, quality impact, time horizon, risk, consistency, or
+  agreement to act.
+- Compare only viable alternatives. Do not pad the analysis with fake options.
+- State the main trade-off, the likely failure mode, and the evidence that would
+  change the recommendation.
+- Treat command success, green tests, HTTP 200, or a plausible answer as signals
+  to inspect, not proof that the real outcome was achieved.
+- If choosing a shortcut, compatibility layer, abstraction, new dependency, or
+  workaround, name its justification and removal or escalation condition.
+
+## Escalation
+
+- Keep small tasks light. Do not turn routine work into a full decision memo.
+- For hard choices where the decision itself is the main work, use
+  `skills/ultra-think/SKILL.md` instead of expanding this rule into a workflow.
+- If source evidence is required, gather the minimum evidence sufficient to
+  support the claim, cite or name it precisely, and stop when the core request is
+  answered.
