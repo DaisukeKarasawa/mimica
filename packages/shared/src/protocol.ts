@@ -1,0 +1,54 @@
+import type { AgentRunState, AvatarState, MessageContext, MimicaSettings } from "./chat.js";
+
+export type { MimicaSettings };
+
+export interface EditorContext {
+  workspacePath: string;
+  currentFilePath?: string;
+  currentFileLanguage?: string;
+  selectedText?: string;
+  selectionStartLine?: number;
+  selectionEndLine?: number;
+}
+
+export type ClientMessage =
+  | { type: "ping"; token: string }
+  | { type: "context_update"; context: EditorContext; token: string }
+  | { type: "companion_ready"; token: string };
+
+export type ServerMessage =
+  | { type: "pong" }
+  | { type: "connection_ack"; port: number; token: string }
+  | { type: "context_ack"; context: EditorContext };
+
+export type CompanionMessage =
+  | { type: "chat_submit"; sessionId: string; content: string; context?: MessageContext }
+  | { type: "chat_cancel"; sessionId: string; runId: string }
+  | { type: "settings_get" }
+  | { type: "settings_update"; settings: Partial<MimicaSettings> };
+
+export type AgentEventMessage =
+  | { type: "agent_state"; sessionId: string; state: AgentRunState; runId?: string }
+  | { type: "agent_delta"; sessionId: string; runId: string; content: string }
+  | { type: "agent_tool"; sessionId: string; runId: string; name: string; detail?: string }
+  | { type: "agent_complete"; sessionId: string; runId: string; content: string }
+  | { type: "agent_error"; sessionId: string; runId: string; message: string };
+
+export function mapAgentRunToAvatar(state: AgentRunState): AvatarState {
+  switch (state) {
+    case "thinking":
+      return "thinking";
+    case "streaming":
+      return "talking";
+    case "waiting":
+      return "waiting";
+    case "completed":
+      return "success";
+    case "failed":
+      return "error";
+    case "cancelled":
+    case "idle":
+    default:
+      return "idle";
+  }
+}
