@@ -143,7 +143,7 @@ When step 5 changed any tracked files:
 
 1. Follow **`.cursor/commands/commit.md`** to completion: plan split, stage, and run **`git commit`** for every intended commit in the same turn.
 2. Use **`.cursor/skills/conventional-commits/SKILL.md`** for messages.
-3. Include **post-commit signing instructions** from the commit command in the user report.
+3. Confirm commits were **signed at commit time** per the commit command; report only if signing failed and recovery is needed.
 4. **Do not run `git push`.**
 
 If there were no code changes (only **Skip** threads), skip this step.

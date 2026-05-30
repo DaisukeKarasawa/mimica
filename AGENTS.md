@@ -129,7 +129,7 @@ When changing how Mimica loads or maps Spine assets:
 ## Learned User Preferences
 
 - When creating or updating project skills, organize the material into agent-usable guidance rather than copying source text verbatim; keep `SKILL.md` concise and move detailed reference material to a nearby reference file when useful.
-- For `/commit` work, include post-commit signing commands in the final report, especially `git commit --amend -S --no-edit` for the latest commit and `git rebase --exec 'git commit --amend --no-edit -S' HEAD~N` for multiple recent commits.
+- For `/commit` work, sign each commit at creation time (`git commit -S` or repo `commit.gpgsign`); report signature status in the final summary. Give amend/rebase recovery commands only when signing failed.
 - For commit-message history cleanup on unpushed work, preserve commit granularity and commit trees unless the user explicitly asks to squash or change content.
 - Prefer project-local, shared sources of truth over hidden global references when codifying repository behavior; avoid keeping duplicate commit-message rule sources.
 - When a path should clearly not be committed (e.g. `__pycache__/`, `*.py[cod]`), add the matching `.gitignore` entry directly instead of asking whether to add it.
