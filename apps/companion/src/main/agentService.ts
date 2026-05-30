@@ -1,11 +1,12 @@
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
-import type { AgentRunState, EditorContext } from "@mimica/shared";
+import type { EditorContext } from "@mimica/shared";
 import { toMessageContext } from "@mimica/shared";
 import type { AgentRunner } from "@mimica/agent-orchestrator";
 import { resolveWorkspacePath } from "./paths.js";
 import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
+import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
 
 export interface AgentSubmitPayload {
   sessionId: string;
@@ -46,17 +47,13 @@ export class AgentService {
     const runId = uuidv4();
     this.activeRunId = runId;
     const wc = this.getWebContents();
+    const emitter = new AgentRunEmitter(
+      wc,
+      payload.sessionId,
+      runId,
+      () => runId === this.activeRunId,
+    );
     const runner = await this.getRunner();
-
-    const emitState = (state: AgentRunState) => {
-      if (runId !== this.activeRunId) return;
-      wc?.send("agent-event", {
-        type: "agent_state",
-        sessionId: payload.sessionId,
-        state,
-        runId,
-      });
-    };
 
     const editorContext = payload.editorContext;
     const context = editorContext
@@ -81,51 +78,24 @@ export class AgentService {
         history,
         personaSystemPrompt: resolvePersonaSystemPrompt(),
         callbacks: {
-          onState: emitState,
-          onDelta: (chunk) => {
-            wc?.send("agent-event", {
-              type: "agent_delta",
-              sessionId: payload.sessionId,
-              runId,
-              content: chunk,
-            });
-          },
-          onTool: (name, detail) => {
-            wc?.send("agent-event", {
-              type: "agent_tool",
-              sessionId: payload.sessionId,
-              runId,
-              name,
-              detail,
-            });
-          },
+          onState: (state) => emitter.state(state),
+          onDelta: (chunk) => emitter.delta(chunk),
+          onTool: (name, detail) => emitter.tool(name, detail),
+          onWarning: (message) => emitter.warning(message),
           onComplete: (content) => {
-            if (runId !== this.activeRunId) return;
-            wc?.send("agent-event", {
-              type: "agent_complete",
-              sessionId: payload.sessionId,
-              runId,
-              content,
-            });
+            emitter.complete(content);
             this.activeRunId = null;
           },
           onError: (message) => {
-            if (runId !== this.activeRunId) return;
-            wc?.send("agent-event", {
-              type: "agent_error",
-              sessionId: payload.sessionId,
-              runId,
-              message,
-            });
+            emitter.error(message);
             this.activeRunId = null;
           },
         },
       });
     } catch (error) {
       if (runId !== this.activeRunId) return;
-      const message =
-        error instanceof Error ? error.message : String(error);
-      wc?.send("agent-event", {
+      const message = error instanceof Error ? error.message : String(error);
+      emitAgentEvent(wc, {
         type: "agent_error",
         sessionId: payload.sessionId,
         runId,

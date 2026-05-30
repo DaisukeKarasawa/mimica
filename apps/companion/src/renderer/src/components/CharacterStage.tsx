@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { AvatarState } from "@mimica/shared";
+import { avatarBadgeLabel } from "@mimica/shared";
 import { SpineStageController } from "@mimica/character-runtime";
 import type { CharacterAssetStatus } from "../../../preload/index";
 
@@ -10,15 +11,6 @@ interface CharacterStageProps {
   assets: CharacterAssetStatus | null;
   onPreviewState?: (state: AvatarState) => void;
 }
-
-const stateLabels: Record<AvatarState, string> = {
-  idle: "待機",
-  thinking: "考え中",
-  talking: "回答中",
-  success: "完了",
-  error: "エラー",
-  waiting: "確認待ち",
-};
 
 const previewStates: AvatarState[] = ["idle", "thinking", "talking", "waiting", "success", "error"];
 
@@ -111,7 +103,7 @@ export function CharacterStage({
       )}
 
       <div className="stage-overlay">
-        <span className="stage-badge">{stateLabels[avatarState]}</span>
+        <span className="stage-badge">{avatarBadgeLabel(avatarState)}</span>
         <span className="stage-hint">
           {loadError
             ? `Spine 読込エラー: ${loadError}`
@@ -132,7 +124,7 @@ export function CharacterStage({
               className={`stage-dev-btn ${avatarState === state ? "active" : ""}`}
               onClick={() => onPreviewState(state)}
             >
-              {stateLabels[state]}
+              {avatarBadgeLabel(state)}
             </button>
           ))}
         </div>
@@ -142,7 +134,7 @@ export function CharacterStage({
         <div className="pulse" />
         <div>
           <strong>
-            {agentName}: {stateLabels[avatarState]}
+            {agentName}: {avatarBadgeLabel(avatarState)}
           </strong>
           <span>{statusText}</span>
         </div>

@@ -1,23 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { AgentEventMessage, AvatarState, ChatMessage, ChatSession, EditorContext } from "@mimica/shared";
-import { AGENT_DISPLAY_NAME, mapAgentRunToAvatar } from "@mimica/shared";
+import type { AvatarState, ChatMessage, ChatSession, EditorContext } from "@mimica/shared";
+import { AGENT_DISPLAY_NAME, avatarStatusLabel } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import type { CharacterAssetStatus } from "../../preload/index";
 import { TopBar } from "./components/TopBar";
 import { CharacterStage } from "./components/CharacterStage";
 import { ChatPanel, type ChatPanelMode } from "./components/ChatPanel";
+import { useAgentEvents } from "./hooks/useAgentEvents";
 import { matchChatTabShortcut } from "./lib/chatTabShortcuts";
 import { loadOpenTabIds, persistOpenTabIds } from "./lib/openTabs";
-
-const statusByAvatar: Record<AvatarState, string> = {
-  idle: "待機中",
-  thinking: "考え中…",
-  talking: "回答中",
-  success: "完了",
-  error: "エラー",
-  waiting: "確認待ち",
-};
 
 export default function App() {
   const [allSessions, setAllSessions] = useState<ChatSession[]>([]);
@@ -28,24 +20,22 @@ export default function App() {
   const [bridgeConnected, setBridgeConnected] = useState(false);
   const [avatarState, setAvatarState] = useState<AvatarState>("idle");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [statusText, setStatusText] = useState("待機中");
+  const [statusText, setStatusText] = useState(avatarStatusLabel("idle"));
   const [characterAssets, setCharacterAssets] = useState<CharacterAssetStatus | null>(null);
   const [devPreview, setDevPreview] = useState(false);
-  const streamingContentRef = useRef("");
-  const activeRunIdRef = useRef<string | null>(null);
-  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearCompletionTimeout = () => {
-    if (completionTimeoutRef.current !== null) {
-      clearTimeout(completionTimeoutRef.current);
-      completionTimeoutRef.current = null;
-    }
-  };
 
   const director = useMemo(
     () => new CharacterDirector({ onStateChange: setAvatarState }),
     [],
   );
+
+  const { handleAgentEvent, resetStream, beginStream } = useAgentEvents({
+    devPreview,
+    director,
+    setAllSessions,
+    setIsStreaming,
+    setStatusText,
+  });
 
   const openSessions = useMemo(
     () =>
@@ -76,130 +66,6 @@ export default function App() {
     });
   }, []);
 
-  const handleAgentEvent = useCallback(
-    (event: AgentEventMessage) => {
-      if (devPreview) return;
-
-      switch (event.type) {
-        case "agent_state": {
-          const avatar = mapAgentRunToAvatar(event.state);
-          director.setState(avatar, true);
-          setStatusText(statusByAvatar[avatar] ?? "実行中");
-          if (event.state === "streaming") setIsStreaming(true);
-          if (event.state === "completed" || event.state === "failed" || event.state === "cancelled") {
-            setIsStreaming(false);
-          }
-          break;
-        }
-        case "agent_delta": {
-          streamingContentRef.current += event.content;
-          const streamId = activeRunIdRef.current ?? `stream-${event.runId}`;
-          const partial: ChatMessage = {
-            id: streamId,
-            role: "assistant",
-            content: streamingContentRef.current,
-            createdAt: new Date().toISOString(),
-            agentRunId: event.runId,
-          };
-          setAllSessions((prev) =>
-            prev.map((s) => {
-              if (s.id !== event.sessionId) return s;
-              const rest = s.messages.filter((m) => m.id !== streamId);
-              return { ...s, messages: [...rest, partial] };
-            }),
-          );
-          break;
-        }
-        case "agent_complete": {
-          const streamId = activeRunIdRef.current ?? `stream-${event.runId}`;
-          streamingContentRef.current = "";
-          activeRunIdRef.current = null;
-          const assistantMsg: ChatMessage = {
-            id: uuidv4(),
-            role: "assistant",
-            content: event.content,
-            createdAt: new Date().toISOString(),
-            agentRunId: event.runId,
-          };
-          let nextSessions: ChatSession[] = [];
-          setAllSessions((prev) => {
-            nextSessions = prev.map((s) => {
-              if (s.id !== event.sessionId) return s;
-              const rest = s.messages.filter((m) => m.id !== streamId);
-              return { ...s, messages: [...rest, assistantMsg] };
-            });
-            return nextSessions;
-          });
-          const updatedSession = nextSessions.find((s) => s.id === event.sessionId);
-          if (updatedSession) {
-            void window.mimica.saveSession(updatedSession);
-          }
-          director.setState("success", true);
-          setStatusText("完了");
-          setIsStreaming(false);
-          clearCompletionTimeout();
-          completionTimeoutRef.current = setTimeout(() => {
-            completionTimeoutRef.current = null;
-            director.setState("idle", true);
-            setStatusText("待機中");
-          }, 1200);
-          break;
-        }
-        case "agent_error": {
-          streamingContentRef.current = "";
-          activeRunIdRef.current = null;
-          setIsStreaming(false);
-          director.setState("error", true);
-          setStatusText(event.message);
-          clearCompletionTimeout();
-          completionTimeoutRef.current = setTimeout(() => {
-            completionTimeoutRef.current = null;
-            director.setState("idle", true);
-            setStatusText("待機中");
-          }, 2000);
-          break;
-        }
-        case "agent_tool": {
-          const streamId = activeRunIdRef.current ?? `stream-${event.runId}`;
-          const tool = { id: uuidv4(), name: event.name, detail: event.detail };
-          setAllSessions((prev) =>
-            prev.map((s) => {
-              if (s.id !== event.sessionId) return s;
-              const idx = s.messages.findIndex((m) => m.id === streamId);
-              if (idx === -1) {
-                return {
-                  ...s,
-                  messages: [
-                    ...s.messages,
-                    {
-                      id: streamId,
-                      role: "assistant" as const,
-                      content: streamingContentRef.current,
-                      createdAt: new Date().toISOString(),
-                      agentRunId: event.runId,
-                      toolCalls: [tool],
-                    },
-                  ],
-                };
-              }
-              const messages = [...s.messages];
-              const msg = messages[idx]!;
-              messages[idx] = {
-                ...msg,
-                toolCalls: [...(msg.toolCalls ?? []), tool],
-              };
-              return { ...s, messages };
-            }),
-          );
-          break;
-        }
-        default:
-          break;
-      }
-    },
-    [devPreview, director],
-  );
-
   useEffect(() => {
     void refreshSessions();
     void window.mimica.getBridgeStatus().then((s) => setBridgeConnected(s.connected));
@@ -210,7 +76,6 @@ export default function App() {
     const unsubCtx = window.mimica.onEditorContext(setEditorContext);
     const unsubAgent = window.mimica.onAgentEvent(handleAgentEvent);
     return () => {
-      clearCompletionTimeout();
       clearInterval(interval);
       unsubCtx();
       unsubAgent();
@@ -268,14 +133,14 @@ export default function App() {
     if (isStreaming && activeSessionId === id) {
       await window.mimica.cancelAgent();
       setIsStreaming(false);
-      streamingContentRef.current = "";
+      resetStream();
     }
     const nextIds = openTabIds.filter((tabId) => tabId !== id);
     setOpenTabs(nextIds);
     if (activeSessionId === id) {
       setActiveSessionId(nextIds[nextIds.length - 1] ?? null);
     }
-  }, [activeSessionId, isStreaming, openTabIds, setOpenTabs]);
+  }, [activeSessionId, isStreaming, openTabIds, resetStream, setOpenTabs]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -313,6 +178,7 @@ export default function App() {
     if (isStreaming && activeSessionId === id) {
       await window.mimica.cancelAgent();
       setIsStreaming(false);
+      resetStream();
     }
     await window.mimica.deleteSession(id);
     const nextIds = openTabIds.filter((tabId) => tabId !== id);
@@ -353,12 +219,10 @@ export default function App() {
     const saved = await window.mimica.saveSession(updated);
     setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
 
-    clearCompletionTimeout();
-    streamingContentRef.current = "";
-    activeRunIdRef.current = uuidv4();
+    beginStream();
     director.setState("thinking", true);
     setIsStreaming(true);
-    setStatusText("考え中…");
+    setStatusText(avatarStatusLabel("thinking"));
 
     await window.mimica.submitAgent({
       sessionId: saved.id,
@@ -369,10 +233,9 @@ export default function App() {
   };
 
   const handleCancel = async () => {
-    clearCompletionTimeout();
     await window.mimica.cancelAgent();
     setIsStreaming(false);
-    streamingContentRef.current = "";
+    resetStream();
     director.setState("idle", true);
     setStatusText("キャンセルしました");
   };
@@ -380,7 +243,7 @@ export default function App() {
   const handlePreviewState = (state: AvatarState) => {
     setDevPreview(true);
     director.setState(state, true);
-    setStatusText(`手動: ${statusByAvatar[state]}`);
+    setStatusText(`手動: ${avatarStatusLabel(state)}`);
   };
 
   return (
