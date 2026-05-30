@@ -4,7 +4,7 @@ import { Physics } from "@esotericsoftware/spine-core";
 import type { AvatarState, CharacterMetadata, MotionMap } from "@mimica/shared";
 import { Application, Assets } from "pixi.js";
 import { ATLAS_SCALE } from "./atlasScale.js";
-import { hideHomeSceneSlots } from "./homeSceneSlots.js";
+import { applyFitPose, stripHomeSceneAttachments } from "./homeSceneSlots.js";
 import { resolveAvatarAnimations } from "./resolveAnimations.js";
 
 export interface SpineStageConfig {
@@ -27,6 +27,10 @@ export class SpineStageController {
   private readonly trackIndex = 0;
   private disposed = false;
   private assetsLoaded = false;
+  private stripSceneOnTick = (): void => {
+    const skeleton = this.spine?.skeleton;
+    if (skeleton) stripHomeSceneAttachments(skeleton);
+  };
 
   async mount(host: HTMLElement, config: SpineStageConfig): Promise<void> {
     if (this.disposed) throw new Error("SpineStageController is disposed");
@@ -57,9 +61,9 @@ export class SpineStageController {
       scale: ATLAS_SCALE,
       autoUpdate: true,
     });
-    hideHomeSceneSlots(spine);
     app.stage.addChild(spine);
     this.spine = spine;
+    app.ticker.add(this.stripSceneOnTick);
     this.fitSpineToStage();
 
     this.resizeObserver = new ResizeObserver(() => {
@@ -83,6 +87,7 @@ export class SpineStageController {
     this.disposed = true;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.app?.ticker.remove(this.stripSceneOnTick);
     this.spine?.destroy({ children: true });
     this.spine = null;
     if (this.app) {
@@ -99,19 +104,25 @@ export class SpineStageController {
   private fitSpineToStage(): void {
     const app = this.app;
     const spine = this.spine;
-    if (!app || !spine) return;
+    const motionMap = this.motionMap;
+    if (!app || !spine || !motionMap) return;
 
     const w = app.screen.width;
     const h = app.screen.height;
     if (w <= 0 || h <= 0) return;
 
-    spine.skeleton.setToSetupPose();
-    hideHomeSceneSlots(spine);
+    const savedTrack = this.saveCurrentTrack();
+    const fitAnimation = resolveAvatarAnimations("idle", motionMap)[0] ?? "Idle_01";
+
+    applyFitPose(spine.skeleton, fitAnimation);
     spine.position.set(0, 0);
     spine.scale.set(ATLAS_SCALE);
     spine.skeleton.updateWorldTransform(Physics.update);
 
     const bounds = spine.getLocalBounds();
+    this.restoreTrack(savedTrack);
+    stripHomeSceneAttachments(spine.skeleton);
+
     if (bounds.width <= 0 || bounds.height <= 0) {
       spine.position.set(w / 2, h / 2);
       return;
@@ -132,6 +143,21 @@ export class SpineStageController {
     spine.position.set(w / 2, h / 2);
   }
 
+  private saveCurrentTrack(): { name: string; loop: boolean; time: number } | null {
+    const track = this.spine?.state.getCurrent(this.trackIndex);
+    const animation = track?.animation;
+    if (!track || !animation) return null;
+    return { name: animation.name, loop: track.loop, time: track.trackTime };
+  }
+
+  private restoreTrack(saved: { name: string; loop: boolean; time: number } | null): void {
+    const spine = this.spine;
+    if (!spine || !saved) return;
+    const track = spine.state.setAnimation(this.trackIndex, saved.name, saved.loop);
+    track.trackTime = saved.time;
+    stripHomeSceneAttachments(spine.skeleton);
+  }
+
   private playState(state: AvatarState): void {
     const spine = this.spine;
     const motionMap = this.motionMap;
@@ -148,6 +174,7 @@ export class SpineStageController {
     if (existingTrack) existingTrack.listener = {};
 
     const track = spine.state.setAnimation(this.trackIndex, animName, loop);
+    stripHomeSceneAttachments(spine.skeleton);
 
     if (!loop && entry?.returnTo) {
       const returnTo = entry.returnTo;
