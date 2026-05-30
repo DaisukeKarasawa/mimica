@@ -1,11 +1,12 @@
 import "@esotericsoftware/spine-pixi-v8";
 import { Spine } from "@esotericsoftware/spine-pixi-v8";
 import { Physics } from "@esotericsoftware/spine-core";
-import type { AvatarState, CharacterMetadata, MotionMap } from "@mimica/shared";
-import { Application, Assets } from "pixi.js";
+import type { AvatarState, CharacterMetadata, MotionMap, StageCropRect } from "@mimica/shared";
+import { Application, Assets, Container, Graphics } from "pixi.js";
 import { ATLAS_SCALE } from "./atlasScale.js";
-import { applyFitPose, stripHomeSceneAttachments } from "./homeSceneSlots.js";
+import { applyFitPose, stripViewportLetterbox } from "./homeSceneSlots.js";
 import { resolveAvatarAnimations } from "./resolveAnimations.js";
+import { resolveStageCrop } from "./stageCrop.js";
 
 export interface SpineStageConfig {
   /** e.g. `mimica-asset://local/` — must end with `/` or will be normalized */
@@ -14,26 +15,29 @@ export interface SpineStageConfig {
   motionMap: MotionMap;
 }
 
-const STAGE_PADDING = 0.06;
 const SKEL_KEY = "mimica-skel";
 const ATLAS_KEY = "mimica-atlas";
 
 export class SpineStageController {
   private app: Application | null = null;
+  private host: HTMLElement | null = null;
+  private stageRoot: Container | null = null;
+  private viewContainer: Container | null = null;
+  private stageMask: Graphics | null = null;
   private spine: Spine | null = null;
+  private metadata: CharacterMetadata | null = null;
   private motionMap: MotionMap | null = null;
+  private cachedCrop: StageCropRect | null = null;
   private currentState: AvatarState = "idle";
   private resizeObserver: ResizeObserver | null = null;
   private readonly trackIndex = 0;
   private disposed = false;
   private assetsLoaded = false;
-  private stripSceneOnTick = (): void => {
-    const skeleton = this.spine?.skeleton;
-    if (skeleton) stripHomeSceneAttachments(skeleton);
-  };
 
   async mount(host: HTMLElement, config: SpineStageConfig): Promise<void> {
     if (this.disposed) throw new Error("SpineStageController is disposed");
+    this.host = host;
+    this.metadata = config.metadata;
     this.motionMap = config.motionMap;
 
     const app = new Application();
@@ -46,6 +50,17 @@ export class SpineStageController {
     });
     host.replaceChildren(app.canvas);
     this.app = app;
+
+    const stageRoot = new Container();
+    const stageMask = new Graphics();
+    const viewContainer = new Container();
+    stageRoot.addChild(stageMask);
+    stageRoot.addChild(viewContainer);
+    stageRoot.mask = stageMask;
+    app.stage.addChild(stageRoot);
+    this.stageRoot = stageRoot;
+    this.stageMask = stageMask;
+    this.viewContainer = viewContainer;
 
     const base = config.assetBaseUrl.endsWith("/")
       ? config.assetBaseUrl
@@ -61,9 +76,14 @@ export class SpineStageController {
       scale: ATLAS_SCALE,
       autoUpdate: true,
     });
-    app.stage.addChild(spine);
+    spine.pivot.set(0, 0);
+    spine.beforeUpdateWorldTransforms = () => {
+      stripViewportLetterbox(spine.skeleton);
+    };
+    viewContainer.addChild(spine);
     this.spine = spine;
-    app.ticker.add(this.stripSceneOnTick);
+
+    this.measureCropRect();
     this.fitSpineToStage();
 
     this.resizeObserver = new ResizeObserver(() => {
@@ -72,11 +92,20 @@ export class SpineStageController {
     this.resizeObserver.observe(host);
 
     this.setAvatarState("idle");
+    requestAnimationFrame(() => {
+      if (!this.disposed) {
+        this.measureCropRect();
+        this.fitSpineToStage();
+      }
+    });
   }
 
   setAvatarState(state: AvatarState): void {
     this.currentState = state;
     this.playState(state);
+    requestAnimationFrame(() => {
+      if (!this.disposed) this.fitSpineToStage();
+    });
   }
 
   getAvatarState(): AvatarState {
@@ -87,9 +116,17 @@ export class SpineStageController {
     this.disposed = true;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
-    this.app?.ticker.remove(this.stripSceneOnTick);
-    this.spine?.destroy({ children: true });
-    this.spine = null;
+    if (this.spine) {
+      this.spine.beforeUpdateWorldTransforms = () => {};
+      this.spine.destroy({ children: true });
+      this.spine = null;
+    }
+    this.stageMask?.destroy();
+    this.stageMask = null;
+    this.viewContainer?.destroy({ children: true });
+    this.viewContainer = null;
+    this.stageRoot?.destroy({ children: true });
+    this.stageRoot = null;
     if (this.app) {
       this.app.destroy(true, { children: true, texture: true });
       this.app = null;
@@ -98,64 +135,73 @@ export class SpineStageController {
       void Assets.unload([SKEL_KEY, ATLAS_KEY]);
       this.assetsLoaded = false;
     }
+    this.host = null;
+    this.metadata = null;
+    this.motionMap = null;
+    this.cachedCrop = null;
   }
 
-  /** ステージ矩形に収まるよう等倍スケールで中央配置（canvas は resizeTo で歪めない） */
-  private fitSpineToStage(): void {
+  private stageSize(): { w: number; h: number } {
+    const host = this.host;
     const app = this.app;
+    const w = host?.clientWidth ?? app?.screen.width ?? 0;
+    const h = host?.clientHeight ?? app?.screen.height ?? 0;
+    return { w, h };
+  }
+
+  private measureCropRect(): void {
     const spine = this.spine;
     const motionMap = this.motionMap;
-    if (!app || !spine || !motionMap) return;
+    if (!spine || !motionMap) return;
 
-    const w = app.screen.width;
-    const h = app.screen.height;
+    const fitAnimation = resolveAvatarAnimations("idle", motionMap)[0] ?? "Idle_01";
+    applyFitPose(spine.skeleton, fitAnimation);
+    stripViewportLetterbox(spine.skeleton);
+    spine.skeleton.updateWorldTransform(Physics.update);
+    this.cachedCrop = resolveStageCrop(spine.skeleton, this.metadata?.stageCrop);
+  }
+
+  /** シーン crop 矩形をステージいっぱいに cover フィット */
+  private fitSpineToStage(): void {
+    const spine = this.spine;
+    const viewContainer = this.viewContainer;
+    const stageMask = this.stageMask;
+    if (!spine || !viewContainer || !stageMask) return;
+
+    const { w, h } = this.stageSize();
     if (w <= 0 || h <= 0) return;
 
-    const savedTrack = this.saveCurrentTrack();
-    const fitAnimation = resolveAvatarAnimations("idle", motionMap)[0] ?? "Idle_01";
+    stageMask.clear().rect(0, 0, w, h).fill(0xffffff);
 
-    applyFitPose(spine.skeleton, fitAnimation);
-    spine.position.set(0, 0);
-    spine.scale.set(ATLAS_SCALE);
-    spine.skeleton.updateWorldTransform(Physics.update);
+    const crop = this.cachedCrop;
+    if (!crop || crop.width <= 0 || crop.height <= 0) return;
 
-    const bounds = spine.getLocalBounds();
-    this.restoreTrack(savedTrack);
-    stripHomeSceneAttachments(spine.skeleton);
+    this.applyCropLayout(spine, viewContainer, crop, w, h);
+  }
 
-    if (bounds.width <= 0 || bounds.height <= 0) {
-      spine.position.set(w / 2, h / 2);
-      return;
-    }
-
-    const padW = w * STAGE_PADDING;
-    const padH = h * STAGE_PADDING;
-    const fitScale = Math.min((w - padW * 2) / bounds.width, (h - padH * 2) / bounds.height);
+  /**
+   * crop 左上を viewContainer 原点に置き、cover スケール後にステージ中央へ寄せる。
+   * spine.scale は ATLAS_SCALE（Spine.from）× fitScale。metadata crop は ATLAS_SCALE 込みの計測値。
+   */
+  private applyCropLayout(
+    spine: Spine,
+    viewContainer: Container,
+    crop: StageCropRect,
+    w: number,
+    h: number,
+  ): void {
+    const fitScale = Math.max(w / crop.width, h / crop.height);
     const totalScale = ATLAS_SCALE * fitScale;
+    const scaledW = crop.width * totalScale;
+    const scaledH = crop.height * totalScale;
 
+    spine.pivot.set(0, 0);
     spine.scale.set(totalScale);
-    spine.skeleton.updateWorldTransform(Physics.update);
+    spine.position.set(-crop.x * totalScale, -crop.y * totalScale);
 
-    const fitted = spine.getLocalBounds();
-    const pivotX = fitted.x + fitted.width / 2;
-    const pivotY = fitted.y + fitted.height / 2;
-    spine.pivot.set(pivotX, pivotY);
-    spine.position.set(w / 2, h / 2);
-  }
-
-  private saveCurrentTrack(): { name: string; loop: boolean; time: number } | null {
-    const track = this.spine?.state.getCurrent(this.trackIndex);
-    const animation = track?.animation;
-    if (!track || !animation) return null;
-    return { name: animation.name, loop: track.loop, time: track.trackTime };
-  }
-
-  private restoreTrack(saved: { name: string; loop: boolean; time: number } | null): void {
-    const spine = this.spine;
-    if (!spine || !saved) return;
-    const track = spine.state.setAnimation(this.trackIndex, saved.name, saved.loop);
-    track.trackTime = saved.time;
-    stripHomeSceneAttachments(spine.skeleton);
+    viewContainer.scale.set(1);
+    viewContainer.position.set((w - scaledW) / 2, (h - scaledH) / 2);
+    stripViewportLetterbox(spine.skeleton);
   }
 
   private playState(state: AvatarState): void {
@@ -173,19 +219,22 @@ export class SpineStageController {
     const existingTrack = spine.state.getCurrent(this.trackIndex);
     if (existingTrack) existingTrack.listener = {};
 
-    const track = spine.state.setAnimation(this.trackIndex, animName, loop);
-    stripHomeSceneAttachments(spine.skeleton);
+    spine.state.setAnimation(this.trackIndex, animName, loop);
+    stripViewportLetterbox(spine.skeleton);
 
     if (!loop && entry?.returnTo) {
       const returnTo = entry.returnTo;
       const expectedState = state;
-      track.listener = {
-        complete: () => {
-          if (this.currentState === expectedState) {
-            this.setAvatarState(returnTo);
-          }
-        },
-      };
+      const track = spine.state.getCurrent(this.trackIndex);
+      if (track) {
+        track.listener = {
+          complete: () => {
+            if (this.currentState === expectedState) {
+              this.setAvatarState(returnTo);
+            }
+          },
+        };
+      }
     }
   }
 }
