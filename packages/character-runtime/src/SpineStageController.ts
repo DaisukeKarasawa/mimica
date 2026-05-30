@@ -4,8 +4,8 @@ import { Physics } from "@esotericsoftware/spine-core";
 import type { AvatarState, CharacterMetadata, MotionMap } from "@mimica/shared";
 import { Application, Assets } from "pixi.js";
 import { ATLAS_SCALE } from "./atlasScale.js";
-import { CharacterDirector } from "./CharacterDirector.js";
 import { hideHomeSceneSlots } from "./homeSceneSlots.js";
+import { resolveAvatarAnimations } from "./resolveAnimations.js";
 
 export interface SpineStageConfig {
   /** e.g. `mimica-asset://local/` — must end with `/` or will be normalized */
@@ -22,7 +22,8 @@ export class SpineStageController {
   private app: Application | null = null;
   private spine: Spine | null = null;
   private motionMap: MotionMap | null = null;
-  private readonly director = new CharacterDirector();
+  private currentState: AvatarState = "idle";
+  private resizeObserver: ResizeObserver | null = null;
   private readonly trackIndex = 0;
   private disposed = false;
   private assetsLoaded = false;
@@ -59,31 +60,27 @@ export class SpineStageController {
     this.spine = spine;
     this.fitSpineToStage();
 
-    const resizeObserver = new ResizeObserver(() => {
+    this.resizeObserver = new ResizeObserver(() => {
       this.fitSpineToStage();
     });
-    resizeObserver.observe(host);
-    (host as HTMLElement & { __mimicaResizeObserver?: ResizeObserver }).__mimicaResizeObserver =
-      resizeObserver;
+    this.resizeObserver.observe(host);
 
     this.setAvatarState("idle");
   }
 
   setAvatarState(state: AvatarState): void {
-    this.director.setState(state, true);
+    this.currentState = state;
     this.playState(state);
   }
 
   getAvatarState(): AvatarState {
-    return this.director.getState();
+    return this.currentState;
   }
 
   destroy(): void {
     this.disposed = true;
-    const host = this.app?.canvas.parentElement;
-    if (host && (host as HTMLElement & { __mimicaResizeObserver?: ResizeObserver }).__mimicaResizeObserver) {
-      (host as HTMLElement & { __mimicaResizeObserver?: ResizeObserver }).__mimicaResizeObserver?.disconnect();
-    }
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.spine?.destroy({ children: true });
     this.spine = null;
     if (this.app) {
@@ -138,7 +135,7 @@ export class SpineStageController {
     const motionMap = this.motionMap;
     if (!spine || !motionMap) return;
 
-    const names = this.director.resolveAnimations(state, motionMap);
+    const names = resolveAvatarAnimations(state, motionMap);
     const animName = names[0];
     if (!animName) return;
 
