@@ -21,6 +21,7 @@ export class CharacterDirector {
   }
 
   setState(next: AvatarState, force = false): void {
+    if (!force && next === this.state) return;
     if (!force && next !== this.state && Date.now() - this.lastChangeAt < this.cooldownMs) {
       return;
     }
@@ -30,10 +31,13 @@ export class CharacterDirector {
   }
 
   resolveAnimations(state: AvatarState, motionMap: MotionMap): string[] {
+    const idleAnimations = motionMap.idle?.animations;
     const entry = motionMap[state];
     if (!entry) {
-      return motionMap.idle?.animations ?? [];
+      return idleAnimations?.length ? idleAnimations : [];
     }
-    return entry.animations.length > 0 ? entry.animations : (entry.fallback ?? motionMap.idle.animations);
+    if (entry.animations.length > 0) return entry.animations;
+    if (entry.fallback?.length) return entry.fallback;
+    return idleAnimations?.length ? idleAnimations : [];
   }
 }

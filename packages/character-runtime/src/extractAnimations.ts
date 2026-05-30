@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { AtlasAttachmentLoader, SkeletonBinary, TextureAtlas } from "@esotericsoftware/spine-core";
+import { ATLAS_SCALE } from "./atlasScale.js";
 
 function usage(): never {
   console.error("Usage: extract-animations <path-to.skel> [path-to.atlas]");
@@ -12,12 +13,12 @@ const args = process.argv.slice(2).filter((a) => a !== "--");
 const skelPath = resolve(args[0] ?? usage());
 const atlasPath = resolve(args[1] ?? skelPath.replace(/\.skel$/i, ".atlas"));
 
-const atlasText = readFileSync(atlasPath, "utf8");
-const atlas = new TextureAtlas(atlasText);
-const attachmentLoader = new AtlasAttachmentLoader(atlas);
-const binary = new SkeletonBinary(attachmentLoader);
-binary.scale = 0.61;
 try {
+  const atlasText = readFileSync(atlasPath, "utf8");
+  const atlas = new TextureAtlas(atlasText);
+  const attachmentLoader = new AtlasAttachmentLoader(atlas);
+  const binary = new SkeletonBinary(attachmentLoader);
+  binary.scale = ATLAS_SCALE;
   const skeletonData = binary.readSkeletonData(readFileSync(skelPath));
   const names = skeletonData.animations.map((a) => a.name).sort();
   console.log(`Animations (${names.length}):`);

@@ -3,6 +3,7 @@ import { Spine } from "@esotericsoftware/spine-pixi-v8";
 import { Physics } from "@esotericsoftware/spine-core";
 import type { AvatarState, CharacterMetadata, MotionMap } from "@mimica/shared";
 import { Application, Assets } from "pixi.js";
+import { ATLAS_SCALE } from "./atlasScale.js";
 import { CharacterDirector } from "./CharacterDirector.js";
 import { hideHomeSceneSlots } from "./homeSceneSlots.js";
 
@@ -13,8 +14,9 @@ export interface SpineStageConfig {
   motionMap: MotionMap;
 }
 
-const ATLAS_SCALE = 0.61;
 const STAGE_PADDING = 0.06;
+const SKEL_KEY = "mimica-skel";
+const ATLAS_KEY = "mimica-atlas";
 
 export class SpineStageController {
   private app: Application | null = null;
@@ -23,6 +25,7 @@ export class SpineStageController {
   private readonly director = new CharacterDirector();
   private readonly trackIndex = 0;
   private disposed = false;
+  private assetsLoaded = false;
 
   async mount(host: HTMLElement, config: SpineStageConfig): Promise<void> {
     if (this.disposed) throw new Error("SpineStageController is disposed");
@@ -40,15 +43,14 @@ export class SpineStageController {
     this.app = app;
 
     const base = config.assetBaseUrl.endsWith("/") ? config.assetBaseUrl : `${config.assetBaseUrl}/`;
-    const skelKey = "mimica-skel";
-    const atlasKey = "mimica-atlas";
-    Assets.add({ alias: skelKey, src: `${base}${config.metadata.skelFile}` });
-    Assets.add({ alias: atlasKey, src: `${base}${config.metadata.atlasFile}` });
-    await Assets.load([skelKey, atlasKey]);
+    Assets.add({ alias: SKEL_KEY, src: `${base}${config.metadata.skelFile}` });
+    Assets.add({ alias: ATLAS_KEY, src: `${base}${config.metadata.atlasFile}` });
+    await Assets.load([SKEL_KEY, ATLAS_KEY]);
+    this.assetsLoaded = true;
 
     const spine = Spine.from({
-      skeleton: skelKey,
-      atlas: atlasKey,
+      skeleton: SKEL_KEY,
+      atlas: ATLAS_KEY,
       scale: ATLAS_SCALE,
       autoUpdate: true,
     });
@@ -87,6 +89,10 @@ export class SpineStageController {
     if (this.app) {
       this.app.destroy(true, { children: true, texture: true });
       this.app = null;
+    }
+    if (this.assetsLoaded) {
+      void Assets.unload([SKEL_KEY, ATLAS_KEY]);
+      this.assetsLoaded = false;
     }
   }
 
