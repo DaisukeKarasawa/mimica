@@ -9,7 +9,20 @@ import { getEditorContext } from "./contextProvider";
 let companionProcess: ChildProcess | null = null;
 let wsClient: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let isShuttingDown = false;
+let pendingConnect: Promise<void> | null = null;
 let bridgeToken: string | null = process.env.MIMICA_BRIDGE_TOKEN?.trim() ?? null;
+
+function debounce(fn: () => void, ms: number): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      fn();
+    }, ms);
+  };
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
@@ -22,15 +35,37 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("mimica.openSettings", () => {
       void vscode.window.showInformationMessage("設定画面は今後実装予定です。");
     }),
-    vscode.window.onDidChangeActiveTextEditor(() => void pushContext()),
-    vscode.workspace.onDidChangeTextDocument(() => void pushContext()),
+    vscode.window.onDidChangeActiveTextEditor(debouncedPushContext),
+    vscode.workspace.onDidChangeTextDocument(debouncedPushContext),
   );
 }
 
 export function deactivate(): void {
-  if (reconnectTimer) clearTimeout(reconnectTimer);
+  isShuttingDown = true;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  pendingConnect = null;
   wsClient?.close();
-  companionProcess?.kill();
+  wsClient = null;
+  if (companionProcess) {
+    killCompanionProcess(companionProcess);
+    companionProcess = null;
+  }
+}
+
+function killCompanionProcess(proc: ChildProcess): void {
+  const { pid } = proc;
+  if (pid != null && process.platform !== "win32") {
+    try {
+      process.kill(-pid, "SIGTERM");
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "ESRCH" && code !== "EPERM") throw err;
+    }
+  }
+  proc.kill();
 }
 
 async function openCompanion(context: vscode.ExtensionContext): Promise<void> {
@@ -54,12 +89,14 @@ async function openCompanion(context: vscode.ExtensionContext): Promise<void> {
 
 function launchCompanion(context: vscode.ExtensionContext): ChildProcess {
   const repoRoot = join(context.extensionPath, "..", "..");
-  return spawn("pnpm", ["--filter", "@mimica/companion", "dev"], {
+  const child = spawn("pnpm", ["--filter", "@mimica/companion", "dev"], {
     cwd: repoRoot,
     stdio: "ignore",
     detached: true,
     env: process.env,
   });
+  child.unref();
+  return child;
 }
 
 function waitForBridge(maxMs = 15000): Promise<void> {
@@ -90,45 +127,64 @@ function handleServerMessage(raw: unknown): void {
 }
 
 async function connectBridge(): Promise<void> {
+  if (isShuttingDown) return;
   if (wsClient?.readyState === WebSocket.OPEN && bridgeToken) return;
-  wsClient?.close();
-  wsClient = new WebSocket(`ws://127.0.0.1:${DEFAULT_WS_PORT}`);
-  await new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Bridge auth timeout")), 5000);
-    wsClient!.once("open", () => {
-      /* connection_ack arrives on message */
+  if (pendingConnect) return pendingConnect;
+
+  pendingConnect = (async () => {
+    wsClient?.close();
+    wsClient = new WebSocket(`ws://127.0.0.1:${DEFAULT_WS_PORT}`);
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Bridge auth timeout")), 5000);
+      wsClient!.once("open", () => {
+        /* connection_ack arrives on message */
+      });
+      wsClient!.once("message", (data) => {
+        try {
+          handleServerMessage(JSON.parse(String(data)));
+          if (bridgeToken) {
+            clearTimeout(timeout);
+            resolve();
+          }
+        } catch {
+          /* wait for valid ack */
+        }
+      });
+      wsClient!.once("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
     });
-    wsClient!.once("message", (data) => {
+    if (isShuttingDown) {
+      wsClient?.close();
+      wsClient = null;
+      return;
+    }
+    wsClient.on("message", (data) => {
       try {
         handleServerMessage(JSON.parse(String(data)));
-        if (bridgeToken) {
-          clearTimeout(timeout);
-          resolve();
-        }
       } catch {
-        /* wait for valid ack */
+        /* ignore */
       }
     });
-    wsClient!.once("error", (err) => {
-      clearTimeout(timeout);
-      reject(err);
+    wsClient.on("close", () => {
+      if (!isShuttingDown) scheduleReconnect();
     });
-  });
-  wsClient.on("message", (data) => {
-    try {
-      handleServerMessage(JSON.parse(String(data)));
-    } catch {
-      /* ignore */
+    if (bridgeToken) {
+      const ready: ClientMessage = { type: "companion_ready", token: bridgeToken };
+      wsClient.send(JSON.stringify(ready));
     }
-  });
-  wsClient.on("close", () => scheduleReconnect());
-  if (bridgeToken) {
-    const ready: ClientMessage = { type: "companion_ready", token: bridgeToken };
-    wsClient.send(JSON.stringify(ready));
+  })();
+
+  try {
+    await pendingConnect;
+  } finally {
+    pendingConnect = null;
   }
 }
 
 function scheduleReconnect(): void {
+  if (isShuttingDown) return;
   if (reconnectTimer) return;
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
@@ -137,6 +193,7 @@ function scheduleReconnect(): void {
 }
 
 async function pushContext(): Promise<void> {
+  if (isShuttingDown) return;
   const ctx = getEditorContext();
   if (!ctx) return;
   if (wsClient?.readyState !== WebSocket.OPEN) {
@@ -150,3 +207,5 @@ async function pushContext(): Promise<void> {
   const msg: ClientMessage = { type: "context_update", context: ctx, token: bridgeToken };
   wsClient?.send(JSON.stringify(msg));
 }
+
+const debouncedPushContext = debounce(() => void pushContext(), 250);
