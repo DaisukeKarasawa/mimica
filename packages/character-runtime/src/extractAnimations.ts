@@ -9,8 +9,10 @@ function usage(): never {
   process.exit(1);
 }
 
-const args = process.argv.slice(2).filter((a) => a !== "--");
-const skelPath = resolve(args[0] ?? usage());
+const args = process.argv.slice(2).filter((a: string) => a !== "--");
+const skelArg = args[0];
+if (!skelArg) usage();
+const skelPath = resolve(skelArg);
 const atlasPath = resolve(args[1] ?? skelPath.replace(/\.skel$/i, ".atlas"));
 
 try {
