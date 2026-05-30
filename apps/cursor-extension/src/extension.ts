@@ -11,7 +11,7 @@ let wsClient: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let isShuttingDown = false;
 let pendingConnect: Promise<void> | null = null;
-let bridgeToken: string | null = process.env.MIMICA_BRIDGE_TOKEN?.trim() ?? null;
+const bridgeToken: string | null = process.env.MIMICA_BRIDGE_TOKEN?.trim() ?? null;
 
 function debounce(fn: () => void, ms: number): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
