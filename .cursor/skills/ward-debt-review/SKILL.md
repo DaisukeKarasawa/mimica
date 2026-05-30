@@ -65,6 +65,7 @@ If no material mismatch exists, say so and name any remaining verification gap.
 
 ```md
 ## Ward Debt Review
+
 - Findings:
 - Repayment opportunities:
 - Acceptable debt, if any:

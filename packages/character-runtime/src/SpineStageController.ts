@@ -43,7 +43,9 @@ export class SpineStageController {
     host.replaceChildren(app.canvas);
     this.app = app;
 
-    const base = config.assetBaseUrl.endsWith("/") ? config.assetBaseUrl : `${config.assetBaseUrl}/`;
+    const base = config.assetBaseUrl.endsWith("/")
+      ? config.assetBaseUrl
+      : `${config.assetBaseUrl}/`;
     Assets.add({ alias: SKEL_KEY, src: `${base}${config.metadata.skelFile}` });
     Assets.add({ alias: ATLAS_KEY, src: `${base}${config.metadata.atlasFile}` });
     await Assets.load([SKEL_KEY, ATLAS_KEY]);

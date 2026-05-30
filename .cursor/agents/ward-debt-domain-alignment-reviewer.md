@@ -25,12 +25,15 @@ Return exactly this structure:
 
 ```md
 ## Findings
+
 - For each item: mismatch, interest, evidence, smallest repayment
 
 ## Acceptable debt
+
 - What can wait and why
 
 ## Unknowns
+
 - What evidence would change the review
 ```
 

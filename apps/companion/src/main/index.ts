@@ -85,6 +85,10 @@ if (!gotLock) {
   });
 }
 
-if (process.env.NODE_ENV === "development" || process.env.ELECTRON_RENDERER_URL || process.env.VITE_DEV_SERVER_URL) {
+if (
+  process.env.NODE_ENV === "development" ||
+  process.env.ELECTRON_RENDERER_URL ||
+  process.env.VITE_DEV_SERVER_URL
+) {
   process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "true";
 }

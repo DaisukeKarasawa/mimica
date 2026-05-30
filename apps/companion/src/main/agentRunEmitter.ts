@@ -1,10 +1,7 @@
 import type { WebContents } from "electron";
 import type { AgentEventMessage, AgentRunState } from "@mimica/shared";
 
-export function emitAgentEvent(
-  wc: WebContents | undefined,
-  event: AgentEventMessage,
-): void {
+export function emitAgentEvent(wc: WebContents | undefined, event: AgentEventMessage): void {
   wc?.send("agent-event", event);
 }
 

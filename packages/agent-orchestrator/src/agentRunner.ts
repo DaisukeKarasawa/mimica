@@ -9,10 +9,7 @@ import {
   processAgentStream,
   resolveFinalAssistantText,
 } from "./processAgentStream.js";
-import {
-  READ_ONLY_HOOK_INSTALL_WARNING,
-  READ_ONLY_TOOL_ERROR,
-} from "./readOnlyPolicy.js";
+import { READ_ONLY_HOOK_INSTALL_WARNING, READ_ONLY_TOOL_ERROR } from "./readOnlyPolicy.js";
 import { resolveCursorApiKey } from "./resolveApiKey.js";
 
 export type { AgentRunCallbacks } from "./agentCallbacks.js";
@@ -68,9 +65,7 @@ export class AgentRunner {
 
     const hooksResult = await ensureReadOnlyHooks(params.workspacePath);
     if (!hooksResult.ok) {
-      params.callbacks.onWarning?.(
-        `${READ_ONLY_HOOK_INSTALL_WARNING} (${hooksResult.message})`,
-      );
+      params.callbacks.onWarning?.(`${READ_ONLY_HOOK_INSTALL_WARNING} (${hooksResult.message})`);
     }
 
     let agent: Awaited<ReturnType<typeof createCursorAgent>>;

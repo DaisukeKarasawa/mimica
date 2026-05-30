@@ -122,10 +122,10 @@ Replace `BASE_BRANCH` with the PR base branch name from `gh pr view`.
 
 ## Permissions errors
 
-| Symptom | Check |
-|---------|--------|
-| GraphQL `FORBIDDEN` | Token scopes; repo write access |
-| Cannot resolve | Same; resolving requires write |
+| Symptom               | Check                             |
+| --------------------- | --------------------------------- |
+| GraphQL `FORBIDDEN`   | Token scopes; repo write access   |
+| Cannot resolve        | Same; resolving requires write    |
 | Empty `reviewThreads` | Wrong PR number or fork repo name |
 
 ## Optional extension

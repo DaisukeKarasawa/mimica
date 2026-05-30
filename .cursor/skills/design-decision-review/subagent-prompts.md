@@ -18,18 +18,23 @@ Subagents start with clean context. They must rely only on the parent prompt plu
 
 ```md
 ## Findings
+
 - [Risk or concern]
 
 ## Evidence
+
 - [Specific code, requirement, command result, documentation, or Unknown]
 
 ## Suspected Failure Pattern
+
 - [Pattern name or None]
 
 ## Acceptable Exception
+
 - [Conditions that would make the current choice acceptable]
 
 ## Overturning Evidence
+
 - [What would change this assessment]
 ```
 

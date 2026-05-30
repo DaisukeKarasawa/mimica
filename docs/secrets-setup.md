@@ -4,11 +4,11 @@ Mimica が Cursor SDK を使う際の `CURSOR_API_KEY` の扱い。
 
 ## 結論
 
-| 保存場所 | 推奨 | Git 管理 |
-|----------|------|----------|
-| 環境変数 `CURSOR_API_KEY` | **最優先** | しない |
-| `~/Library/Application Support/Mimica/secrets.json` | 環境変数の代替 | しない |
-| リポジトリ内の設定ファイル | **入れない** | — |
+| 保存場所                                            | 推奨           | Git 管理 |
+| --------------------------------------------------- | -------------- | -------- |
+| 環境変数 `CURSOR_API_KEY`                           | **最優先**     | しない   |
+| `~/Library/Application Support/Mimica/secrets.json` | 環境変数の代替 | しない   |
+| リポジトリ内の設定ファイル                          | **入れない**   | —        |
 
 **Mimica の `settings.json` には API キーを書かない**設計にします。  
 理由: 設定ファイルは将来 UI から編集・ログ出力・共有されやすく、漏洩リスクが高いため。

@@ -1,10 +1,4 @@
-export type AvatarState =
-  | "idle"
-  | "thinking"
-  | "talking"
-  | "success"
-  | "error"
-  | "waiting";
+export type AvatarState = "idle" | "thinking" | "talking" | "success" | "error" | "waiting";
 
 export type AgentRunState =
   | "idle"

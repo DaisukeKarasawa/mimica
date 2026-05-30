@@ -24,10 +24,7 @@ export default function App() {
   const [characterAssets, setCharacterAssets] = useState<CharacterAssetStatus | null>(null);
   const [devPreview, setDevPreview] = useState(false);
 
-  const director = useMemo(
-    () => new CharacterDirector({ onStateChange: setAvatarState }),
-    [],
-  );
+  const director = useMemo(() => new CharacterDirector({ onStateChange: setAvatarState }), []);
 
   const { handleAgentEvent, resetStream, beginStream } = useAgentEvents({
     devPreview,
@@ -129,18 +126,21 @@ export default function App() {
     [openTabIds],
   );
 
-  const handleCloseTab = useCallback(async (id: string) => {
-    if (isStreaming && activeSessionId === id) {
-      await window.mimica.cancelAgent();
-      setIsStreaming(false);
-      resetStream();
-    }
-    const nextIds = openTabIds.filter((tabId) => tabId !== id);
-    setOpenTabs(nextIds);
-    if (activeSessionId === id) {
-      setActiveSessionId(nextIds[nextIds.length - 1] ?? null);
-    }
-  }, [activeSessionId, isStreaming, openTabIds, resetStream, setOpenTabs]);
+  const handleCloseTab = useCallback(
+    async (id: string) => {
+      if (isStreaming && activeSessionId === id) {
+        await window.mimica.cancelAgent();
+        setIsStreaming(false);
+        resetStream();
+      }
+      const nextIds = openTabIds.filter((tabId) => tabId !== id);
+      setOpenTabs(nextIds);
+      if (activeSessionId === id) {
+        setActiveSessionId(nextIds[nextIds.length - 1] ?? null);
+      }
+    },
+    [activeSessionId, isStreaming, openTabIds, resetStream, setOpenTabs],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

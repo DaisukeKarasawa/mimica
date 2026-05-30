@@ -25,10 +25,7 @@ function apis(): Pick<ElectronMain, "protocol" | "net"> {
 }
 
 /** 設定パス → 同ベース名の別拡張子 → アセットルートの既定ファイル名 */
-export function resolveChatIconFile(
-  assetRootDir: string,
-  configuredPath: string,
-): string | null {
+export function resolveChatIconFile(assetRootDir: string, configuredPath: string): string | null {
   const configured = assertContained(resolveExpandedPath(configuredPath), assetRootDir);
   if (existsSync(configured)) return configured;
 

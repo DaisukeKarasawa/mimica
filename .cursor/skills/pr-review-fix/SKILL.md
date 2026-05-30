@@ -28,14 +28,14 @@ Optional: `jq` for filtering GraphQL JSON.
 
 ## Related skills and commands
 
-| When | Read / use |
-|------|------------|
-| Pasted review text (no PR fetch) | `.cursor/commands/review-fix.md` |
-| Evaluate before implementing each point | `receiving-code-review` (superpowers) — verify, no performative agreement |
-| Architecture, dependency, boundary, compatibility fixes | `.cursor/skills/design-decision-review/SKILL.md` |
-| MVP shortcuts, phased delivery, debt in the fix | `.cursor/skills/ward-debt-planning/SKILL.md` |
-| After code changes | `thermo-nuclear-code-quality-review` via Task (see below) |
-| Record fixes locally | `.cursor/commands/commit.md` (`/commit`) — required when there are code changes |
+| When                                                    | Read / use                                                                      |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Pasted review text (no PR fetch)                        | `.cursor/commands/review-fix.md`                                                |
+| Evaluate before implementing each point                 | `receiving-code-review` (superpowers) — verify, no performative agreement       |
+| Architecture, dependency, boundary, compatibility fixes | `.cursor/skills/design-decision-review/SKILL.md`                                |
+| MVP shortcuts, phased delivery, debt in the fix         | `.cursor/skills/ward-debt-planning/SKILL.md`                                    |
+| After code changes                                      | `thermo-nuclear-code-quality-review` via Task (see below)                       |
+| Record fixes locally                                    | `.cursor/commands/commit.md` (`/commit`) — required when there are code changes |
 
 **Push policy:** Never run `git push`. The human always pushes. Thread replies and resolve happen on GitHub without requiring a push.
 
@@ -45,6 +45,7 @@ Copy and track:
 
 ```markdown
 PR review fix:
+
 - [ ] 1. Resolve PR and checkout head branch
 - [ ] 2. Fetch unresolved review threads only
 - [ ] 3. Triage each thread (fix / skip / ask)
@@ -86,11 +87,11 @@ For **each unresolved thread**, in order:
 
 **Subagents (use when helpful):**
 
-| Condition | Delegate |
-|-----------|----------|
-| 4+ unrelated threads | Parallel `Task` (`explore` or `generalPurpose`): one thread group per task; return verdict + evidence only |
-| Security, Electron boundary, rights-sensitive assets | Dedicated `Task` with explicit security checklist from `AGENTS.md` |
-| Single thread but large blast radius | `design-decision-review` conductor flow before planning |
+| Condition                                            | Delegate                                                                                                   |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 4+ unrelated threads                                 | Parallel `Task` (`explore` or `generalPurpose`): one thread group per task; return verdict + evidence only |
+| Security, Electron boundary, rights-sensitive assets | Dedicated `Task` with explicit security checklist from `AGENTS.md`                                         |
+| Single thread but large blast radius                 | `design-decision-review` conductor flow before planning                                                    |
 
 Do not implement until all threads are triaged. If any **Ask** remains, stop and question the user before step 5.
 
@@ -157,11 +158,11 @@ For each thread processed in step 3 (including **Skip**):
 
 **Reply content rules**
 
-| Verdict | Reply |
-|---------|--------|
-| **Fix** | What changed (files/behavior), how verified, commit subject or hash if helpful. Note that the fix is committed locally and awaits human push—do not imply it is already on the remote branch. No thanks, no performative praise. |
-| **Skip** | Technical reason with evidence (test, doc, invariant). Offer follow-up only if a real open decision remains. |
-| **Ask** (if user answered and you fixed later) | Decision taken + change summary. |
+| Verdict                                        | Reply                                                                                                                                                                                                                            |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fix**                                        | What changed (files/behavior), how verified, commit subject or hash if helpful. Note that the fix is committed locally and awaits human push—do not imply it is already on the remote branch. No thanks, no performative praise. |
+| **Skip**                                       | Technical reason with evidence (test, doc, invariant). Offer follow-up only if a real open decision remains.                                                                                                                     |
+| **Ask** (if user answered and you fixed later) | Decision taken + change summary.                                                                                                                                                                                                 |
 
 Do not resolve a thread without a reply. Do not leave unresolved threads open after finishing.
 

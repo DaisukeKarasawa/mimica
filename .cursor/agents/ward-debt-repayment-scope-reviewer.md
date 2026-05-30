@@ -29,15 +29,19 @@ Return exactly this structure:
 
 ```md
 ## Verdict
+
 - repay now | narrow scope | defer | redesign
 
 ## Reasoning
+
 - What mismatch is or is not being repaid
 
 ## Safer smallest step
+
 - One concrete recommendation
 
 ## Overturning evidence
+
 - What would change the verdict
 ```
 

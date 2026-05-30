@@ -67,7 +67,11 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           director.setState(avatar, true);
           setStatusText(avatarStatusLabel(avatar));
           if (event.state === "streaming") setIsStreaming(true);
-          if (event.state === "completed" || event.state === "failed" || event.state === "cancelled") {
+          if (
+            event.state === "completed" ||
+            event.state === "failed" ||
+            event.state === "cancelled"
+          ) {
             setIsStreaming(false);
           }
           break;
@@ -77,20 +81,22 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
         case "agent_delta": {
           streamingContentRef.current += event.content;
-          setAllSessions((prev) =>
-            reduceAgentEvent(prev, event, {
-              streamId: activeStreamIdRef.current,
-              content: streamingContentRef.current,
-            }).sessions,
+          setAllSessions(
+            (prev) =>
+              reduceAgentEvent(prev, event, {
+                streamId: activeStreamIdRef.current,
+                content: streamingContentRef.current,
+              }).sessions,
           );
           break;
         }
         case "agent_tool": {
-          setAllSessions((prev) =>
-            reduceAgentEvent(prev, event, {
-              streamId: activeStreamIdRef.current,
-              content: streamingContentRef.current,
-            }).sessions,
+          setAllSessions(
+            (prev) =>
+              reduceAgentEvent(prev, event, {
+                streamId: activeStreamIdRef.current,
+                content: streamingContentRef.current,
+              }).sessions,
           );
           break;
         }

@@ -29,9 +29,7 @@ function getTemplatePersonaDir(): string {
   }
 
   if (!existsSync(cachedTemplatePersonaDir)) {
-    console.warn(
-      `${LOG_PREFIX} template persona directory not found: ${cachedTemplatePersonaDir}`,
-    );
+    console.warn(`${LOG_PREFIX} template persona directory not found: ${cachedTemplatePersonaDir}`);
   }
 
   return cachedTemplatePersonaDir;
@@ -39,10 +37,7 @@ function getTemplatePersonaDir(): string {
 
 function readPersonaPack(skillPath: string): string | null {
   const templatePersonaDir = getTemplatePersonaDir();
-  const candidates = [
-    skillPath,
-    join(templatePersonaDir, "SKILL.md"),
-  ].filter((p) => existsSync(p));
+  const candidates = [skillPath, join(templatePersonaDir, "SKILL.md")].filter((p) => existsSync(p));
 
   const resolved = candidates[0];
   if (!resolved) {

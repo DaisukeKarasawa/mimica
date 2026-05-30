@@ -33,12 +33,12 @@
 
 ## 0. 前提
 
-| 項目 | 内容 |
-|------|------|
-| OS | macOS（Apple Silicon 想定。Intel の場合は x86_64 版 BA-AD） |
-| ディスク | 空き **5 GB 以上**（Bundle 一時保存用） |
-| ネットワーク | 初回ダウンロードに必要 |
-| Python | 3.10+（抽出スクリプト用） |
+| 項目         | 内容                                                        |
+| ------------ | ----------------------------------------------------------- |
+| OS           | macOS（Apple Silicon 想定。Intel の場合は x86_64 版 BA-AD） |
+| ディスク     | 空き **5 GB 以上**（Bundle 一時保存用）                     |
+| ネットワーク | 初回ダウンロードに必要                                      |
+| Python       | 3.10+（抽出スクリプト用）                                   |
 
 ### 入手するファイル（最終形）
 
@@ -224,12 +224,12 @@ Agent 吹き出し横のアイコン。**正方形 PNG** 推奨（例: 128×128 
 cp /path/to/your-icon.png ~/MimicaAssets/characters/rio/icon.png
 ```
 
-| 項目 | 内容 |
-|------|------|
-| 配置先 | `~/MimicaAssets/characters/rio/icon.png` |
-| Git | コミットしない（ローカル素材） |
-| 未配置時 | グラデーションのプレースホルダー |
-| 反映 | `pnpm dev:companion` を再起動 |
+| 項目     | 内容                                     |
+| -------- | ---------------------------------------- |
+| 配置先   | `~/MimicaAssets/characters/rio/icon.png` |
+| Git      | コミットしない（ローカル素材）           |
+| 未配置時 | グラデーションのプレースホルダー         |
+| 反映     | `pnpm dev:companion` を再起動            |
 
 別ファイル名にしたい場合は、当面 **`icon.*`（png/jpg/jpeg/webp）** のいずれかを `rio/` 直下に置く（`DEFAULT_SETTINGS.chatIconPath` は既定で `icon.png` を指すが、無いときは同ベース名・上記候補を順に探す）。
 
@@ -263,10 +263,10 @@ ls ~/MimicaAssets/characters/rio/textures/
 抽出した `.skel` の先頭付近に **Spine バージョン文字列**（例: `4.2.33`）が入っています。  
 Mimica の `@mimica/character-runtime` は **同じ 4.2 系**（`@esotericsoftware/spine-pixi-v8@4.2.x`）に揃えてください。
 
-| 症状 | 原因の例 |
-|------|----------|
-| `Bone name must not be null` | `.skel` が 4.2 系なのにランタイムが 4.3 系 |
-| アニメが再生されない | `motion-map.json` の名前が実ファイルと不一致 |
+| 症状                         | 原因の例                                     |
+| ---------------------------- | -------------------------------------------- |
+| `Bone name must not be null` | `.skel` が 4.2 系なのにランタイムが 4.3 系   |
+| アニメが再生されない         | `motion-map.json` の名前が実ファイルと不一致 |
 
 アニメ名一覧:
 
@@ -300,13 +300,13 @@ pnpm --filter @mimica/character-runtime extract-animations -- \
 
 ## トラブルシューティング
 
-| 症状 | 対処 |
-|------|------|
-| `baad` で 0 件 | `--filter "ch0158"` に広げる / `baad --update` |
+| 症状                   | 対処                                                |
+| ---------------------- | --------------------------------------------------- |
+| `baad` で 0 件         | `--filter "ch0158"` に広げる / `baad --update`      |
 | `.skel` が見つからない | `find ... -iname "*0158*"` で再検索。Bundle 追加 DL |
-| 画面が真っ白 | `textures/` に PNG 不足。`.atlas` と突合 |
-| ファイル名が違う | `metadata.json` を編集 |
-| UnityPy エラー | `pip install -U UnityPy Pillow` |
+| 画面が真っ白           | `textures/` に PNG 不足。`.atlas` と突合            |
+| ファイル名が違う       | `metadata.json` を編集                              |
+| UnityPy エラー         | `pip install -U UnityPy Pillow`                     |
 
 ### 代替: GUI ツール
 

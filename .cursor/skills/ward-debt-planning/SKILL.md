@@ -56,6 +56,7 @@ Use this compact structure when the Ward debt lens changes the plan:
 
 ```md
 ## Learnable Slice
+
 - Goal:
 - Current understanding:
 - Assumptions:
@@ -71,12 +72,12 @@ Omit the structure when the normal answer is enough.
 
 ## Common Mistakes
 
-| Mistake | Better move |
-|---|---|
-| Calling sloppy code "technical debt" | Keep the code clear and name the real uncertainty |
-| Planning a rewrite after every MVP | Name the specific repayment trigger |
+| Mistake                                              | Better move                                                    |
+| ---------------------------------------------------- | -------------------------------------------------------------- |
+| Calling sloppy code "technical debt"                 | Keep the code clear and name the real uncertainty              |
+| Planning a rewrite after every MVP                   | Name the specific repayment trigger                            |
 | Adding generic abstractions for unknown future cases | Encode current understanding directly and keep it refactorable |
-| Shipping to learn without tests or observation | Define how learning and correctness will be detected |
+| Shipping to learn without tests or observation       | Define how learning and correctness will be detected           |
 
 ## Related agents
 

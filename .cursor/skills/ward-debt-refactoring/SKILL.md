@@ -57,6 +57,7 @@ Use this when the refactor decision is material:
 
 ```md
 ## Debt Repayment Brief
+
 - Current understanding:
 - System mismatch:
 - Interest being paid:
@@ -69,12 +70,12 @@ Use this when the refactor decision is material:
 
 ## Common Mistakes
 
-| Mistake | Better move |
-|---|---|
-| Refactoring because code feels old | Name the understanding it fails to express |
-| Rewriting because local cleanup is hard | Check whether boundaries or contracts actually force a rewrite |
-| Extracting a generic helper | Extract the domain concept only when the concept is stable enough |
-| Preserving every legacy shape | Preserve shipped behavior, not accidental internal confusion |
+| Mistake                                 | Better move                                                       |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| Refactoring because code feels old      | Name the understanding it fails to express                        |
+| Rewriting because local cleanup is hard | Check whether boundaries or contracts actually force a rewrite    |
+| Extracting a generic helper             | Extract the domain concept only when the concept is stable enough |
+| Preserving every legacy shape           | Preserve shipped behavior, not accidental internal confusion      |
 
 ## Related agents
 

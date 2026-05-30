@@ -23,7 +23,6 @@ reviews:
     - prioritized findings when fixes are needed
     - required verification: pnpm typecheck, pnpm build, and relevant manual checks from docs/project-kickoff.md or docs/requirements.md when behavior changes
   high_level_summary_in_walkthrough: false
-
   auto_title_instructions: |
     Use Conventional Commits format: <type>[optional scope]: <description>.
     Prefer types: feat, fix, docs, refactor, test, chore, build, ci, perf, style.

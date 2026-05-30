@@ -11,9 +11,7 @@ interface HooksConfig {
   hooks: Record<string, Array<Record<string, unknown>>>;
 }
 
-export type EnsureReadOnlyHooksResult =
-  | { ok: true }
-  | { ok: false; message: string };
+export type EnsureReadOnlyHooksResult = { ok: true } | { ok: false; message: string };
 
 function packageRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -61,7 +59,9 @@ function mergeHooks(existing: HooksConfig, mimica: HooksConfig["hooks"]): HooksC
 }
 
 /** Install Mimica read-only hook scripts into the agent workspace (pre-dispatch enforcement). */
-export async function ensureReadOnlyHooks(workspacePath: string): Promise<EnsureReadOnlyHooksResult> {
+export async function ensureReadOnlyHooks(
+  workspacePath: string,
+): Promise<EnsureReadOnlyHooksResult> {
   try {
     const scriptPath = bundledHookScriptPath();
     const cursorDir = join(workspacePath, ".cursor");

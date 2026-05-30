@@ -29,15 +29,19 @@ Return exactly this structure:
 
 ```md
 ## Findings
+
 - Missing or weak parts (be specific)
 
 ## Recommended slice changes
+
 - Ordered list
 
 ## Repayment trigger to record
+
 - One concrete trigger the team should track
 
 ## Conditions that require planning before shipping
+
 - Contracts, data, security, migration, or other hard boundaries
 ```
 

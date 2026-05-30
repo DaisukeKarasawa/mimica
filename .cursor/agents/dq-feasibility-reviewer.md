@@ -25,17 +25,22 @@ Return exactly this structure:
 
 ```md
 ## Findings
+
 - [Risk or concern]
 
 ## Evidence
+
 - [Specific code, requirement, command result, documentation, or Unknown]
 
 ## Suspected Failure Pattern
+
 - [Pattern name or None]
 
 ## Acceptable Exception
+
 - [Conditions that would make the current choice acceptable]
 
 ## Overturning Evidence
+
 - [What would change this assessment]
 ```

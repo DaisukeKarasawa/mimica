@@ -17,7 +17,9 @@ export function buildContextPrompt(context: MessageContext): string {
     parts.push(`Language: ${context.currentFileLanguage}`);
   }
   if (context.selectedText) {
-    parts.push(`Selected text (${context.selectionStartLine ?? "?"}-${context.selectionEndLine ?? "?"}):\n${context.selectedText}`);
+    parts.push(
+      `Selected text (${context.selectionStartLine ?? "?"}-${context.selectionEndLine ?? "?"}):\n${context.selectedText}`,
+    );
   }
   return parts.join("\n");
 }

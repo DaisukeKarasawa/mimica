@@ -79,8 +79,7 @@ export function createMainWindow(): BrowserWindowType {
     },
   });
 
-  const devServerUrl =
-    process.env.ELECTRON_RENDERER_URL ?? process.env.VITE_DEV_SERVER_URL;
+  const devServerUrl = process.env.ELECTRON_RENDERER_URL ?? process.env.VITE_DEV_SERVER_URL;
 
   if (devServerUrl) {
     void win.loadURL(devServerUrl);

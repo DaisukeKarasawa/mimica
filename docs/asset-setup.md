@@ -13,11 +13,11 @@ cp templates/assets/*.json ~/MimicaAssets/characters/rio/
 
 ## 必要ファイル
 
-| ファイル | 説明 |
-|----------|------|
-| `CH0158_home.skel` | Spine スケルトン |
-| `CH0158_home.atlas` | アトラス定義 |
-| `textures/*.png` | テクスチャ |
+| ファイル                            | 説明                          |
+| ----------------------------------- | ----------------------------- |
+| `CH0158_home.skel`                  | Spine スケルトン              |
+| `CH0158_home.atlas`                 | アトラス定義                  |
+| `textures/*.png`                    | テクスチャ                    |
 | `metadata.json` / `motion-map.json` | Mimica テンプレートからコピー |
 
 ## 入手

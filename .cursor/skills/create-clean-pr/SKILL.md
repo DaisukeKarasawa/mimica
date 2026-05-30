@@ -45,12 +45,12 @@ resolved through `AskQuestion` before `gh pr create` runs.
 
 ## Differences from nearby skills
 
-| Skill / asset | Relationship |
-| --- | --- |
-| `decision-scope-clarification` | Clarifies execution paths before work. This skill collects PR-specific Why, verification, and review expectations. |
-| `split-to-prs` | Splits one pile of work into multiple PRs. This skill opens one PR. |
-| `small-slice-verified-implementation` | Implements and verifies code. This skill only pushes and opens the PR. |
-| `commands/git-actions/setup-pr.md` | Reference for extra `gh` flags and examples. Do not edit that file from this workflow. |
+| Skill / asset                         | Relationship                                                                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `decision-scope-clarification`        | Clarifies execution paths before work. This skill collects PR-specific Why, verification, and review expectations. |
+| `split-to-prs`                        | Splits one pile of work into multiple PRs. This skill opens one PR.                                                |
+| `small-slice-verified-implementation` | Implements and verifies code. This skill only pushes and opens the PR.                                             |
+| `commands/git-actions/setup-pr.md`    | Reference for extra `gh` flags and examples. Do not edit that file from this workflow.                             |
 
 ## Hard rules
 
@@ -68,23 +68,23 @@ resolved through `AskQuestion` before `gh pr create` runs.
 
 ### Always required (ask if unclear)
 
-| Section | Content |
-| --- | --- |
-| 概要 | What changed, in plain Japanese |
-| 背景・目的 | Why the change exists; link issues when provided |
-| 実装内容 | Bullet list of main changes |
-| 確認手順 | Steps for reviewers to verify; include results only if the user confirmed them |
-| レビュー観点 | What kind of feedback is wanted (quick scan, design, security, etc.) |
+| Section      | Content                                                                        |
+| ------------ | ------------------------------------------------------------------------------ |
+| 概要         | What changed, in plain Japanese                                                |
+| 背景・目的   | Why the change exists; link issues when provided                               |
+| 実装内容     | Bullet list of main changes                                                    |
+| 確認手順     | Steps for reviewers to verify; include results only if the user confirmed them |
+| レビュー観点 | What kind of feedback is wanted (quick scan, design, security, etc.)           |
 
 ### Conditionally required (ask whether it applies, then ask for content if yes)
 
-| Section | When |
-| --- | --- |
-| 原因と対処 | Bug fix |
-| 変更結果 | UI, UX, or API behavior change |
-| スコープ外 | Intentional exclusions from this PR |
-| 関連 | Linked issues; use `Closes #n` when the user confirms auto-close |
-| 注意事項 | Post-merge commands or operational follow-up |
+| Section    | When                                                             |
+| ---------- | ---------------------------------------------------------------- |
+| 原因と対処 | Bug fix                                                          |
+| 変更結果   | UI, UX, or API behavior change                                   |
+| スコープ外 | Intentional exclusions from this PR                              |
+| 関連       | Linked issues; use `Closes #n` when the user confirms auto-close |
+| 注意事項   | Post-merge commands or operational follow-up                     |
 
 ### Optional (include only when the user mentions them)
 
@@ -100,6 +100,7 @@ Use this structure for the final Japanese body. Remove sections that do not appl
 ## 背景・目的
 
 ## 実装内容
+
 -
 
 ## 確認手順
@@ -140,17 +141,17 @@ repo inspection.
 
 ### Typical Ask topics
 
-| Topic | Why |
-| --- | --- |
-| 背景・目的 | Not derivable from diff alone |
-| 関連 Issue | Often absent from commits |
-| レビューの種類・深さ | GitHub review best practice |
-| 動作確認の実施と結果 | Needed for 確認手順 |
-| Draft か Open か | Required every run |
-| ベースブランチ | When not the repo default |
-| 原因と対処 | Bug-fix PRs |
-| 変更結果の証跡 | UI/API changes (screenshots, sample responses) |
-| レビュワー | When team process requires explicit assignment |
+| Topic                | Why                                            |
+| -------------------- | ---------------------------------------------- |
+| 背景・目的           | Not derivable from diff alone                  |
+| 関連 Issue           | Often absent from commits                      |
+| レビューの種類・深さ | GitHub review best practice                    |
+| 動作確認の実施と結果 | Needed for 確認手順                            |
+| Draft か Open か     | Required every run                             |
+| ベースブランチ       | When not the repo default                      |
+| 原因と対処           | Bug-fix PRs                                    |
+| 変更結果の証跡       | UI/API changes (screenshots, sample responses) |
+| レビュワー           | When team process requires explicit assignment |
 
 ### Do not Ask (gather first)
 
@@ -277,16 +278,20 @@ Copy and track when helpful:
 
 ```markdown
 ## 概要
+
 ログイン失敗時にユーザー向けエラーメッセージが表示されない問題を修正する。
 
 ## 背景・目的
+
 #456 で報告された UX 不具合に対応する。
 
 ## 原因と対処
+
 **原因**: 認証失敗時に例外が握りつぶされ、UI へメッセージが渡っていなかった。
 **対処**: 失敗理由を UI 層へ返すようハンドリングを整理した。
 
 ## 確認手順
+
 1. 誤パスワードでログインする
 2. 「パスワードが正しくありません」が表示されることを確認した
 ```
@@ -295,6 +300,7 @@ Copy and track when helpful:
 
 ```markdown
 ## 背景・目的
+
 おそらくログイン周りの改善のため。
 ```
 
@@ -302,13 +308,13 @@ Do not publish this — Why is inferred, not confirmed.
 
 ## Stop conditions
 
-| Condition | Action |
-| --- | --- |
-| `gh` missing or auth failed | Guide setup, stop |
-| No commits to publish | Stop, ask user to commit or clarify branch |
-| Required section unknown | `AskQuestion`, do not create PR |
-| Push failed | Stop, fix push first |
-| User cancels or defers PR | Stop without `gh pr create` |
+| Condition                   | Action                                     |
+| --------------------------- | ------------------------------------------ |
+| `gh` missing or auth failed | Guide setup, stop                          |
+| No commits to publish       | Stop, ask user to commit or clarify branch |
+| Required section unknown    | `AskQuestion`, do not create PR            |
+| Push failed                 | Stop, fix push first                       |
+| User cancels or defers PR   | Stop without `gh pr create`                |
 
 ## References
 

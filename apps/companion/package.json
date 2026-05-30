@@ -28,17 +28,19 @@
     "@types/react-dom": "^19.0.2",
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.3.4",
-    "electron": "^33.4.11",
-    "electron-vite": "^2.3.0",
+    "electron": "^39.8.5",
+    "electron-vite": "^5.0.0",
     "typescript": "^5.7.2",
-    "vite": "^5.4.11"
+    "vite": "^6.4.2"
   },
   "build": {
     "extraResources": [
       {
         "from": "../../templates/persona",
         "to": "templates/persona",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ]
   }

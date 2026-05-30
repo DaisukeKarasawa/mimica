@@ -21,7 +21,9 @@ const binCandidates = [
 ];
 const bin = binCandidates.find((p) => existsSync(p));
 if (!bin) {
-  console.error("electron-vite が見つかりません。リポジトリ直下で pnpm install を実行してください。");
+  console.error(
+    "electron-vite が見つかりません。リポジトリ直下で pnpm install を実行してください。",
+  );
   process.exit(1);
 }
 

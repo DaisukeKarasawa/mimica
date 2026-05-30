@@ -3,10 +3,7 @@ import type { AvatarState } from "./chat.js";
 export type { AvatarState };
 
 /** Single source for avatar UI copy (status bar vs stage badge). */
-export const AVATAR_STATE_LABELS: Record<
-  AvatarState,
-  { status: string; badge: string }
-> = {
+export const AVATAR_STATE_LABELS: Record<AvatarState, { status: string; badge: string }> = {
   idle: { status: "待機中", badge: "待機" },
   thinking: { status: "考え中…", badge: "考え中" },
   talking: { status: "回答中", badge: "回答中" },

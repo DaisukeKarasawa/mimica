@@ -128,106 +128,99 @@ export function ChatPanel({
       </div>
 
       <div className="chat-body">
-      {showChat ? (
-        <>
-          <div className="context">
-            <div className="chip">Workspace: {basename(editorContext?.workspacePath) ?? "—"}</div>
-            <div className="chip">Current: {basename(editorContext?.currentFilePath) ?? "—"}</div>
-            <div className="chip">
-              Selection:{" "}
-              {editorContext?.selectedText
-                ? `${(editorContext.selectionEndLine ?? 0) - (editorContext.selectionStartLine ?? 0) + 1} lines`
-                : "—"}
+        {showChat ? (
+          <>
+            <div className="context">
+              <div className="chip">Workspace: {basename(editorContext?.workspacePath) ?? "—"}</div>
+              <div className="chip">Current: {basename(editorContext?.currentFilePath) ?? "—"}</div>
+              <div className="chip">
+                Selection:{" "}
+                {editorContext?.selectedText
+                  ? `${(editorContext.selectionEndLine ?? 0) - (editorContext.selectionStartLine ?? 0) + 1} lines`
+                  : "—"}
+              </div>
             </div>
-          </div>
 
-          <div className="messages">
-            {!activeSession && (
-              <p className="chat-empty">
-                タブがありません。「+」で新規チャットを開くか、「履歴」からセッションを選んでください。
-              </p>
-            )}
-            {activeSession?.messages.map((msg) =>
-              msg.role === "user" ? (
-                <div key={msg.id} className="msg user">
-                  <div className="bubble">{msg.content}</div>
-                </div>
-              ) : (
-                <div key={msg.id} className="msg agent">
-                  {chatIconUrl ? (
-                    <img
-                      src={chatIconUrl}
-                      alt=""
-                      className="agent-icon"
-                      title="調月リオ"
-                    />
-                  ) : (
-                    <div className="agent-icon" title="キャラクターアイコン（未配置）" />
-                  )}
-                  <div className="bubble">
-                    <div className="agent-name-row">
-                      <span className="meta">
-                        {AGENT_DISPLAY_NAME} · {msg.role === "assistant" ? avatarState : "system"}
-                      </span>
-                    </div>
-                    <MarkdownMessage content={msg.content} />
-                    {msg.toolCalls?.map((tool) => (
-                      <div key={tool.id} className="tool-card">
-                        tool: {tool.name}
-                        {tool.detail ? ` · ${tool.detail}` : ""}
-                      </div>
-                    ))}
+            <div className="messages">
+              {!activeSession && (
+                <p className="chat-empty">
+                  タブがありません。「+」で新規チャットを開くか、「履歴」からセッションを選んでください。
+                </p>
+              )}
+              {activeSession?.messages.map((msg) =>
+                msg.role === "user" ? (
+                  <div key={msg.id} className="msg user">
+                    <div className="bubble">{msg.content}</div>
                   </div>
-                </div>
-              ),
-            )}
-            {showThinkingIndicator && (
-              <ThinkingIndicator chatIconUrl={chatIconUrl} />
-            )}
-          </div>
+                ) : (
+                  <div key={msg.id} className="msg agent">
+                    {chatIconUrl ? (
+                      <img src={chatIconUrl} alt="" className="agent-icon" title="調月リオ" />
+                    ) : (
+                      <div className="agent-icon" title="キャラクターアイコン（未配置）" />
+                    )}
+                    <div className="bubble">
+                      <div className="agent-name-row">
+                        <span className="meta">
+                          {AGENT_DISPLAY_NAME} · {msg.role === "assistant" ? avatarState : "system"}
+                        </span>
+                      </div>
+                      <MarkdownMessage content={msg.content} />
+                      {msg.toolCalls?.map((tool) => (
+                        <div key={tool.id} className="tool-card">
+                          tool: {tool.name}
+                          {tool.detail ? ` · ${tool.detail}` : ""}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ),
+              )}
+              {showThinkingIndicator && <ThinkingIndicator chatIconUrl={chatIconUrl} />}
+            </div>
 
-          <div className="composer">
-            {isStreaming && (
-              <div className="runbar">
-                <span>Agent 応答中… キャラクター状態: {avatarState}</span>
-                <button type="button" className="cancel" onClick={onCancel}>
-                  キャンセル
+            <div className="composer">
+              {isStreaming && (
+                <div className="runbar">
+                  <span>Agent 応答中… キャラクター状態: {avatarState}</span>
+                  <button type="button" className="cancel" onClick={onCancel}>
+                    キャンセル
+                  </button>
+                </div>
+              )}
+              <div className="input-row">
+                <textarea
+                  placeholder="キャラクターに相談する…（Shift+Enter で送信）"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  disabled={!activeSession}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" || !e.shiftKey) return;
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                    e.preventDefault();
+                    handleSubmit();
+                  }}
+                />
+                <button
+                  type="button"
+                  className="send"
+                  onClick={handleSubmit}
+                  disabled={isStreaming || !activeSession}
+                  title="Shift+Enter で送信"
+                >
+                  ↵
                 </button>
               </div>
-            )}
-            <div className="input-row">
-              <textarea
-                placeholder="キャラクターに相談する…（Shift+Enter で送信）"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={!activeSession}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter" || !e.shiftKey) return;
-                  if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-                  e.preventDefault();
-                  handleSubmit();
-                }}
-              />
-              <button
-                type="button"
-                className="send"
-                onClick={handleSubmit}
-                disabled={isStreaming || !activeSession}
-                title="Shift+Enter で送信"
-              >
-                ↵
-              </button>
             </div>
-          </div>
-        </>
-      ) : (
-        <ChatHistoryPanel
-          sessions={historySessions}
-          activeSessionId={activeSessionId}
-          onSelect={onSelectHistorySession}
-          onDelete={onDeleteSession}
-        />
-      )}
+          </>
+        ) : (
+          <ChatHistoryPanel
+            sessions={historySessions}
+            activeSessionId={activeSessionId}
+            onSelect={onSelectHistorySession}
+            onDelete={onDeleteSession}
+          />
+        )}
       </div>
     </aside>
   );

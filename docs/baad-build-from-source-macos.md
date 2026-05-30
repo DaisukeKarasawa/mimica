@@ -2,9 +2,9 @@
 
 Releases の zip バイナリは使わず、**GitHub のソースをクローン → 自分の Mac でビルド** する手順。
 
-- macOS の「マルウェア検証」ダイアログを避けやすい  
-- 中身は公開リポジトリのソースから追える  
-- 個人利用・非配布の前提は変わりません  
+- macOS の「マルウェア検証」ダイアログを避けやすい
+- 中身は公開リポジトリのソースから追える
+- 個人利用・非配布の前提は変わりません
 
 ---
 
@@ -37,8 +37,8 @@ Rust のビルドに必要です。
 xcode-select --install
 ```
 
-- ポップアップが出たら **「インストール」**  
-- すでに入っている場合は「インストール済み」と出る → そのまま次へ  
+- ポップアップが出たら **「インストール」**
+- すでに入っている場合は「インストール済み」と出る → そのまま次へ
 
 ---
 
@@ -54,8 +54,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 表示された質問:
 
-| 質問 | 選び方 |
-|------|--------|
+| 質問                                     | 選び方                                        |
+| ---------------------------------------- | --------------------------------------------- |
 | `1) Proceed with installation (default)` | **1** を押して Enter（そのまま Enter でも可） |
 
 ### 3-2. パスを反映
@@ -75,6 +75,7 @@ cargo --version
 
 > **毎回 `cargo: command not found` になる場合**  
 > `~/.zshrc` に次が入っているか確認:
+>
 > ```bash
 > echo 'source "$HOME/.cargo/env"' >> ~/.zshrc
 > source ~/.zshrc
@@ -114,8 +115,8 @@ cd ~/dev/BA-AD
 cargo build --release --locked
 ```
 
-- **初回は 5〜15 分** かかることがあります（依存 crate のダウンロード）  
-- 最後に `Finished release` と出れば成功  
+- **初回は 5〜15 分** かかることがあります（依存 crate のダウンロード）
+- 最後に `Finished release` と出れば成功
 
 バイナリの場所:
 
@@ -217,13 +218,13 @@ AssetBundle の中身（`.skel` / `.atlas` / PNG）を取り出す:
 
 ## よくあるつまずき
 
-| 症状 | 対処 |
-|------|------|
-| `cargo: command not found` | `source "$HOME/.cargo/env"` |
-| `linker cc not found` | `xcode-select --install` |
-| ビルドが遅い | 初回のみ。2 回目以降は速い |
+| 症状                                | 対処                                               |
+| ----------------------------------- | -------------------------------------------------- |
+| `cargo: command not found`          | `source "$HOME/.cargo/env"`                        |
+| `linker cc not found`               | `xcode-select --install`                           |
+| ビルドが遅い                        | 初回のみ。2 回目以降は速い                         |
 | `baad: command not found`（方法 A） | `~/dev/BA-AD/target/release/baad` をフルパスで実行 |
-| ダウンロード 0 件 | `baad --clean` → `baad --update` → §⑧ 再実行 |
+| ダウンロード 0 件                   | `baad --clean` → `baad --update` → §⑧ 再実行       |
 
 ---
 
@@ -252,6 +253,6 @@ rm ~/.cargo/bin/baad
 
 ## 関連
 
-- リポジトリ: https://github.com/Deathemonic/BA-AD  
-- Mimica 全体: [spine-asset-guide.md](./spine-asset-guide.md)  
+- リポジトリ: https://github.com/Deathemonic/BA-AD
+- Mimica 全体: [spine-asset-guide.md](./spine-asset-guide.md)
 - zip 版（非推奨）: [baad-install-macos.md](./baad-install-macos.md)

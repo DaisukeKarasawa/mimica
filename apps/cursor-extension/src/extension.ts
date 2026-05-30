@@ -30,7 +30,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("mimica.askAboutSelection", () => void pushContext()),
     vscode.commands.registerCommand("mimica.askAboutCurrentFile", () => void pushContext()),
     vscode.commands.registerCommand("mimica.reloadCharacter", () => {
-      void vscode.window.showInformationMessage("キャラクターの再読み込みは Companion 側で行います。");
+      void vscode.window.showInformationMessage(
+        "キャラクターの再読み込みは Companion 側で行います。",
+      );
     }),
     vscode.commands.registerCommand("mimica.openSettings", () => {
       void vscode.window.showInformationMessage("設定画面は今後実装予定です。");
