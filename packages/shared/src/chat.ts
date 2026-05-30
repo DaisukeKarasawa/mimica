@@ -16,7 +16,13 @@ export type AgentRunState =
   | "cancelled"
   | "failed";
 
-export type AgentMode = "ask" | "agent";
+export type AgentMode = "ask" | "agent" | "plan";
+
+export const AGENT_MODE_LABELS: Record<AgentMode, string> = {
+  ask: "Ask",
+  agent: "Agent",
+  plan: "Plan",
+};
 
 export type MessageRole = "user" | "assistant" | "system";
 

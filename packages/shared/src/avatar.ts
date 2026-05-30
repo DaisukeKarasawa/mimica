@@ -30,9 +30,19 @@ export interface MotionMapEntry {
 
 export type MotionMap = Record<AvatarState, MotionMapEntry>;
 
+/** Axis-aligned crop in skeleton space (with ATLAS_SCALE). Overrides auto bounds when set. */
+export interface StageCropRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface CharacterMetadata {
   id: string;
   displayName: string;
   skelFile: string;
   atlasFile: string;
+  /** Optional fixed crop; otherwise computed from drawable slots (letterbox excluded). */
+  stageCrop?: StageCropRect;
 }
