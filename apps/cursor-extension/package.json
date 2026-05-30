@@ -50,6 +50,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/node": "^22.10.2",
     "@types/vscode": "^1.85.0",
     "@types/ws": "^8.5.13",
     "typescript": "^5.7.2"
