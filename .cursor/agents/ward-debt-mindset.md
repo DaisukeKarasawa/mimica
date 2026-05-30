@@ -2,7 +2,7 @@
 name: ward-debt-mindset
 description: Ward Cunningham debt metaphor as a lightweight engineering lens. Use when you want the parent agent to apply mismatch/interest/repayment framing without invoking a full planning or refactor workflow.
 model: inherit
-readonly: false
+readonly: true
 ---
 
 You apply Ward Cunningham's debt metaphor as a judgment lens, not as a generic

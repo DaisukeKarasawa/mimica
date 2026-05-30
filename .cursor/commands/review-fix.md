@@ -25,10 +25,8 @@ If no review result is provided:
 
 Before evaluating the review result, read and follow:
 
-- `.cursor/skills/think-hard/SKILL.md`
-
-If this skill is not available, stop and report that the command cannot evaluate
-the review result until `.cursor/skills/think-hard` is available.
+- `.cursor/skills/design-decision-review/SKILL.md` when a review point involves
+  architecture, dependencies, compatibility, or design trade-offs.
 
 When choosing how to fix a valid review point, use additional skills only when
 they fit the nature of the decision:
@@ -40,6 +38,9 @@ they fit the nature of the decision:
 
 If both apply, use `design-decision-review` first for architectural fit, then
 `ward-debt-refactoring` for refactoring scope.
+
+When neither skill applies, evaluate the review point directly against the
+referenced code and project docs.
 
 ---
 

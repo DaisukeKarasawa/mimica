@@ -44,7 +44,7 @@ or source-backed guidance.
 
 - Keep small tasks light. Do not turn routine work into a full decision memo.
 - For hard choices where the decision itself is the main work, use
-  `skills/ultra-think/SKILL.md` instead of expanding this rule into a workflow.
+  `.cursor/skills/design-decision-review/SKILL.md` instead of expanding this rule into a workflow.
 - If source evidence is required, gather the minimum evidence sufficient to
   support the claim, cite or name it precisely, and stop when the core request is
   answered.
