@@ -18,9 +18,10 @@
   overflow: hidden;
 }
 
-/* サイズは Pixi resizeTo + autoDensity に任せる（CSS 伸縮で歪めない） */
 .spine-host canvas {
   display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .stage--spine-active::before {

@@ -33,6 +33,7 @@ export class SpineStageController {
   private readonly trackIndex = 0;
   private disposed = false;
   private assetsLoaded = false;
+  private pendingFitFrames = 0;
 
   async mount(host: HTMLElement, config: SpineStageConfig): Promise<void> {
     if (this.disposed) throw new Error("SpineStageController is disposed");
@@ -77,14 +78,16 @@ export class SpineStageController {
       autoUpdate: true,
     });
     spine.pivot.set(0, 0);
-    spine.beforeUpdateWorldTransforms = () => {
-      stripViewportLetterbox(spine.skeleton);
+    spine.beforeUpdateWorldTransforms = (object) => {
+      stripViewportLetterbox(object.skeleton);
+      object.spineAttachmentsDirty = true;
     };
     viewContainer.addChild(spine);
     this.spine = spine;
 
     this.measureCropRect();
     this.fitSpineToStage();
+    this.scheduleStageFitRetries();
 
     this.resizeObserver = new ResizeObserver(() => {
       this.fitSpineToStage();
@@ -92,20 +95,12 @@ export class SpineStageController {
     this.resizeObserver.observe(host);
 
     this.setAvatarState("idle");
-    requestAnimationFrame(() => {
-      if (!this.disposed) {
-        this.measureCropRect();
-        this.fitSpineToStage();
-      }
-    });
   }
 
   setAvatarState(state: AvatarState): void {
     this.currentState = state;
     this.playState(state);
-    requestAnimationFrame(() => {
-      if (!this.disposed) this.fitSpineToStage();
-    });
+    this.scheduleStageFitRetries();
   }
 
   getAvatarState(): AvatarState {
@@ -114,6 +109,7 @@ export class SpineStageController {
 
   destroy(): void {
     this.disposed = true;
+    this.pendingFitFrames = 0;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     if (this.spine) {
@@ -144,9 +140,22 @@ export class SpineStageController {
   private stageSize(): { w: number; h: number } {
     const host = this.host;
     const app = this.app;
-    const w = host?.clientWidth ?? app?.screen.width ?? 0;
-    const h = host?.clientHeight ?? app?.screen.height ?? 0;
+    const w = Math.max(host?.clientWidth ?? 0, app?.screen.width ?? 0);
+    const h = Math.max(host?.clientHeight ?? 0, app?.screen.height ?? 0);
     return { w, h };
+  }
+
+  /** Host layout can settle after mount; retry fit until dimensions are stable. */
+  private scheduleStageFitRetries(frames = 4): void {
+    if (this.disposed) return;
+    this.pendingFitFrames = frames;
+    const tick = () => {
+      if (this.disposed || this.pendingFitFrames <= 0) return;
+      this.pendingFitFrames -= 1;
+      this.fitSpineToStage();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 
   private measureCropRect(): void {
@@ -180,8 +189,8 @@ export class SpineStageController {
   }
 
   /**
-   * crop 左上を viewContainer 原点に置き、cover スケール後にステージ中央へ寄せる。
-   * spine.scale は ATLAS_SCALE（Spine.from）× fitScale。metadata crop は ATLAS_SCALE 込みの計測値。
+   * crop は skeleton 空間（binary.scale = ATLAS_SCALE 込み）。Pixi 表示は spine.scale でさらに ATLAS_SCALE。
+   * getLocalBounds 計測と同じ: fitScale = max(w/(crop*ATLAS)), totalScale = ATLAS_SCALE * fitScale。
    */
   private applyCropLayout(
     spine: Spine,
@@ -190,7 +199,10 @@ export class SpineStageController {
     w: number,
     h: number,
   ): void {
-    const fitScale = Math.max(w / crop.width, h / crop.height);
+    const fitScale = Math.max(
+      w / (crop.width * ATLAS_SCALE),
+      h / (crop.height * ATLAS_SCALE),
+    );
     const totalScale = ATLAS_SCALE * fitScale;
     const scaledW = crop.width * totalScale;
     const scaledH = crop.height * totalScale;
@@ -199,6 +211,7 @@ export class SpineStageController {
     spine.scale.set(totalScale);
     spine.position.set(-crop.x * totalScale, -crop.y * totalScale);
 
+    viewContainer.pivot.set(0, 0);
     viewContainer.scale.set(1);
     viewContainer.position.set((w - scaledW) / 2, (h - scaledH) / 2);
     stripViewportLetterbox(spine.skeleton);

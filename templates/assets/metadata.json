@@ -2,11 +2,5 @@
   "id": "rio",
   "displayName": "調月リオ",
   "skelFile": "CH0158_home.skel",
-  "atlasFile": "CH0158_home.atlas",
-  "stageCrop": {
-    "x": -1310.74,
-    "y": -482.66,
-    "width": 2536.55,
-    "height": 1917.33
-  }
+  "atlasFile": "CH0158_home.atlas"
 }
