@@ -39,7 +39,7 @@
     "",
     "  fallback (string[], optional)",
     "    Used when animations is empty or missing clips. First name wins.",
-    "    Example: thinking uses Look_01_M with fallback Start_Idle_01.",
+    "    Example: thinking uses Look_01_M with fallback Idle_01.",
     "",
     "  returnTo (AvatarState, optional)",
     "    loop:false only — target state after one-shot completes (typically \"idle\").",
@@ -49,32 +49,32 @@
     "  _M  — body motion loops (e.g. Look_01_M, Talk_02_M, LookEnd_01_M).",
     "  _A  — action / expression one-shots (e.g. Pat_01_A, LookEnd_01_A).",
     "  *End* — paired end clip for a motion (PatEnd_01_A after Pat_01_A).",
-    "  No suffix — neutral idle/base (e.g. Start_Idle_01).",
+    "  No suffix — neutral idle/base (e.g. Idle_01). Start_Idle_01 has camera/scene motion.",
     "  CH####_* — scene-specific clips; verify with extract-animations before use.",
     "",
     "Minimal entry example:",
-    "  \"thinking\": { \"loop\": true, \"animations\": [\"Look_01_M\"], \"fallback\": [\"Start_Idle_01\"] }",
+    "  \"thinking\": { \"loop\": true, \"animations\": [\"Look_01_M\"], \"fallback\": [\"Idle_01\"] }",
     "",
     "Remove this \"//\" key after copy if you prefer a state-only file (runtime ignores it)."
   ],
   "idle": {
     "loop": true,
-    "animations": ["Start_Idle_01"]
+    "animations": ["Idle_01"]
   },
   "thinking": {
     "loop": true,
     "animations": ["Look_01_M"],
-    "fallback": ["Start_Idle_01"]
+    "fallback": ["Idle_01"]
   },
   "waiting": {
     "loop": true,
     "animations": ["LookEnd_01_M"],
-    "fallback": ["Start_Idle_01"]
+    "fallback": ["Idle_01"]
   },
   "talking": {
     "loop": true,
     "animations": ["Talk_01_M", "Talk_02_M", "Talk_03_M", "Talk_04_M", "Talk_05_M"],
-    "fallback": ["Look_01_M", "Start_Idle_01"]
+    "fallback": ["Look_01_M", "Idle_01"]
   },
   "success": {
     "loop": false,

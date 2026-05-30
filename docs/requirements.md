@@ -257,17 +257,17 @@ type AvatarState = "idle" | "thinking" | "talking" | "success" | "error" | "wait
 {
   "idle": {
     "loop": true,
-    "animations": ["Start_Idle_01"]
+    "animations": ["Idle_01"]
   },
   "thinking": {
     "loop": true,
     "animations": ["Look_01_M"],
-    "fallback": ["Start_Idle_01"]
+    "fallback": ["Idle_01"]
   },
   "waiting": {
     "loop": true,
     "animations": ["LookEnd_01_M"],
-    "fallback": ["Start_Idle_01"]
+    "fallback": ["Idle_01"]
   },
   "talking": {
     "loop": true,
@@ -276,7 +276,7 @@ type AvatarState = "idle" | "thinking" | "talking" | "success" | "error" | "wait
       "CH0158_MemorialLobby_5_2",
       "CH0158_MemorialLobby_5_3"
     ],
-    "fallback": ["Look_01_M", "Start_Idle_01"]
+    "fallback": ["Look_01_M", "Idle_01"]
   },
   "success": {
     "loop": false,
@@ -294,7 +294,7 @@ type AvatarState = "idle" | "thinking" | "talking" | "success" | "error" | "wait
 確認すべきこと:
 
 - `CH0158_MemorialLobby_5_*` がtalking用途に使えるか
-- `Start_Idle_01` が常時idleに適しているか
+- 常時 idle は `Idle_01`（`Start_Idle_01` は画面移動ありのため非推奨）
 - `Pat_01_*` がsuccess/reactionに適しているか
 - `Look_01_M` がthinkingに適しているか
 - 明示的なTalk系アニメーションが存在するか
