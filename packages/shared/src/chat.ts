@@ -50,7 +50,7 @@ export interface ChatSession {
   createdAt: string;
   updatedAt: string;
   workspacePath: string;
-  characterId: "rio";
+  characterId: string;
   messages: ChatMessage[];
 }
 

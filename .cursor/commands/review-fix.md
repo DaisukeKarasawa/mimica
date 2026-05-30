@@ -25,10 +25,10 @@ If no review result is provided:
 
 Before evaluating the review result, read and follow:
 
-- `~/.cursor/skills/think-hard/SKILL.md`
+- `.cursor/skills/think-hard/SKILL.md`
 
 If this skill is not available, stop and report that the command cannot evaluate
-the review result until `~/.cursor/skills/think-hard` is available.
+the review result until `.cursor/skills/think-hard` is available.
 
 When choosing how to fix a valid review point, use additional skills only when
 they fit the nature of the decision:

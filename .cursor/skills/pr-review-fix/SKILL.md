@@ -43,7 +43,7 @@ Optional: `jq` for filtering GraphQL JSON.
 
 Copy and track:
 
-```
+```markdown
 PR review fix:
 - [ ] 1. Resolve PR and checkout head branch
 - [ ] 2. Fetch unresolved review threads only
@@ -123,7 +123,7 @@ Run the smallest meaningful checks for touched surfaces (targeted tests, typeche
 
 Delegate to subagent:
 
-```
+```python
 Task(subagent_type="thermo-nuclear-code-quality-review", prompt="...")
 ```
 
