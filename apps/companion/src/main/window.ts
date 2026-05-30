@@ -22,7 +22,21 @@ function loadWindowState(): WindowState {
   try {
     const path = windowStatePath();
     if (existsSync(path)) {
-      return JSON.parse(readFileSync(path, "utf8")) as WindowState;
+      const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+      if (parsed !== null && typeof parsed === "object") {
+        const { width, height, x, y } = parsed as Record<string, unknown>;
+        if (
+          typeof width === "number" &&
+          isFinite(width) &&
+          typeof height === "number" &&
+          isFinite(height)
+        ) {
+          const state: WindowState = { width, height };
+          if (typeof x === "number" && isFinite(x)) state.x = x;
+          if (typeof y === "number" && isFinite(y)) state.y = y;
+          return state;
+        }
+      }
     }
   } catch {
     /* use defaults */
@@ -76,6 +90,7 @@ export function createMainWindow(): BrowserWindowType {
 
   win.on("close", () => saveWindowState(win));
 
+  // Electron closes the window on Cmd/Ctrl+W by default; suppress so chat tab shortcuts can use it.
   win.webContents.on("before-input-event", (event, input) => {
     if (input.type !== "keyDown") return;
     const mod = process.platform === "darwin" ? input.meta : input.control;

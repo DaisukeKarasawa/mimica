@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import type { ClientMessage, EditorContext, ServerMessage } from "@mimica/shared";
 
@@ -17,7 +17,12 @@ function isEditorContext(value: unknown): value is EditorContext {
 function parseClientMessage(data: unknown, token: string): ClientMessage | null {
   if (!data || typeof data !== "object") return null;
   const msg = data as Record<string, unknown>;
-  if (msg.token !== token || typeof msg.type !== "string") return null;
+  if (typeof msg.type !== "string") return null;
+  if (typeof msg.token !== "string") return null;
+  const providedToken = Buffer.from(msg.token, "utf8");
+  const expectedToken = Buffer.from(token, "utf8");
+  if (providedToken.length !== expectedToken.length) return null;
+  if (!timingSafeEqual(providedToken, expectedToken)) return null;
 
   switch (msg.type) {
     case "ping":

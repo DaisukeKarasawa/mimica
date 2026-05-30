@@ -53,7 +53,7 @@ if (!gotLock) {
     attachMainWindow(createMainWindow());
 
     ipcMain.handle("character:assets", () => getCharacterAssetStatus());
-    ipcMain.handle("agent:submit", (_e, payload) => agentService!.submit(payload));
+    ipcMain.handle("agent:submit", (_e, payload) => agentService?.submit(payload));
     ipcMain.handle("agent:cancel", () => agentService?.cancel());
 
     ipcMain.handle("sessions:list", () => sessionStore.list());

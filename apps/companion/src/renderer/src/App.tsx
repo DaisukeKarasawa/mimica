@@ -33,6 +33,14 @@ export default function App() {
   const [devPreview, setDevPreview] = useState(false);
   const streamingContentRef = useRef("");
   const activeRunIdRef = useRef<string | null>(null);
+  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCompletionTimeout = () => {
+    if (completionTimeoutRef.current !== null) {
+      clearTimeout(completionTimeoutRef.current);
+      completionTimeoutRef.current = null;
+    }
+  };
 
   const director = useMemo(
     () => new CharacterDirector({ onStateChange: setAvatarState }),
@@ -113,19 +121,25 @@ export default function App() {
             createdAt: new Date().toISOString(),
             agentRunId: event.runId,
           };
-          setAllSessions((prev) =>
-            prev.map((s) => {
+          let nextSessions: ChatSession[] = [];
+          setAllSessions((prev) => {
+            nextSessions = prev.map((s) => {
               if (s.id !== event.sessionId) return s;
               const rest = s.messages.filter((m) => m.id !== streamId);
-              const next = { ...s, messages: [...rest, assistantMsg] };
-              void window.mimica.saveSession(next);
-              return next;
-            }),
-          );
+              return { ...s, messages: [...rest, assistantMsg] };
+            });
+            return nextSessions;
+          });
+          const updatedSession = nextSessions.find((s) => s.id === event.sessionId);
+          if (updatedSession) {
+            void window.mimica.saveSession(updatedSession);
+          }
           director.setState("success", true);
           setStatusText("完了");
           setIsStreaming(false);
-          setTimeout(() => {
+          clearCompletionTimeout();
+          completionTimeoutRef.current = setTimeout(() => {
+            completionTimeoutRef.current = null;
             director.setState("idle", true);
             setStatusText("待機中");
           }, 1200);
@@ -137,7 +151,9 @@ export default function App() {
           setIsStreaming(false);
           director.setState("error", true);
           setStatusText(event.message);
-          setTimeout(() => {
+          clearCompletionTimeout();
+          completionTimeoutRef.current = setTimeout(() => {
+            completionTimeoutRef.current = null;
             director.setState("idle", true);
             setStatusText("待機中");
           }, 2000);
@@ -194,6 +210,7 @@ export default function App() {
     const unsubCtx = window.mimica.onEditorContext(setEditorContext);
     const unsubAgent = window.mimica.onAgentEvent(handleAgentEvent);
     return () => {
+      clearCompletionTimeout();
       clearInterval(interval);
       unsubCtx();
       unsubAgent();
@@ -336,6 +353,7 @@ export default function App() {
     const saved = await window.mimica.saveSession(updated);
     setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
 
+    clearCompletionTimeout();
     streamingContentRef.current = "";
     activeRunIdRef.current = uuidv4();
     director.setState("thinking", true);
@@ -351,6 +369,7 @@ export default function App() {
   };
 
   const handleCancel = async () => {
+    clearCompletionTimeout();
     await window.mimica.cancelAgent();
     setIsStreaming(false);
     streamingContentRef.current = "";

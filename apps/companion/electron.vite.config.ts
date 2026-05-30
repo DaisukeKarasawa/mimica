@@ -5,6 +5,8 @@ import react from "@vitejs/plugin-react";
 /** Bundled into main CJS (ESM-only exports). @mimica/agent-orchestrator pulls in @cursor/sdk — load via import() instead. */
 const WORKSPACE_MAIN_DEPS = ["@mimica/shared"];
 
+// Packaged persona templates: package.json "build.extraResources" → process.resourcesPath/templates/persona
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin({ exclude: WORKSPACE_MAIN_DEPS })],

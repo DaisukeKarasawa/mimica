@@ -573,7 +573,11 @@
   color: var(--text);
   background: rgba(13, 12, 12, 0.38);
   font-size: 13px;
-  outline: none;
+}
+
+.history-search input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .history-groups {
@@ -938,8 +942,12 @@ textarea {
   padding: 12px;
   color: var(--text);
   background: rgba(13, 12, 12, 0.38);
-  outline: none;
   font-size: 13px;
+}
+
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .send {

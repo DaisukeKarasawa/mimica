@@ -3,7 +3,7 @@ import type { WebContents } from "electron";
 import type { AgentRunState, EditorContext } from "@mimica/shared";
 import { toMessageContext } from "@mimica/shared";
 import type { AgentRunner } from "@mimica/agent-orchestrator";
-import { expandHomePath } from "./paths.js";
+import { resolveWorkspacePath } from "./paths.js";
 import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 
@@ -49,6 +49,7 @@ export class AgentService {
     const runner = await this.getRunner();
 
     const emitState = (state: AgentRunState) => {
+      if (runId !== this.activeRunId) return;
       wc?.send("agent-event", {
         type: "agent_state",
         sessionId: payload.sessionId,
@@ -70,53 +71,71 @@ export class AgentService {
         ? allMessages.slice(0, -1)
         : allMessages;
 
-    const cwd = expandHomePath(context.workspacePath ?? payload.workspacePath);
+    const cwd = resolveWorkspacePath(context.workspacePath ?? payload.workspacePath);
 
-    await runner.runChat({
-      prompt: payload.content,
-      workspacePath: cwd,
-      context,
-      history,
-      personaSystemPrompt: resolvePersonaSystemPrompt(),
-      callbacks: {
-        onState: emitState,
-        onDelta: (chunk) => {
-          wc?.send("agent-event", {
-            type: "agent_delta",
-            sessionId: payload.sessionId,
-            runId,
-            content: chunk,
-          });
+    try {
+      await runner.runChat({
+        prompt: payload.content,
+        workspacePath: cwd,
+        context,
+        history,
+        personaSystemPrompt: resolvePersonaSystemPrompt(),
+        callbacks: {
+          onState: emitState,
+          onDelta: (chunk) => {
+            wc?.send("agent-event", {
+              type: "agent_delta",
+              sessionId: payload.sessionId,
+              runId,
+              content: chunk,
+            });
+          },
+          onTool: (name, detail) => {
+            wc?.send("agent-event", {
+              type: "agent_tool",
+              sessionId: payload.sessionId,
+              runId,
+              name,
+              detail,
+            });
+          },
+          onComplete: (content) => {
+            if (runId !== this.activeRunId) return;
+            wc?.send("agent-event", {
+              type: "agent_complete",
+              sessionId: payload.sessionId,
+              runId,
+              content,
+            });
+            this.activeRunId = null;
+          },
+          onError: (message) => {
+            if (runId !== this.activeRunId) return;
+            wc?.send("agent-event", {
+              type: "agent_error",
+              sessionId: payload.sessionId,
+              runId,
+              message,
+            });
+            this.activeRunId = null;
+          },
         },
-        onTool: (name, detail) => {
-          wc?.send("agent-event", {
-            type: "agent_tool",
-            sessionId: payload.sessionId,
-            runId,
-            name,
-            detail,
-          });
-        },
-        onComplete: (content) => {
-          wc?.send("agent-event", {
-            type: "agent_complete",
-            sessionId: payload.sessionId,
-            runId,
-            content,
-          });
-          this.activeRunId = null;
-        },
-        onError: (message) => {
-          wc?.send("agent-event", {
-            type: "agent_error",
-            sessionId: payload.sessionId,
-            runId,
-            message,
-          });
-          this.activeRunId = null;
-        },
-      },
-    });
+      });
+    } catch (error) {
+      if (runId !== this.activeRunId) return;
+      const message =
+        error instanceof Error ? error.message : String(error);
+      wc?.send("agent-event", {
+        type: "agent_error",
+        sessionId: payload.sessionId,
+        runId,
+        message,
+      });
+    } finally {
+      if (this.activeRunId === runId) {
+        this.activeRunId = null;
+      }
+    }
   }
 
   async cancel(): Promise<void> {
