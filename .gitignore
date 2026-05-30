@@ -1,0 +1,33 @@
+node_modules/
+.pnpm-store/
+dist/
+out/
+.turbo/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+apps/companion/release/
+apps/cursor-extension/*.vsix
+.vscode-test/
+
+# Spine / extracted game assets (local only — see docs/spine-asset-guide.md)
+*.skel
+*.skel.bytes
+*.atlas
+
+# Local asset tree if copied or symlinked into the workspace
+MimicaAssets/
+
+# Persona dialogue (user-provided; may contain third-party game text)
+templates/persona/lines.json
+templates/persona/lines.source.txt
+
+# Secrets (real keys live outside Git)
+**/secrets.json
+!templates/secrets.example.json
+
+# Session / conversation persistence
+**/sessions/
