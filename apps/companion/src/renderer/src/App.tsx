@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { AvatarState, ChatMessage, ChatSession, EditorContext } from "@mimica/shared";
-import { AGENT_DISPLAY_NAME, avatarStatusLabel } from "@mimica/shared";
+import type { AgentMode, AvatarState, ChatMessage, ChatSession, EditorContext } from "@mimica/shared";
+import { AGENT_DISPLAY_NAME, DEFAULT_SETTINGS, avatarStatusLabel } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import type { CharacterAssetStatus } from "../../preload/index";
 import { TopBar } from "./components/TopBar";
@@ -23,6 +23,7 @@ export default function App() {
   const [statusText, setStatusText] = useState(avatarStatusLabel("idle"));
   const [characterAssets, setCharacterAssets] = useState<CharacterAssetStatus | null>(null);
   const [devPreview, setDevPreview] = useState(false);
+  const [agentMode, setAgentMode] = useState<AgentMode>(DEFAULT_SETTINGS.defaultAgentMode);
 
   const director = useMemo(() => new CharacterDirector({ onStateChange: setAvatarState }), []);
 
@@ -228,6 +229,7 @@ export default function App() {
       sessionId: saved.id,
       content,
       workspacePath: saved.workspacePath,
+      mode: agentMode,
       editorContext,
     });
   };
@@ -248,7 +250,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <TopBar connected={bridgeConnected} agentMode="agent" />
+      <TopBar connected={bridgeConnected} agentMode={agentMode} />
       <main className="main">
         <CharacterStage
           avatarState={avatarState}
@@ -266,6 +268,8 @@ export default function App() {
           editorContext={editorContext}
           isStreaming={isStreaming}
           avatarState={avatarState}
+          agentMode={agentMode}
+          onAgentModeChange={setAgentMode}
           chatIconUrl={characterAssets?.chatIconUrl}
           onSelectSession={(id) => {
             setActiveSessionId(id);

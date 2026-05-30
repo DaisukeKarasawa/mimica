@@ -17,8 +17,9 @@ export async function processAgentStream(params: {
   callbacks: AgentRunCallbacks;
   signal?: AbortSignal;
   isCancelled: () => boolean;
+  enforceReadOnly?: boolean;
 }): Promise<ProcessAgentStreamResult> {
-  const { run, callbacks, signal, isCancelled } = params;
+  const { run, callbacks, signal, isCancelled, enforceReadOnly = false } = params;
   let writeToolBlocked = false;
   let sawToolCall = false;
   let preToolText = "";
@@ -49,7 +50,11 @@ export async function processAgentStream(params: {
     }
 
     if (event.type === "tool_call") {
-      if (isWriteTool(event.name) && isBlockedToolCallStatus(event.status)) {
+      if (
+        enforceReadOnly &&
+        isWriteTool(event.name) &&
+        isBlockedToolCallStatus(event.status)
+      ) {
         await blockWriteTool(event.name);
         break;
       }

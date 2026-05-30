@@ -1,7 +1,7 @@
 import type { Run } from "@cursor/sdk";
-import type { ChatMessage, MessageContext } from "@mimica/shared";
+import type { AgentMode, ChatMessage, MessageContext } from "@mimica/shared";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
-import { createCursorAgent } from "./createCursorAgent.js";
+import { createCursorAgent, type CursorSdkConversationMode } from "./createCursorAgent.js";
 import { ensureReadOnlyHooks } from "./ensureReadOnlyHooks.js";
 import { buildContextPrompt } from "./eventMapper.js";
 import {
@@ -17,6 +17,7 @@ export type { AgentRunCallbacks } from "./agentCallbacks.js";
 export interface RunChatParams {
   prompt: string;
   workspacePath: string;
+  mode: AgentMode;
   context?: MessageContext;
   history?: ChatMessage[];
   apiKey?: string;
@@ -26,15 +27,40 @@ export interface RunChatParams {
   signal?: AbortSignal;
 }
 
-const READ_ONLY_PREAMBLE = `You are the Mimica coding companion (調月リオ UI). Read-only mode: do not create, edit, delete, or run commands that modify the workspace. You may read and analyze files.
-
-CRITICAL output rule for the user-visible message:
+const OUTPUT_RULES = `CRITICAL output rule for the user-visible message:
 - Output ONLY the final answer in 調月リオ persona (short intro + substantive reply + optional short closing).
 - NEVER write planning, process narration, or tool preamble to the user. Forbidden examples: 「調べます」「確認します」「ペルソナ設定を確認」「ワークスペースを読み取ります」「最新の情報を取得します」.
 - Do planning silently via tools. The user must not see your internal steps.
 - Format the substantive reply as GitHub-Flavored Markdown: use blank lines between sections; tables must have one row per line (never collapse table rows onto a single line).
 
 Reply in Japanese when the user writes in Japanese. Follow the persona instructions below.`;
+
+const ASK_PREAMBLE = `You are the Mimica coding companion (調月リオ UI) in Ask mode: do not create, edit, delete, or run commands that modify the workspace. You may read and analyze files.
+
+${OUTPUT_RULES}`;
+
+const AGENT_PREAMBLE = `You are the Mimica coding companion (調月リオ UI) in Agent mode: you may read, edit, and run shell commands in the workspace when needed to answer the user.
+
+${OUTPUT_RULES}`;
+
+const PLAN_PREAMBLE = `You are the Mimica coding companion (調月リオ UI) in Plan mode: explore the codebase, propose a clear plan, and only implement when the user confirms or asks you to build.
+
+${OUTPUT_RULES}`;
+
+function preambleForMode(mode: AgentMode): string {
+  switch (mode) {
+    case "ask":
+      return ASK_PREAMBLE;
+    case "plan":
+      return PLAN_PREAMBLE;
+    default:
+      return AGENT_PREAMBLE;
+  }
+}
+
+function sdkModeFor(mode: AgentMode): CursorSdkConversationMode {
+  return mode === "plan" ? "plan" : "agent";
+}
 
 function buildHistoryPrompt(messages: ChatMessage[]): string {
   const turns = messages.filter((m) => m.role === "user" || m.role === "assistant");
@@ -60,17 +86,25 @@ export class AgentRunner {
 
     this.cancelled = false;
     const fullPrompt = this.buildFullPrompt(params);
+    const enforceReadOnly = params.mode === "ask";
+    const sdkMode = sdkModeFor(params.mode);
 
     params.callbacks.onState("thinking");
 
-    const hooksResult = await ensureReadOnlyHooks(params.workspacePath);
-    if (!hooksResult.ok) {
-      params.callbacks.onWarning?.(`${READ_ONLY_HOOK_INSTALL_WARNING} (${hooksResult.message})`);
+    if (enforceReadOnly) {
+      const hooksResult = await ensureReadOnlyHooks(params.workspacePath);
+      if (!hooksResult.ok) {
+        params.callbacks.onWarning?.(`${READ_ONLY_HOOK_INSTALL_WARNING} (${hooksResult.message})`);
+      }
     }
 
     let agent: Awaited<ReturnType<typeof createCursorAgent>>;
     try {
-      agent = await createCursorAgent({ apiKey, workspacePath: params.workspacePath });
+      agent = await createCursorAgent({
+        apiKey,
+        workspacePath: params.workspacePath,
+        mode: sdkMode,
+      });
     } catch (err) {
       params.callbacks.onState("failed");
       params.callbacks.onError(err instanceof Error ? err.message : String(err));
@@ -80,7 +114,7 @@ export class AgentRunner {
     try {
       let writeToolBlocked = false;
       const blockWriteTool = async (name: string): Promise<void> => {
-        if (writeToolBlocked) return;
+        if (!enforceReadOnly || writeToolBlocked) return;
         writeToolBlocked = true;
         await this.activeRun?.cancel();
         params.callbacks.onState("failed");
@@ -88,7 +122,9 @@ export class AgentRunner {
       };
 
       const run = await agent.send(fullPrompt, {
+        mode: sdkMode,
         onDelta: async ({ update }) => {
+          if (!enforceReadOnly) return;
           const blocked = await handleSendToolDelta({
             update,
             run,
@@ -107,6 +143,7 @@ export class AgentRunner {
         callbacks: params.callbacks,
         signal: params.signal,
         isCancelled: () => this.cancelled,
+        enforceReadOnly,
       });
 
       if (streamResult.writeToolBlocked || writeToolBlocked) {
@@ -151,7 +188,7 @@ export class AgentRunner {
     const contextBlock = params.context ? buildContextPrompt(params.context) : "";
     const historyBlock = params.history ? buildHistoryPrompt(params.history) : "";
     return [
-      READ_ONLY_PREAMBLE,
+      preambleForMode(params.mode),
       params.personaSystemPrompt,
       historyBlock,
       contextBlock,

@@ -156,6 +156,5 @@ When changing how Mimica loads or maps Spine assets:
 - Dev-repo Cursor hooks: `.cursor/hooks.json` + `.cursor/hooks/security-guard.mjs`
   gate `beforeShellExecution` / `beforeMCPExecution` (deny remote-to-shell patterns;
   ask on package installs and risky MCP). Do not put MVP read-only guard here.
-- MVP read-only Agent enforcement is Companion-only: `ensureReadOnlyHooks()` injects
-  `packages/agent-orchestrator/hooks/mimica-read-only-guard.mjs` into the target
-  workspace at agent run time.
+- Companion Agent modes: **Ask** (read-only hooks + write-tool block), **Agent** (full
+  SDK tools), **Plan** (`mode: "plan"`). `ensureReadOnlyHooks()` runs only for Ask.

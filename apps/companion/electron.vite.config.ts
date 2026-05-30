@@ -32,7 +32,14 @@ export default defineConfig({
     resolve: {
       alias: {
         "@renderer": resolve(__dirname, "src/renderer/src"),
+        "@mimica/character-runtime": resolve(
+          __dirname,
+          "../../packages/character-runtime/src/index.ts",
+        ),
       },
+    },
+    optimizeDeps: {
+      exclude: ["@mimica/character-runtime"],
     },
     plugins: [react()],
   },

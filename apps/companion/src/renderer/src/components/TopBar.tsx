@@ -1,6 +1,9 @@
+import type { AgentMode } from "@mimica/shared";
+import { AGENT_MODE_LABELS } from "@mimica/shared";
+
 interface TopBarProps {
   connected: boolean;
-  agentMode: "ask" | "agent";
+  agentMode: AgentMode;
 }
 
 export function TopBar({ connected, agentMode }: TopBarProps) {
@@ -18,7 +21,7 @@ export function TopBar({ connected, agentMode }: TopBarProps) {
           <span className={`dot ${connected ? "connected" : "disconnected"}`} />
           {connected ? "Cursor 接続中" : "Cursor 未接続"}
         </div>
-        <div className="pill">モード: {agentMode === "agent" ? "Agent" : "Ask"}</div>
+        <div className="pill">モード: {AGENT_MODE_LABELS[agentMode]}</div>
         <div className="pill">モデル: Auto</div>
         <div className="pill">テーマ: Kanagawa Dragon</div>
       </div>

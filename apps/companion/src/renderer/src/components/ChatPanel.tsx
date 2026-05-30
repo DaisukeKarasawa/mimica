@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { AvatarState, ChatSession, EditorContext } from "@mimica/shared";
-import { AGENT_DISPLAY_NAME } from "@mimica/shared";
+import type { AgentMode, AvatarState, ChatSession, EditorContext } from "@mimica/shared";
+import { AGENT_DISPLAY_NAME, AGENT_MODE_LABELS } from "@mimica/shared";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
@@ -16,6 +16,8 @@ interface ChatPanelProps {
   editorContext: EditorContext | null;
   isStreaming: boolean;
   avatarState: AvatarState;
+  agentMode: AgentMode;
+  onAgentModeChange: (mode: AgentMode) => void;
   chatIconUrl?: string | null;
   onSelectSession: (id: string) => void;
   onCloseTab: (id: string) => void;
@@ -42,6 +44,8 @@ export function ChatPanel({
   editorContext,
   isStreaming,
   avatarState,
+  agentMode,
+  onAgentModeChange,
   chatIconUrl,
   onSelectSession,
   onCloseTab,
@@ -188,6 +192,20 @@ export function ChatPanel({
                   </button>
                 </div>
               )}
+              <div className="mode-row" role="group" aria-label="Agent モード">
+                {(["ask", "agent", "plan"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`mode-chip ${agentMode === mode ? "active" : ""}`}
+                    disabled={isStreaming}
+                    aria-pressed={agentMode === mode}
+                    onClick={() => onAgentModeChange(mode)}
+                  >
+                    {AGENT_MODE_LABELS[mode]}
+                  </button>
+                ))}
+              </div>
               <div className="input-row">
                 <textarea
                   placeholder="キャラクターに相談する…（Shift+Enter で送信）"

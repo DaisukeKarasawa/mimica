@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
-import type { EditorContext } from "@mimica/shared";
+import type { AgentMode, EditorContext } from "@mimica/shared";
 import { toMessageContext } from "@mimica/shared";
 import type { AgentRunner } from "@mimica/agent-orchestrator";
 import { resolveWorkspacePath } from "./paths.js";
@@ -12,6 +12,7 @@ export interface AgentSubmitPayload {
   sessionId: string;
   content: string;
   workspacePath: string;
+  mode: AgentMode;
   editorContext?: EditorContext | null;
 }
 
@@ -76,6 +77,7 @@ export class AgentService {
       await runner.runChat({
         prompt: payload.content,
         workspacePath: cwd,
+        mode: payload.mode,
         context,
         history,
         personaSystemPrompt: resolvePersonaSystemPrompt(),

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentEventMessage,
+  AgentMode,
   CharacterMetadata,
   ChatSession,
   EditorContext,
@@ -21,6 +22,7 @@ export interface AgentSubmitPayload {
   sessionId: string;
   content: string;
   workspacePath: string;
+  mode: AgentMode;
   editorContext?: EditorContext | null;
 }
 

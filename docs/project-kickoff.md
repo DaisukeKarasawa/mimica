@@ -42,9 +42,10 @@ Cursor Extension          Electron Companion App
 
 | 項目                 | 決定                                                                       |
 | -------------------- | -------------------------------------------------------------------------- |
-| デフォルトモード     | **Agent（読取専用）**                                                      |
-| ツール利用           | ファイル読取等は可                                                         |
-| コード編集・自動適用 | MVP では不可（Phase 5 以降）                                               |
+| デフォルトモード     | **Agent**（UI で Ask / Agent / Plan 切替）                                 |
+| Ask                  | 読取専用（hook + ストリーム遮断）                                          |
+| Agent / Plan         | Cursor SDK の `mode: "agent"` / `"plan"`（編集・シェル可）                   |
+| 差分 UI              | Accept/Reject は Phase 5 以降                                              |
 | ツール実行 UI        | **基本ツールカード**（`docs/ui-mock.html` 風、`read_file` 等をカード表示） |
 | Avatar `waiting`     | **MVP で使用**（ユーザー入力待ち・確認質問時）                             |
 
