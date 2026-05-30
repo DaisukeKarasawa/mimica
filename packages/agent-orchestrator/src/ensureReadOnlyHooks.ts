@@ -1,17 +1,30 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MIMICA_READ_ONLY_HOOK_SCRIPT } from "./readOnlyTools.js";
+import { MIMICA_READ_ONLY_HOOK_SCRIPT } from "./readOnlyPolicy.js";
 
 const HOOK_GUARD_MARKER = "mimica-read-only-guard";
+const DENIED_HOOK_TOOLS_FILE = "denied-hook-tools.mjs";
 
 interface HooksConfig {
   version: number;
   hooks: Record<string, Array<Record<string, unknown>>>;
 }
 
+export type EnsureReadOnlyHooksResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+function packageRoot(): string {
+  return join(dirname(fileURLToPath(import.meta.url)), "..");
+}
+
 function bundledHookScriptPath(): string {
-  return join(dirname(fileURLToPath(import.meta.url)), "..", "hooks", MIMICA_READ_ONLY_HOOK_SCRIPT);
+  return join(packageRoot(), "hooks", MIMICA_READ_ONLY_HOOK_SCRIPT);
+}
+
+function bundledDeniedToolsPath(): string {
+  return join(packageRoot(), "policy", DENIED_HOOK_TOOLS_FILE);
 }
 
 function mimicaHookEntries(scriptPath: string): HooksConfig["hooks"] {
@@ -48,30 +61,39 @@ function mergeHooks(existing: HooksConfig, mimica: HooksConfig["hooks"]): HooksC
 }
 
 /** Install Mimica read-only hook scripts into the agent workspace (pre-dispatch enforcement). */
-export async function ensureReadOnlyHooks(workspacePath: string): Promise<void> {
-  const scriptPath = bundledHookScriptPath();
-  const cursorDir = join(workspacePath, ".cursor");
-  const hooksDir = join(cursorDir, "hooks");
-  const hooksJsonPath = join(cursorDir, "hooks.json");
-  const workspaceScriptPath = join(hooksDir, MIMICA_READ_ONLY_HOOK_SCRIPT);
-
-  await mkdir(hooksDir, { recursive: true });
-  await writeFile(workspaceScriptPath, await readFile(scriptPath));
-
-  let config: HooksConfig = { version: 1, hooks: {} };
+export async function ensureReadOnlyHooks(workspacePath: string): Promise<EnsureReadOnlyHooksResult> {
   try {
-    config = JSON.parse(await readFile(hooksJsonPath, "utf8")) as HooksConfig;
-    if (!config.hooks || typeof config.hooks !== "object") {
-      config.hooks = {};
+    const scriptPath = bundledHookScriptPath();
+    const cursorDir = join(workspacePath, ".cursor");
+    const hooksDir = join(cursorDir, "hooks");
+    const hooksJsonPath = join(cursorDir, "hooks.json");
+    const workspaceScriptPath = join(hooksDir, MIMICA_READ_ONLY_HOOK_SCRIPT);
+    const workspaceDeniedToolsPath = join(hooksDir, DENIED_HOOK_TOOLS_FILE);
+
+    await mkdir(hooksDir, { recursive: true });
+    await copyFile(bundledDeniedToolsPath(), workspaceDeniedToolsPath);
+    await copyFile(scriptPath, workspaceScriptPath);
+
+    let config: HooksConfig = { version: 1, hooks: {} };
+    try {
+      config = JSON.parse(await readFile(hooksJsonPath, "utf8")) as HooksConfig;
+      if (!config.hooks || typeof config.hooks !== "object") {
+        config.hooks = {};
+      }
+    } catch {
+      // No hooks.json yet — create one below.
     }
-  } catch {
-    // No hooks.json yet — create one below.
-  }
 
-  if (hasMimicaGuard(config)) {
-    return;
-  }
+    if (!hasMimicaGuard(config)) {
+      const next = mergeHooks(config, mimicaHookEntries(workspaceScriptPath));
+      await writeFile(hooksJsonPath, `${JSON.stringify(next, null, 2)}\n`);
+    }
 
-  const next = mergeHooks(config, mimicaHookEntries(workspaceScriptPath));
-  await writeFile(hooksJsonPath, `${JSON.stringify(next, null, 2)}\n`);
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
 }

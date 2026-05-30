@@ -4,8 +4,7 @@
  * Used by preToolUse, beforeShellExecution, and beforeMCPExecution.
  */
 import { readFileSync } from "node:fs";
-
-const DENIED_HOOK_TOOL_RE = /^(Write|Delete|Shell|Task|Edit|ApplyPatch|Create)$/;
+import { DENIED_HOOK_TOOL_RE } from "../policy/denied-hook-tools.mjs";
 
 function readInput() {
   try {

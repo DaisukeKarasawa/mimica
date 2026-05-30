@@ -1,19 +1,21 @@
-import { Agent } from "@cursor/sdk";
 import type { Run } from "@cursor/sdk";
-import type { AgentRunState, ChatMessage, MessageContext } from "@mimica/shared";
+import type { ChatMessage, MessageContext } from "@mimica/shared";
+import type { AgentRunCallbacks } from "./agentCallbacks.js";
+import { createCursorAgent } from "./createCursorAgent.js";
 import { ensureReadOnlyHooks } from "./ensureReadOnlyHooks.js";
 import { buildContextPrompt } from "./eventMapper.js";
+import {
+  handleSendToolDelta,
+  processAgentStream,
+  resolveFinalAssistantText,
+} from "./processAgentStream.js";
+import {
+  READ_ONLY_HOOK_INSTALL_WARNING,
+  READ_ONLY_TOOL_ERROR,
+} from "./readOnlyPolicy.js";
 import { resolveCursorApiKey } from "./resolveApiKey.js";
-import { isWriteTool, READ_ONLY_TOOL_ERROR } from "./readOnlyTools.js";
-import { stripMetaNarration } from "./userFacingText.js";
 
-export interface AgentRunCallbacks {
-  onState: (state: AgentRunState) => void;
-  onDelta: (chunk: string) => void;
-  onComplete: (content: string) => void;
-  onError: (message: string) => void;
-  onTool?: (name: string, detail?: string) => void;
-}
+export type { AgentRunCallbacks } from "./agentCallbacks.js";
 
 export interface RunChatParams {
   prompt: string;
@@ -47,31 +49,6 @@ function buildHistoryPrompt(messages: ChatMessage[]): string {
   return `## Conversation history\n${lines.join("\n\n")}`;
 }
 
-function streamVisibleText(
-  accumulated: string,
-  visibleLen: number,
-  onDelta: (chunk: string) => void,
-): { text: string; visibleLen: number } {
-  const visible = stripMetaNarration(accumulated);
-  const delta = visible.slice(visibleLen);
-  if (delta) onDelta(delta);
-  return { text: accumulated, visibleLen: visible.length };
-}
-
-function toolCallName(toolCall: unknown): string | undefined {
-  if (!toolCall || typeof toolCall !== "object") return undefined;
-  const record = toolCall as Record<string, unknown>;
-  for (const key of ["toolName", "name", "type"] as const) {
-    const value = record[key];
-    if (typeof value === "string" && value.length > 0) return value;
-  }
-  return undefined;
-}
-
-function isBlockedToolCallStatus(status: string | undefined): boolean {
-  return status !== "completed" && status !== "error";
-}
-
 export class AgentRunner {
   private activeRun: Run | null = null;
   private cancelled = false;
@@ -85,61 +62,32 @@ export class AgentRunner {
     }
 
     this.cancelled = false;
-    const contextBlock = params.context ? buildContextPrompt(params.context) : "";
-    const historyBlock = params.history ? buildHistoryPrompt(params.history) : "";
-    const fullPrompt = [
-      READ_ONLY_PREAMBLE,
-      params.personaSystemPrompt,
-      historyBlock,
-      contextBlock,
-      `## User message\n${params.prompt}`,
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    const fullPrompt = this.buildFullPrompt(params);
 
     params.callbacks.onState("thinking");
 
-    try {
-      await ensureReadOnlyHooks(params.workspacePath);
-    } catch {
-      // Hook install failure is non-fatal; stream/onDelta checks remain as fallback.
+    const hooksResult = await ensureReadOnlyHooks(params.workspacePath);
+    if (!hooksResult.ok) {
+      params.callbacks.onWarning?.(
+        `${READ_ONLY_HOOK_INSTALL_WARNING} (${hooksResult.message})`,
+      );
     }
 
-    const localOptions = {
-      cwd: params.workspacePath,
-      settingSources: [] as const,
-      sandboxOptions: { enabled: true },
-    };
-
-    let agent: Awaited<ReturnType<typeof Agent.create>>;
+    let agent: Awaited<ReturnType<typeof createCursorAgent>>;
     try {
-      agent = await Agent.create({
-        apiKey,
-        model: { id: "composer-2.5" },
-        local: localOptions,
-        name: "Mimica",
-      });
-    } catch {
-      try {
-        agent = await Agent.create({
-          apiKey,
-          model: { id: "composer-2.5" },
-          local: { cwd: params.workspacePath, settingSources: [] },
-          name: "Mimica",
-        });
-      } catch (err) {
-        params.callbacks.onState("failed");
-        params.callbacks.onError(err instanceof Error ? err.message : String(err));
-        return;
-      }
+      agent = await createCursorAgent({ apiKey, workspacePath: params.workspacePath });
+    } catch (err) {
+      params.callbacks.onState("failed");
+      params.callbacks.onError(err instanceof Error ? err.message : String(err));
+      return;
     }
 
     try {
       let writeToolBlocked = false;
-      const blockWriteTool = async (run: Run, name: string): Promise<void> => {
+      const blockWriteTool = async (name: string): Promise<void> => {
         if (writeToolBlocked) return;
         writeToolBlocked = true;
-        await run.cancel();
+        await this.activeRun?.cancel();
         params.callbacks.onState("failed");
         params.callbacks.onError(READ_ONLY_TOOL_ERROR(name));
       };
@@ -147,76 +95,28 @@ export class AgentRunner {
       let run!: Run;
       run = await agent.send(fullPrompt, {
         onDelta: async ({ update }) => {
-          if (writeToolBlocked || this.cancelled || params.signal?.aborted) return;
-          if (update.type !== "tool-call-started" && update.type !== "partial-tool-call") {
-            return;
-          }
-          const name = toolCallName(update.toolCall);
-          if (name && isWriteTool(name)) {
-            await blockWriteTool(run, name);
-          }
+          const blocked = await handleSendToolDelta({
+            update,
+            run,
+            writeToolBlocked,
+            isCancelled: () => this.cancelled,
+            signal: params.signal,
+            blockWriteTool,
+          });
+          if (blocked) writeToolBlocked = true;
         },
       });
       this.activeRun = run;
 
-      let sawToolCall = false;
-      let preToolText = "";
-      let postToolText = "";
-      let preToolVisibleLen = 0;
-      let postToolVisibleLen = 0;
+      const streamResult = await processAgentStream({
+        run,
+        callbacks: params.callbacks,
+        signal: params.signal,
+        isCancelled: () => this.cancelled,
+      });
 
-      for await (const event of run.stream()) {
-        if (writeToolBlocked) {
-          return;
-        }
-
-        if (this.cancelled || params.signal?.aborted) {
-          await run.cancel();
-          params.callbacks.onState("cancelled");
-          return;
-        }
-
-        if (event.type === "request") {
-          params.callbacks.onState("waiting");
-          continue;
-        }
-
-        if (event.type === "tool_call") {
-          if (isWriteTool(event.name) && isBlockedToolCallStatus(event.status)) {
-            await blockWriteTool(run, event.name);
-            return;
-          }
-
-          if (event.status === "running") {
-            sawToolCall = true;
-            params.callbacks.onState("thinking");
-            params.callbacks.onTool?.(event.name, event.status);
-          }
-          continue;
-        }
-
-        if (event.type === "thinking" || event.type === "task") {
-          params.callbacks.onState("thinking");
-          continue;
-        }
-
-        if (event.type !== "assistant") continue;
-
-        params.callbacks.onState("streaming");
-        for (const block of event.message.content) {
-          if (block.type !== "text" || !block.text) continue;
-
-          if (!sawToolCall) {
-            preToolText += block.text;
-            const streamed = streamVisibleText(preToolText, preToolVisibleLen, params.callbacks.onDelta);
-            preToolVisibleLen = streamed.visibleLen;
-            continue;
-          }
-
-          postToolText += block.text;
-          const streamed = streamVisibleText(postToolText, postToolVisibleLen, params.callbacks.onDelta);
-          postToolVisibleLen = streamed.visibleLen;
-        }
+      if (streamResult.writeToolBlocked || writeToolBlocked) {
+        return;
       }
 
       const result = await run.wait();
@@ -230,10 +130,12 @@ export class AgentRunner {
         return;
       }
 
-      let finalText = stripMetaNarration(sawToolCall ? postToolText : preToolText);
-      if (!finalText.trim()) {
-        finalText = stripMetaNarration(result.result ?? preToolText + postToolText);
-      }
+      const finalText = resolveFinalAssistantText(
+        streamResult.sawToolCall,
+        streamResult.preToolText,
+        streamResult.postToolText,
+        result.result,
+      );
 
       params.callbacks.onState("completed");
       params.callbacks.onComplete(finalText);
@@ -249,5 +151,19 @@ export class AgentRunner {
   async cancel(): Promise<void> {
     this.cancelled = true;
     await this.activeRun?.cancel();
+  }
+
+  private buildFullPrompt(params: RunChatParams): string {
+    const contextBlock = params.context ? buildContextPrompt(params.context) : "";
+    const historyBlock = params.history ? buildHistoryPrompt(params.history) : "";
+    return [
+      READ_ONLY_PREAMBLE,
+      params.personaSystemPrompt,
+      historyBlock,
+      contextBlock,
+      `## User message\n${params.prompt}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   }
 }
