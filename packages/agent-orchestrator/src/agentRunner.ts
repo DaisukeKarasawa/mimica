@@ -1,8 +1,10 @@
 import { Agent } from "@cursor/sdk";
 import type { Run } from "@cursor/sdk";
 import type { AgentRunState, ChatMessage, MessageContext } from "@mimica/shared";
+import { ensureReadOnlyHooks } from "./ensureReadOnlyHooks.js";
 import { buildContextPrompt } from "./eventMapper.js";
 import { resolveCursorApiKey } from "./resolveApiKey.js";
+import { isWriteTool, READ_ONLY_TOOL_ERROR } from "./readOnlyTools.js";
 import { stripMetaNarration } from "./userFacingText.js";
 
 export interface AgentRunCallbacks {
@@ -35,13 +37,6 @@ CRITICAL output rule for the user-visible message:
 
 Reply in Japanese when the user writes in Japanese. Follow the persona instructions below.`;
 
-const WRITE_TOOL_RE =
-  /^(write|edit|delete|shell|run_terminal|terminal|apply_patch|create|str_replace|patch|execute)/i;
-
-function isWriteTool(name: string): boolean {
-  return WRITE_TOOL_RE.test(name);
-}
-
 function buildHistoryPrompt(messages: ChatMessage[]): string {
   const turns = messages.filter((m) => m.role === "user" || m.role === "assistant");
   if (turns.length === 0) return "";
@@ -61,6 +56,20 @@ function streamVisibleText(
   const delta = visible.slice(visibleLen);
   if (delta) onDelta(delta);
   return { text: accumulated, visibleLen: visible.length };
+}
+
+function toolCallName(toolCall: unknown): string | undefined {
+  if (!toolCall || typeof toolCall !== "object") return undefined;
+  const record = toolCall as Record<string, unknown>;
+  for (const key of ["toolName", "name", "type"] as const) {
+    const value = record[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return undefined;
+}
+
+function isBlockedToolCallStatus(status: string | undefined): boolean {
+  return status !== "completed" && status !== "error";
 }
 
 export class AgentRunner {
@@ -90,28 +99,64 @@ export class AgentRunner {
 
     params.callbacks.onState("thinking");
 
+    try {
+      await ensureReadOnlyHooks(params.workspacePath);
+    } catch {
+      // Hook install failure is non-fatal; stream/onDelta checks remain as fallback.
+    }
+
+    const localOptions = {
+      cwd: params.workspacePath,
+      settingSources: [] as const,
+      sandboxOptions: { enabled: true },
+    };
+
     let agent: Awaited<ReturnType<typeof Agent.create>>;
     try {
       agent = await Agent.create({
         apiKey,
         model: { id: "composer-2.5" },
-        local: {
-          cwd: params.workspacePath,
-          sandboxOptions: { enabled: true },
-        },
+        local: localOptions,
         name: "Mimica",
       });
     } catch {
-      agent = await Agent.create({
-        apiKey,
-        model: { id: "composer-2.5" },
-        local: { cwd: params.workspacePath },
-        name: "Mimica",
-      });
+      try {
+        agent = await Agent.create({
+          apiKey,
+          model: { id: "composer-2.5" },
+          local: { cwd: params.workspacePath, settingSources: [] },
+          name: "Mimica",
+        });
+      } catch (err) {
+        params.callbacks.onState("failed");
+        params.callbacks.onError(err instanceof Error ? err.message : String(err));
+        return;
+      }
     }
 
     try {
-      const run = await agent.send(fullPrompt);
+      let writeToolBlocked = false;
+      const blockWriteTool = async (run: Run, name: string): Promise<void> => {
+        if (writeToolBlocked) return;
+        writeToolBlocked = true;
+        await run.cancel();
+        params.callbacks.onState("failed");
+        params.callbacks.onError(READ_ONLY_TOOL_ERROR(name));
+      };
+
+      let run!: Run;
+      run = await agent.send(fullPrompt, {
+        onDelta: async ({ update }) => {
+          if (writeToolBlocked || this.cancelled || params.signal?.aborted) return;
+          if (update.type !== "tool-call-started" && update.type !== "partial-tool-call") {
+            return;
+          }
+          const name = toolCallName(update.toolCall);
+          if (name && isWriteTool(name)) {
+            await blockWriteTool(run, name);
+          }
+        },
+      });
       this.activeRun = run;
 
       let sawToolCall = false;
@@ -121,6 +166,10 @@ export class AgentRunner {
       let postToolVisibleLen = 0;
 
       for await (const event of run.stream()) {
+        if (writeToolBlocked) {
+          return;
+        }
+
         if (this.cancelled || params.signal?.aborted) {
           await run.cancel();
           params.callbacks.onState("cancelled");
@@ -133,12 +182,8 @@ export class AgentRunner {
         }
 
         if (event.type === "tool_call") {
-          if (event.status === "running" && isWriteTool(event.name)) {
-            await run.cancel();
-            params.callbacks.onState("failed");
-            params.callbacks.onError(
-              `Read-only mode: ツール "${event.name}" は MVP では利用できません`,
-            );
+          if (isWriteTool(event.name) && isBlockedToolCallStatus(event.status)) {
+            await blockWriteTool(run, event.name);
             return;
           }
 
