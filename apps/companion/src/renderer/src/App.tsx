@@ -74,6 +74,11 @@ export default function App() {
 
   const applyChatTabShortcut = useCallback(
     (action: ChatTabShortcutAction) => {
+      if (typeof action === "object" && action.type === "selectTab") {
+        tabs.selectTabByIndex(action.index);
+        return;
+      }
+
       switch (action) {
         case "new":
           void tabs.handleNewSession(resolveWorkspacePath());
@@ -107,6 +112,7 @@ export default function App() {
       tabs.handleNewSession,
       tabs.handleCloseTab,
       tabs.cycleTab,
+      tabs.selectTabByIndex,
       tabs.panelMode,
       tabs.setPanelMode,
     ],
