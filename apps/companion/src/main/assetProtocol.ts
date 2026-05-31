@@ -2,7 +2,7 @@ import { readFileSync, existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, normalize, relative } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { CharacterMetadata, MotionMap } from "@mimica/shared";
+import type { CharacterAssetStatus, CharacterMetadata, MotionMap } from "@mimica/shared";
 import { DEFAULT_SETTINGS } from "@mimica/shared";
 import type { ElectronMain } from "./electron.js";
 import { assertContained, resolveContainedPath, resolveExpandedPath } from "./paths.js";
@@ -87,16 +87,6 @@ export function setupAssetProtocolHandler(): void {
     }
     return net.fetch(pathToFileURL(realPath).href);
   });
-}
-
-export interface CharacterAssetStatus {
-  baseUrl: string;
-  assetRoot: string;
-  ready: boolean;
-  missing: string[];
-  metadata: CharacterMetadata | null;
-  motionMap: MotionMap | null;
-  chatIconUrl: string | null;
 }
 
 export function getCharacterAssetStatus(): CharacterAssetStatus {

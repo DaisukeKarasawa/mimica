@@ -2,21 +2,10 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentEventMessage,
   AgentMode,
-  CharacterMetadata,
+  CharacterAssetStatus,
   ChatSession,
   EditorContext,
-  MotionMap,
 } from "@mimica/shared";
-
-export interface CharacterAssetStatus {
-  baseUrl: string;
-  assetRoot: string;
-  ready: boolean;
-  missing: string[];
-  metadata: CharacterMetadata | null;
-  motionMap: MotionMap | null;
-  chatIconUrl: string | null;
-}
 
 export interface AgentSubmitPayload {
   sessionId: string;
@@ -29,7 +18,6 @@ export interface AgentSubmitPayload {
 export interface MimicaApi {
   listSessions: () => Promise<ChatSession[]>;
   createSession: (workspacePath: string) => Promise<ChatSession>;
-  switchSession: (id: string) => Promise<ChatSession | undefined>;
   deleteSession: (id: string) => Promise<void>;
   saveSession: (session: ChatSession) => Promise<ChatSession>;
   getBridgeStatus: () => Promise<{ connected: boolean; port: number }>;
@@ -44,7 +32,6 @@ export interface MimicaApi {
 const api: MimicaApi = {
   listSessions: () => ipcRenderer.invoke("sessions:list"),
   createSession: (workspacePath) => ipcRenderer.invoke("sessions:create", workspacePath),
-  switchSession: (id) => ipcRenderer.invoke("sessions:switch", id),
   deleteSession: (id) => ipcRenderer.invoke("sessions:delete", id),
   saveSession: (session) => ipcRenderer.invoke("sessions:save", session),
   getBridgeStatus: () => ipcRenderer.invoke("bridge:status"),
@@ -71,3 +58,5 @@ declare global {
     mimica: MimicaApi;
   }
 }
+
+export type { CharacterAssetStatus };

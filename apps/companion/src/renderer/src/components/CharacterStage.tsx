@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { AvatarState } from "@mimica/shared";
+import type { AvatarState, CharacterAssetStatus } from "@mimica/shared";
 import { avatarBadgeLabel } from "@mimica/shared";
 import { SpineStageController } from "@mimica/character-runtime";
-import type { CharacterAssetStatus } from "../../../preload/index";
 
 interface CharacterStageProps {
   avatarState: AvatarState;

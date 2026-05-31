@@ -81,36 +81,30 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
         case "agent_delta": {
           streamingContentRef.current += event.content;
-          setAllSessions(
-            (prev) =>
-              reduceAgentEvent(prev, event, {
-                streamId: activeStreamIdRef.current,
-                content: streamingContentRef.current,
-              }).sessions,
+          setAllSessions((prev) =>
+            reduceAgentEvent(prev, event, {
+              streamId: activeStreamIdRef.current,
+              content: streamingContentRef.current,
+            }),
           );
           break;
         }
         case "agent_tool": {
-          setAllSessions(
-            (prev) =>
-              reduceAgentEvent(prev, event, {
-                streamId: activeStreamIdRef.current,
-                content: streamingContentRef.current,
-              }).sessions,
+          setAllSessions((prev) =>
+            reduceAgentEvent(prev, event, {
+              streamId: activeStreamIdRef.current,
+              content: streamingContentRef.current,
+            }),
           );
           break;
         }
         case "agent_complete": {
-          setAllSessions((prev) => {
-            const result = reduceAgentEvent(prev, event, {
+          setAllSessions((prev) =>
+            reduceAgentEvent(prev, event, {
               streamId: activeStreamIdRef.current,
               content: streamingContentRef.current,
-            });
-            if (result.sideEffect.type === "save_session") {
-              void window.mimica.saveSession(result.sideEffect.session);
-            }
-            return result.sessions;
-          });
+            }),
+          );
           streamingContentRef.current = "";
           activeStreamIdRef.current = null;
           director.setState("success", true);

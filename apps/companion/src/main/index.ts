@@ -13,11 +13,12 @@ import { AgentService } from "./agentService.js";
 import type { BrowserWindow as BrowserWindowType } from "electron";
 import { openAllowedExternalUrl } from "./openExternal.js";
 
-const { app, BrowserWindow, ipcMain } = electron();
+const electronApis = electron();
 
-bindElectronApis(electron());
+bindElectronApis(electronApis);
 registerAssetProtocol();
 
+const { app, BrowserWindow, ipcMain } = electronApis;
 let mainWindow: BrowserWindowType | null = null;
 let bridgeServer: CursorBridgeServer | null = null;
 const sessionStore = new SessionStore();
@@ -54,14 +55,19 @@ if (!gotLock) {
     attachMainWindow(createMainWindow());
 
     ipcMain.handle("character:assets", () => getCharacterAssetStatus());
-    ipcMain.handle("agent:submit", (_e, payload) => agentService?.submit(payload));
-    ipcMain.handle("agent:cancel", () => agentService?.cancel());
+    ipcMain.handle("agent:submit", (_e, payload) => {
+      if (!agentService) throw new Error("Agent service is unavailable");
+      return agentService.submit(payload);
+    });
+    ipcMain.handle("agent:cancel", () => {
+      if (!agentService) throw new Error("Agent service is unavailable");
+      return agentService.cancel();
+    });
 
     ipcMain.handle("sessions:list", () => sessionStore.list());
     ipcMain.handle("sessions:create", (_e, workspacePath: string) =>
       sessionStore.create(workspacePath),
     );
-    ipcMain.handle("sessions:switch", (_e, id: string) => sessionStore.get(id));
     ipcMain.handle("sessions:delete", (_e, id: string) => sessionStore.delete(id));
     ipcMain.handle("sessions:save", (_e, session) => sessionStore.save(session));
     ipcMain.handle("bridge:status", () => ({

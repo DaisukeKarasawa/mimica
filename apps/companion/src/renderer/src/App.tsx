@@ -1,29 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type {
   AgentMode,
   AvatarState,
   ChatMessage,
-  ChatSession,
+  CharacterAssetStatus,
   EditorContext,
 } from "@mimica/shared";
-import { AGENT_DISPLAY_NAME, DEFAULT_SETTINGS, avatarStatusLabel } from "@mimica/shared";
+import {
+  AGENT_DISPLAY_NAME,
+  avatarStatusLabel,
+  DEFAULT_SETTINGS,
+  DEFAULT_WORKSPACE_FALLBACK,
+} from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
-import type { CharacterAssetStatus } from "../../preload/index";
 import { TopBar } from "./components/TopBar";
 import { CharacterStage } from "./components/CharacterStage";
-import { ChatPanel, type ChatPanelMode } from "./components/ChatPanel";
+import { ChatPanel } from "./components/ChatPanel";
 import { useAgentEvents } from "./hooks/useAgentEvents";
+import { useBridgeStatus } from "./hooks/useBridgeStatus";
+import { useSessionTabs } from "./hooks/useSessionTabs";
 import { matchChatTabShortcut } from "./lib/chatTabShortcuts";
-import { loadOpenTabIds, persistOpenTabIds } from "./lib/openTabs";
 
 export default function App() {
-  const [allSessions, setAllSessions] = useState<ChatSession[]>([]);
-  const [openTabIds, setOpenTabIds] = useState<string[]>(() => loadOpenTabIds());
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [panelMode, setPanelMode] = useState<ChatPanelMode>("chat");
   const [editorContext, setEditorContext] = useState<EditorContext | null>(null);
-  const [bridgeConnected, setBridgeConnected] = useState(false);
   const [avatarState, setAvatarState] = useState<AvatarState>("idle");
   const [isStreaming, setIsStreaming] = useState(false);
   const [statusText, setStatusText] = useState(avatarStatusLabel("idle"));
@@ -31,123 +31,46 @@ export default function App() {
   const [devPreview, setDevPreview] = useState(false);
   const [agentMode, setAgentMode] = useState<AgentMode>(DEFAULT_SETTINGS.defaultAgentMode);
 
+  const resetStreamRef = useRef<() => void>(() => {});
+
+  const bridgeConnected = useBridgeStatus();
   const director = useMemo(() => new CharacterDirector({ onStateChange: setAvatarState }), []);
+
+  const handleStopStreaming = useCallback(async () => {
+    await window.mimica.cancelAgent();
+    setIsStreaming(false);
+    resetStreamRef.current();
+  }, []);
+
+  const tabs = useSessionTabs({
+    isStreaming,
+    onStopStreaming: handleStopStreaming,
+  });
 
   const { handleAgentEvent, resetStream, beginStream } = useAgentEvents({
     devPreview,
     director,
-    setAllSessions,
+    setAllSessions: tabs.setAllSessions,
     setIsStreaming,
     setStatusText,
   });
 
-  const openSessions = useMemo(
-    () =>
-      openTabIds
-        .map((id) => allSessions.find((s) => s.id === id))
-        .filter((s): s is ChatSession => s !== undefined),
-    [openTabIds, allSessions],
+  resetStreamRef.current = resetStream;
+
+  const resolveWorkspacePath = useCallback(
+    () => editorContext?.workspacePath ?? DEFAULT_WORKSPACE_FALLBACK,
+    [editorContext?.workspacePath],
   );
 
-  const activeSession = allSessions.find((s) => s.id === activeSessionId) ?? null;
-
-  const setOpenTabs = useCallback((ids: string[] | ((prev: string[]) => string[])) => {
-    setOpenTabIds((prev) => {
-      const next = typeof ids === "function" ? ids(prev) : ids;
-      persistOpenTabIds(next);
-      return next;
-    });
-  }, []);
-
-  const refreshSessions = useCallback(async () => {
-    const list = await window.mimica.listSessions();
-    setAllSessions(list);
-
-    setOpenTabIds((prev) => {
-      const pruned = prev.filter((id) => list.some((s) => s.id === id));
-      if (pruned.length !== prev.length) persistOpenTabIds(pruned);
-      return pruned;
-    });
-  }, []);
-
   useEffect(() => {
-    void refreshSessions();
-    void window.mimica.getBridgeStatus().then((s) => setBridgeConnected(s.connected));
     void window.mimica.getCharacterAssets().then(setCharacterAssets);
-    const interval = setInterval(() => {
-      void window.mimica.getBridgeStatus().then((s) => setBridgeConnected(s.connected));
-    }, 3000);
     const unsubCtx = window.mimica.onEditorContext(setEditorContext);
     const unsubAgent = window.mimica.onAgentEvent(handleAgentEvent);
     return () => {
-      clearInterval(interval);
       unsubCtx();
       unsubAgent();
     };
-  }, [refreshSessions, handleAgentEvent]);
-
-  useEffect(() => {
-    if (allSessions.length === 0 || openTabIds.length > 0) return;
-    const id = allSessions[0].id;
-    setOpenTabs([id]);
-    if (!activeSessionId) setActiveSessionId(id);
-  }, [allSessions, openTabIds.length, activeSessionId, setOpenTabs]);
-
-  useEffect(() => {
-    if (panelMode !== "chat") return;
-    if (activeSessionId && openTabIds.includes(activeSessionId)) return;
-    const next = openTabIds[openTabIds.length - 1] ?? null;
-    setActiveSessionId(next);
-  }, [panelMode, activeSessionId, openTabIds]);
-
-  const openSessionTab = useCallback(
-    (id: string) => {
-      setOpenTabs(openTabIds.includes(id) ? openTabIds : [...openTabIds, id]);
-      setActiveSessionId(id);
-      setPanelMode("chat");
-    },
-    [openTabIds, setOpenTabs],
-  );
-
-  const handleNewSession = useCallback(async () => {
-    const ws = editorContext?.workspacePath ?? "~/dev/mimica";
-    const session = await window.mimica.createSession(ws);
-    await refreshSessions();
-    setOpenTabs((prev) => [...prev, session.id]);
-    setActiveSessionId(session.id);
-    setPanelMode("chat");
-  }, [editorContext?.workspacePath, refreshSessions, setOpenTabs]);
-
-  const cycleTab = useCallback(
-    (direction: 1 | -1) => {
-      if (openTabIds.length === 0) return;
-      setPanelMode("chat");
-      setActiveSessionId((prev) => {
-        const idx = prev ? openTabIds.indexOf(prev) : -1;
-        let next = idx + direction;
-        if (next < 0) next = openTabIds.length - 1;
-        if (next >= openTabIds.length) next = 0;
-        return openTabIds[next] ?? null;
-      });
-    },
-    [openTabIds],
-  );
-
-  const handleCloseTab = useCallback(
-    async (id: string) => {
-      if (isStreaming && activeSessionId === id) {
-        await window.mimica.cancelAgent();
-        setIsStreaming(false);
-        resetStream();
-      }
-      const nextIds = openTabIds.filter((tabId) => tabId !== id);
-      setOpenTabs(nextIds);
-      if (activeSessionId === id) {
-        setActiveSessionId(nextIds[nextIds.length - 1] ?? null);
-      }
-    },
-    [activeSessionId, isStreaming, openTabIds, resetStream, setOpenTabs],
-  );
+  }, [handleAgentEvent]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -158,55 +81,44 @@ export default function App() {
 
       switch (action) {
         case "new":
-          void handleNewSession();
+          void tabs.handleNewSession(resolveWorkspacePath());
           break;
         case "close": {
           const target =
-            activeSessionId && openTabIds.includes(activeSessionId)
-              ? activeSessionId
-              : openTabIds[openTabIds.length - 1];
-          if (target) void handleCloseTab(target);
+            tabs.activeSessionId && tabs.openTabIds.includes(tabs.activeSessionId)
+              ? tabs.activeSessionId
+              : tabs.openTabIds[tabs.openTabIds.length - 1];
+          if (target) void tabs.handleCloseTab(target);
           break;
         }
         case "next":
-          cycleTab(1);
+          tabs.cycleTab(1);
           break;
         case "prev":
-          cycleTab(-1);
+          tabs.cycleTab(-1);
           break;
       }
     };
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [activeSessionId, openTabIds, handleNewSession, handleCloseTab, cycleTab]);
-
-  const handleDeleteSession = async (id: string) => {
-    if (isStreaming && activeSessionId === id) {
-      await window.mimica.cancelAgent();
-      setIsStreaming(false);
-      resetStream();
-    }
-    await window.mimica.deleteSession(id);
-    const nextIds = openTabIds.filter((tabId) => tabId !== id);
-    setOpenTabs(nextIds);
-    if (activeSessionId === id) {
-      setActiveSessionId(nextIds[nextIds.length - 1] ?? null);
-    }
-    await refreshSessions();
-  };
+  }, [
+    resolveWorkspacePath,
+    tabs.activeSessionId,
+    tabs.openTabIds,
+    tabs.handleNewSession,
+    tabs.handleCloseTab,
+    tabs.cycleTab,
+  ]);
 
   const handleSend = async (content: string) => {
     if (devPreview) setDevPreview(false);
 
-    let session = activeSession;
+    let session = tabs.activeSession;
     if (!session) {
-      const ws = editorContext?.workspacePath ?? "~/dev/mimica";
-      session = await window.mimica.createSession(ws);
-      setOpenTabs([...openTabIds, session.id]);
-      setActiveSessionId(session.id);
-      await refreshSessions();
+      session = await tabs.handleNewSession(resolveWorkspacePath());
     }
+
     const userMsg: ChatMessage = {
       id: uuidv4(),
       role: "user",
@@ -218,19 +130,15 @@ export default function App() {
     if (session.messages.length === 0) {
       title = content.slice(0, 24) + (content.length > 24 ? "…" : "");
     }
-    const updated: ChatSession = {
+    const updated = {
       ...session,
       title,
       messages: [...session.messages, userMsg],
     };
     const saved = await window.mimica.saveSession(updated);
-    setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+    tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
 
     beginStream();
-    director.setState("thinking", true);
-    setIsStreaming(true);
-    setStatusText(avatarStatusLabel("thinking"));
-
     await window.mimica.submitAgent({
       sessionId: saved.id,
       content,
@@ -241,9 +149,7 @@ export default function App() {
   };
 
   const handleCancel = async () => {
-    await window.mimica.cancelAgent();
-    setIsStreaming(false);
-    resetStream();
+    await handleStopStreaming();
     director.setState("idle", true);
     setStatusText("キャンセルしました");
   };
@@ -266,11 +172,11 @@ export default function App() {
           onPreviewState={handlePreviewState}
         />
         <ChatPanel
-          openSessions={openSessions}
-          historySessions={allSessions}
-          activeSessionId={activeSessionId}
-          activeSession={activeSession}
-          panelMode={panelMode}
+          openSessions={tabs.openSessions}
+          historySessions={tabs.allSessions}
+          activeSessionId={tabs.activeSessionId}
+          activeSession={tabs.activeSession}
+          panelMode={tabs.panelMode}
           editorContext={editorContext}
           isStreaming={isStreaming}
           avatarState={avatarState}
@@ -278,14 +184,14 @@ export default function App() {
           onAgentModeChange={setAgentMode}
           chatIconUrl={characterAssets?.chatIconUrl}
           onSelectSession={(id) => {
-            setActiveSessionId(id);
-            setPanelMode("chat");
+            tabs.setActiveSessionId(id);
+            tabs.setPanelMode("chat");
           }}
-          onCloseTab={(id) => void handleCloseTab(id)}
-          onShowHistory={() => setPanelMode("history")}
-          onSelectHistorySession={openSessionTab}
-          onDeleteSession={(id) => void handleDeleteSession(id)}
-          onNewSession={() => void handleNewSession()}
+          onCloseTab={(id) => void tabs.handleCloseTab(id)}
+          onShowHistory={() => tabs.setPanelMode("history")}
+          onSelectHistorySession={tabs.openSessionTab}
+          onDeleteSession={(id) => void tabs.handleDeleteSession(id)}
+          onNewSession={() => void tabs.handleNewSession(resolveWorkspacePath())}
           onSend={(text) => void handleSend(text)}
           onCancel={() => void handleCancel()}
         />

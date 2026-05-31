@@ -32,7 +32,7 @@ export function applyAgentComplete(
   runId: string,
   streamId: string,
   content: string,
-): { sessions: ChatSession[]; updatedSession: ChatSession | undefined } {
+): ChatSession[] {
   const assistantMsg: ChatMessage = {
     id: uuidv4(),
     role: "assistant",
@@ -40,14 +40,11 @@ export function applyAgentComplete(
     createdAt: new Date().toISOString(),
     agentRunId: runId,
   };
-  let updatedSession: ChatSession | undefined;
-  const next = sessions.map((s) => {
+  return sessions.map((s) => {
     if (s.id !== sessionId) return s;
     const rest = s.messages.filter((m) => m.id !== streamId);
-    updatedSession = { ...s, messages: [...rest, assistantMsg] };
-    return updatedSession;
+    return { ...s, messages: [...rest, assistantMsg] };
   });
-  return { sessions: next, updatedSession };
 }
 
 export function applyAgentTool(
@@ -89,55 +86,39 @@ export function applyAgentTool(
   });
 }
 
-export type AgentSessionSideEffect =
-  | { type: "save_session"; session: ChatSession }
-  | { type: "none" };
-
 export function reduceAgentEvent(
   sessions: ChatSession[],
   event: AgentEventMessage,
   stream: { streamId: string | null; content: string },
-): { sessions: ChatSession[]; sideEffect: AgentSessionSideEffect } {
+): ChatSession[] {
   switch (event.type) {
     case "agent_delta": {
       const streamId = streamMessageId(event.runId, stream.streamId);
-      return {
-        sessions: applyAgentDelta(sessions, event.sessionId, event.runId, streamId, stream.content),
-        sideEffect: { type: "none" },
-      };
+      return applyAgentDelta(sessions, event.sessionId, event.runId, streamId, stream.content);
     }
     case "agent_complete": {
       const streamId = streamMessageId(event.runId, stream.streamId);
-      const { sessions: next, updatedSession } = applyAgentComplete(
+      return applyAgentComplete(
         sessions,
         event.sessionId,
         event.runId,
         streamId,
         event.content,
       );
-      return {
-        sessions: next,
-        sideEffect: updatedSession
-          ? { type: "save_session", session: updatedSession }
-          : { type: "none" },
-      };
     }
     case "agent_tool": {
       const streamId = streamMessageId(event.runId, stream.streamId);
-      return {
-        sessions: applyAgentTool(
-          sessions,
-          event.sessionId,
-          event.runId,
-          streamId,
-          stream.content,
-          event.name,
-          event.detail,
-        ),
-        sideEffect: { type: "none" },
-      };
+      return applyAgentTool(
+        sessions,
+        event.sessionId,
+        event.runId,
+        streamId,
+        stream.content,
+        event.name,
+        event.detail,
+      );
     }
     default:
-      return { sessions, sideEffect: { type: "none" } };
+      return sessions;
   }
 }

@@ -7,6 +7,7 @@ import { resolveWorkspacePath } from "./paths.js";
 import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
+import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
 
 export interface AgentSubmitPayload {
   sessionId: string;
@@ -63,11 +64,7 @@ export class AgentService {
 
     const session = this.sessionStore.get(payload.sessionId);
     const allMessages = session?.messages ?? [];
-    const last = allMessages.at(-1);
-    const history =
-      last?.role === "user" && last.content === payload.content
-        ? allMessages.slice(0, -1)
-        : allMessages;
+    const history = historyForAgentPrompt(allMessages, payload.content);
 
     const cwd = resolveWorkspacePath(
       editorContext?.workspacePath ?? session?.workspacePath ?? payload.workspacePath,
@@ -87,6 +84,10 @@ export class AgentService {
           onTool: (name, detail) => emitter.tool(name, detail),
           onWarning: (message) => emitter.warning(message),
           onComplete: (content) => {
+            const current = this.sessionStore.get(payload.sessionId);
+            if (current) {
+              this.sessionStore.save(appendAssistantMessage(current, content, runId));
+            }
             emitter.complete(content);
             this.activeRunId = null;
           },
