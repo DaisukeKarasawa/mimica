@@ -1,0 +1,138 @@
+.stage {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02)),
+    radial-gradient(circle at 45% 16%, rgba(255, 255, 255, 0.2), transparent 18%),
+    linear-gradient(135deg, #16234a 0%, #172f56 42%, #24345f 58%, #10182f 100%);
+  box-shadow: var(--shadow);
+}
+
+.spine-host {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.spine-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.stage--spine-active::before {
+  opacity: 0.25;
+}
+
+.stage-dev-controls {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 78px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stage-dev-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.stage-dev-btn.active {
+  color: var(--text);
+  border-color: rgba(255, 183, 130, 0.55);
+  background: rgba(255, 183, 130, 0.15);
+}
+
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black 30%, transparent 82%);
+  opacity: 0.62;
+}
+
+.stage-overlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.stage-badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(18, 18, 15, 0.72);
+  border: 1px solid var(--line);
+  font-size: 11px;
+}
+
+.stage-hint {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.status-card {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(520px, calc(100% - 36px));
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(18, 18, 15, 0.68);
+  backdrop-filter: blur(20px);
+}
+
+.status-card strong {
+  display: block;
+  font-size: 13px;
+}
+
+.status-card span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pulse {
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, rgba(135, 169, 135, 0.92), rgba(196, 178, 138, 0.88));
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(0.98);
+    opacity: 0.82;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}

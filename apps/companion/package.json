@@ -1,0 +1,48 @@
+{
+  "name": "@mimica/companion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mimica Electron Companion App",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "pnpm --filter @mimica/character-runtime build && node scripts/run-electron-vite.mjs dev",
+    "build": "node scripts/run-electron-vite.mjs build",
+    "preview": "node scripts/run-electron-vite.mjs preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@mimica/agent-orchestrator": "workspace:*",
+    "@mimica/character-runtime": "workspace:*",
+    "@mimica/shared": "workspace:*",
+    "@mimica/ui": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.1",
+    "uuid": "^11.0.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@types/ws": "^8.5.13",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^39.8.5",
+    "electron-vite": "^5.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.4.2"
+  },
+  "build": {
+    "extraResources": [
+      {
+        "from": "../../templates/persona",
+        "to": "templates/persona",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  }
+}

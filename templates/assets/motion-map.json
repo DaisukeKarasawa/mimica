@@ -1,0 +1,94 @@
+{
+  "//": [
+    "Motion map template — maps AvatarState to Spine animation names.",
+    "",
+    "TypeScript schema (copy target must stay valid JSON):",
+    "  import type { AvatarState, MotionMap, MotionMapEntry } from \"@mimica/shared\";",
+    "  // MotionMapEntry: packages/shared/src/avatar.ts",
+    "  // AvatarState keys: packages/shared/src/chat.ts",
+    "  // Runtime: packages/character-runtime/src/CharacterDirector.ts, SpineStageController.ts",
+    "",
+    "Deploy path (default): ~/MimicaAssets/characters/rio/motion-map.json",
+    "List skeleton animations: pnpm --filter @mimica/character-runtime extract-animations -- <path>.skel",
+    "",
+    "Top-level keys = AvatarState: idle | thinking | talking | waiting | success | error | cancelled",
+    "Each value is a MotionMapEntry:",
+    "",
+    "State transition semantics (CharacterDirector.setState → SpineStageController.playState):",
+    "",
+    "  loop:true — persistent loop states: idle, thinking, waiting, talking",
+    "    Entered only by explicit setState() / setAvatarState() (agent events, UI, dev preview).",
+    "    Animation loops until the next setState(); do not use returnTo (ignored when loop is true).",
+    "",
+    "  loop:false — one-shot reactions: success, error",
+    "    Play animations[0] once; on complete, auto setAvatarState(returnTo) when returnTo is set.",
+    "    This template uses returnTo \"idle\" for success and error.",
+    "",
+    "  returnTo omitted (loop:false only):",
+    "    No auto-return; AvatarState stays on success/error until the next explicit setState().",
+    "    loop omitted defaults to true (entry?.loop ?? true in SpineStageController).",
+    "",
+    "  loop (boolean, required)",
+    "    true  — see persistent loop states above.",
+    "    false — see one-shot reactions above; pair with returnTo for auto-return.",
+    "",
+    "  animations (string[], required)",
+    "    Spine animation names from the .skel. Runtime plays animations[0] only.",
+    "    Put the preferred clip first; extra entries are reserved for future rotation.",
+    "    If empty, fallback (then idle) is used.",
+    "",
+    "  fallback (string[], optional)",
+    "    Used when animations is empty or missing clips. First name wins.",
+    "    Example: thinking uses Look_01_M with fallback Idle_01.",
+    "",
+    "  returnTo (AvatarState, optional)",
+    "    loop:false only — target state after one-shot completes (typically \"idle\").",
+    "    Ignored when loop is true. Omitted → no automatic transition (see above).",
+    "",
+    "Animation naming (Blue Archive / CH0158_home convention — not validated in code):",
+    "  _M  — body motion loops (e.g. Look_01_M, Talk_02_M, LookEnd_01_M).",
+    "  _A  — action / expression one-shots (e.g. Pat_01_A, LookEnd_01_A).",
+    "  *End* — paired end clip for a motion (PatEnd_01_A after Pat_01_A).",
+    "  No suffix — neutral idle/base (e.g. Idle_01). Start_Idle_01 has camera/scene motion.",
+    "  CH####_* — scene-specific clips; verify with extract-animations before use.",
+    "",
+    "Minimal entry example:",
+    "  \"thinking\": { \"loop\": true, \"animations\": [\"Look_01_M\"], \"fallback\": [\"Idle_01\"] }",
+    "",
+    "Remove this \"//\" key after copy if you prefer a state-only file (runtime ignores it)."
+  ],
+  "idle": {
+    "loop": true,
+    "animations": ["Idle_01"]
+  },
+  "thinking": {
+    "loop": true,
+    "animations": ["Look_01_M"],
+    "fallback": ["Idle_01"]
+  },
+  "waiting": {
+    "loop": true,
+    "animations": ["LookEnd_01_M"],
+    "fallback": ["Idle_01"]
+  },
+  "talking": {
+    "loop": true,
+    "animations": ["Talk_01_M", "Talk_02_M", "Talk_03_M", "Talk_04_M", "Talk_05_M"],
+    "fallback": ["Look_01_M", "Idle_01"]
+  },
+  "success": {
+    "loop": false,
+    "animations": ["Pat_01_A", "PatEnd_01_A"],
+    "returnTo": "idle"
+  },
+  "error": {
+    "loop": false,
+    "animations": ["LookEnd_01_A"],
+    "returnTo": "idle"
+  },
+  "cancelled": {
+    "loop": false,
+    "animations": ["LookEnd_01_A"],
+    "returnTo": "idle"
+  }
+}

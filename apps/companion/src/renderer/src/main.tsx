@@ -1,0 +1,18 @@
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "@mimica/ui/theme.css";
+import "./styles/shell.css";
+import "./styles/stage.css";
+import "./styles/stage-placeholder.css";
+import "./styles/chat.css";
+
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element #root not found");
+}
+createRoot(rootElement).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);

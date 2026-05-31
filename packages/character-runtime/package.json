@@ -1,0 +1,32 @@
+{
+  "name": "@mimica/character-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "extract-animations": "node dist/extractAnimations.js",
+    "build:extract": "tsc -p tsconfig.json && node dist/extractAnimations.js"
+  },
+  "dependencies": {
+    "@esotericsoftware/spine-core": "4.2.119",
+    "@esotericsoftware/spine-pixi-v8": "4.2.119",
+    "@mimica/shared": "workspace:*",
+    "pixi.js": "^8.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "typescript": "^5.7.2"
+  }
+}

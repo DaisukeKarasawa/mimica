@@ -1,0 +1,232 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "ja-JP"
+early_access: false
+inheritance: false
+tone_instructions: >
+  Write Japanese. Calm, terse, caring cool kouhai tone inspired by Ai Nanasaki;
+  use 「先輩」 only when natural. Keep criteria strict. Give clear serious
+  findings plus fixes/verification. No impersonation, quotes, jokes, chat,
+  poems, art, emoji.
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+
+  high_level_summary: true
+  high_level_summary_instructions: |
+    Write the summary in Japanese, optimized for Cursor to evaluate and act on later.
+    Include:
+    - the purpose of the change
+    - important risks
+    - the review angles CodeRabbit focused on
+    - prioritized findings when fixes are needed
+    - required verification: pnpm typecheck, pnpm build, and relevant manual checks from docs/project-kickoff.md or docs/requirements.md when behavior changes
+  high_level_summary_in_walkthrough: false
+  auto_title_instructions: |
+    Use Conventional Commits format: <type>[optional scope]: <description>.
+    Prefer types: feat, fix, docs, refactor, test, chore, build, ci, perf, style.
+    Prefer scopes when helpful: companion, extension, shared, ui, character-runtime, agent-orchestrator, docs.
+    Keep the title concise, specific, and focused on the intent of the change.
+
+  review_status: true
+  review_details: true
+  commit_status: true
+  fail_commit_status: true
+
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  assess_linked_issues: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  auto_apply_labels: false
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  poem: false
+  in_progress_fortune: false
+  enable_prompt_for_ai_agents: true
+
+  labeling_instructions:
+    - label: "companion"
+      instructions: "Suggest when changes affect the Electron Companion app (main, preload, renderer, sessions, bridge)."
+    - label: "extension"
+      instructions: "Suggest when changes affect apps/cursor-extension commands, context provider, or WebSocket client."
+    - label: "spine"
+      instructions: "Suggest when changes affect PixiJS/Spine rendering, motion maps, or character-runtime avatar state."
+    - label: "cursor-sdk"
+      instructions: "Suggest when changes affect @cursor/sdk orchestration, agent streaming, or tool cards."
+    - label: "docs"
+      instructions: "Suggest when changes affect requirements, kickoff docs, asset guides, or persona templates."
+
+  path_filters:
+    - "!pnpm-lock.yaml"
+    - "!out/**"
+    - "!node_modules/**"
+    - "!*.tsbuildinfo"
+    - "!apps/companion/release/**"
+
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        This repository is a macOS-only Cursor Companion monorepo: Electron + TypeScript + React + PixiJS/Spine, plus a Cursor extension and shared packages.
+
+        Optimize review comments for an AI agent workflow. Each important finding should include:
+        - the concrete risk or broken invariant,
+        - the relevant file/function,
+        - the expected behavior,
+        - the likely fix direction,
+        - the verification needed after the fix.
+
+        Prioritize correctness, security boundaries, Electron IPC safety, localhost WebSocket scope, Cursor SDK usage, session persistence, Spine asset loading from user-local paths, Avatar state mapping, and alignment with docs/requirements.md and docs/project-kickoff.md.
+
+        Avoid subjective style comments unless they affect maintainability, correctness, or future agent work. Prefer fewer high-signal comments over broad nitpicks.
+    - path: "apps/companion/src/main/**"
+      instructions: |
+        Focus on Electron lifecycle, window behavior, session store, localhost bridge server, and safe access to userData and external asset paths under ~/MimicaAssets.
+        Verify contextIsolation, sandboxing, and narrow typed IPC channels.
+    - path: "apps/companion/src/preload/**"
+      instructions: |
+        Treat this as a security boundary. Flag broad API exposure, generic ipcRenderer wrappers, direct filesystem access from the renderer, or payloads not represented by @mimica/shared types.
+    - path: "apps/companion/src/renderer/**"
+      instructions: |
+        Focus on React UI, Chat Panel behavior, Character Stage (PixiJS/Spine lifecycle), cleanup on unmount, and separation from main-process responsibilities.
+    - path: "apps/cursor-extension/**"
+      instructions: |
+        Focus on Cursor-only APIs, editor context collection, Companion launch command, and WebSocket client behavior bound to localhost.
+    - path: "packages/agent-orchestrator/**"
+      instructions: |
+        Focus on Cursor SDK local runtime usage, streaming/cancel semantics, tool event mapping, and failure behavior when CURSOR_API_KEY is missing.
+    - path: "packages/character-runtime/**"
+      instructions: |
+        Focus on Spine/PixiJS lifecycle, motion-map driven states, and mapping agent events to avatar states via shared protocol types.
+    - path: "packages/shared/**"
+      instructions: |
+        Treat shared protocol and settings types as contracts between extension, companion, and orchestrator. Flag breaking changes without coordinated updates.
+    - path: "docs/**"
+      instructions: |
+        Check whether doc changes update acceptance criteria, constraints, validation, or kickoff task status when behavior or scope changes.
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 5
+    drafts: false
+    labels:
+      - "!do-not-review"
+    ignore_title_keywords:
+      - "[skip review]"
+
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+
+  pre_merge_checks:
+    override_requested_reviewers_only: false
+    docstrings:
+      mode: "warning"
+      threshold: 60
+    title:
+      mode: "error"
+      requirements: >
+        PR titles must use Conventional Commits format:
+        <type>[optional scope]: <description>. Prefer scopes from this repository
+        when useful: companion, extension, shared, ui, character-runtime, agent-orchestrator, docs.
+    description:
+      mode: "warning"
+    issue_assessment:
+      mode: "off"
+    custom_checks:
+      - name: "Electron IPC Boundary"
+        mode: "error"
+        instructions: |
+          Fail if the PR weakens Electron's main/preload/renderer boundary in apps/companion.
+
+          Fail when any changed code:
+          - disables contextIsolation or sandbox for BrowserWindow,
+          - enables nodeIntegration in renderer code,
+          - exposes generic ipcRenderer, arbitrary channel invocation, shell execution, or broad filesystem APIs to the renderer,
+          - adds renderer access to local files outside explicit asset-loading or session paths documented in requirements,
+          - accepts untyped or structurally unclear IPC payloads instead of @mimica/shared types.
+
+          Pass when IPC changes remain narrowly scoped, typed, and consistent with packages/shared.
+      - name: "Local Spine Asset Boundary"
+        mode: "error"
+        instructions: |
+          Fail if the PR commits real character Spine assets or weakens the local-only asset policy.
+
+          Fail when any changed code or config:
+          - adds tracked .skel, .atlas, texture binaries, or reference media that belong under ~/MimicaAssets/characters/rio/,
+          - removes or weakens ignore rules that keep production Spine assets out of Git,
+          - treats BA-derived local assets as distributable production assets without an explicit requirements update.
+
+          Pass when only templates under templates/assets/, documentation, or code referencing user-local paths changes.
+      - name: "Secrets And Cursor SDK Boundary"
+        mode: "error"
+        instructions: |
+          Fail if the PR commits secrets or expands outbound data scope without documentation.
+
+          Fail when any changed code or config:
+          - commits API keys, .env values, or templates/secrets.json with real credentials,
+          - logs or persists CURSOR_API_KEY,
+          - sends workspace files, chat history, or editor context to non-local endpoints without explicit scope in docs/requirements.md,
+          - enables write/apply Agent tools in MVP scope without updating requirements.
+
+          Pass when secrets stay in environment/.env examples and SDK usage matches read-only MVP Agent policy.
+      - name: "MVP Verification Evidence"
+        mode: "warning"
+        instructions: |
+          Fail when the PR changes runtime behavior under apps/** or packages/** and neither the PR description nor changed documentation states validation.
+
+          Runtime behavior includes Companion UI, WebSocket bridge, session persistence, Cursor SDK streaming/cancel, Spine rendering, avatar state mapping, or extension context delivery.
+
+          Required validation evidence should mention the relevant subset of:
+          - pnpm typecheck
+          - pnpm build
+          - pnpm security (when dependencies change)
+          - manual checks from docs/project-kickoff.md or docs/requirements.md affected by the change
+
+          Pass when the PR is docs-only or validation evidence is present.
+      - name: "Requirement Drift"
+        mode: "warning"
+        instructions: |
+          Fail when the PR changes user-visible MVP behavior but conflicts with docs/requirements.md or docs/project-kickoff.md without updating those documents.
+
+          User-visible MVP behavior includes macOS-only scope, external Companion window layout, read-only Agent mode, localhost WebSocket bridge, session tabs/history, avatar state mapping, and persona tone boundaries.
+
+          Pass when code remains aligned with requirements or the requirements are updated in the same PR.
+
+chat:
+  art: false
+  auto_reply: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - ".cursor/rules/*.mdc"
+      - ".cursor/skills/*/SKILL.md"
+      - "docs/requirements.md"
+      - "docs/project-kickoff.md"
+
+code_generation:
+  docstrings:
+    language: "en-US"
+    path_instructions:
+      - path: "apps/**/*.ts"
+        instructions: >
+          Generate or improve docstrings only for exported APIs, shared types,
+          IPC-facing functions, Electron lifecycle boundaries, WebSocket protocol
+          handlers, and non-obvious behavior. Keep docstrings concise. Do not add
+          docstrings to trivial private helpers or self-explanatory UI wiring.
+      - path: "packages/**/*.ts"
+        instructions: >
+          Generate or improve docstrings for exported package APIs and protocol
+          contracts. Skip trivial re-exports and obvious type aliases.

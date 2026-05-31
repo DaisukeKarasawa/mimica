@@ -1,0 +1,29 @@
+{
+  "characterId": "rio",
+  "displayName": "調月リオ",
+  "source": "lines.source.txt",
+  "addressing": {
+    "user": ["先生", "貴方"],
+    "self": ["私", "わたし"]
+  },
+  "categories": {
+    "greeting_login": ["（wiki 等から取得したセリフをここに追加）"],
+    "idle_home": [],
+    "affection_sensei": [],
+    "growth_praise": [],
+    "combat_support": [],
+    "gift_receive": [],
+    "schedule": [],
+    "philosophy": [],
+    "work_request": [],
+    "bond_embarrassed": [],
+    "seasonal": []
+  },
+  "reactions": {
+    "thinking": ["合理的な解を導き出すわ。"],
+    "success": ["結果で証明したわ。"],
+    "error": ["……想定外ね。再計算するわ。"],
+    "waiting": ["貴方の判断を待っているわ。"],
+    "cancelled": ["了解。中断するわ。"]
+  }
+}

@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Format, lint, typecheck, and build
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Guard local-only assets and secrets
+        run: |
+          set -euo pipefail
+
+          failures=()
+
+          tracked_spine="$(
+            git ls-files | grep -E '\.(skel(\.bytes)?|atlas)$' || true
+          )"
+          if [ -n "$tracked_spine" ]; then
+            failures+=("Spine binaries must stay outside Git (use ~/MimicaAssets/):")
+            failures+=("$tracked_spine")
+          fi
+
+          tracked_local_assets="$(git ls-files 'MimicaAssets/' || true)"
+          if [ -n "$tracked_local_assets" ]; then
+            failures+=("Files under MimicaAssets/ must not be committed:")
+            failures+=("$tracked_local_assets")
+          fi
+
+          tracked_env="$(
+            git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -Ev '(^|/)\.env\.example$' || true
+          )"
+          if [ -n "$tracked_env" ]; then
+            failures+=(".env files must not be committed:")
+            failures+=("$tracked_env")
+          fi
+
+          tracked_secrets="$(
+            git ls-files | grep -E '(^|/)secrets\.json$' | grep -Ev '\.example\.' || true
+          )"
+          if [ -n "$tracked_secrets" ]; then
+            failures+=("secrets.json must not be committed:")
+            failures+=("$tracked_secrets")
+          fi
+
+          tracked_persona="$(
+            git ls-files \
+              'templates/persona/lines.json' \
+              'templates/persona/lines.source.txt' || true
+          )"
+          if [ -n "$tracked_persona" ]; then
+            failures+=("Persona dialogue must stay local (~/MimicaAssets/.../persona/):")
+            failures+=("$tracked_persona")
+          fi
+
+          if [ "${#failures[@]}" -gt 0 ]; then
+            printf '%s\n' "${failures[@]}"
+            exit 1
+          fi
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
