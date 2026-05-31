@@ -27,11 +27,16 @@ export interface Bounds {
   maxY: number;
 }
 
+export interface HeadHitContext {
+  hit: boolean;
+  lookCenterClientX: number;
+}
+
 /**
  * Projects a skeleton-world point into a 2D output space (client/CSS px or Pixi
  * stage px, depending on the caller). The hit region drawn by the live skeleton
- * depends on the crop cover-fit (`SpineStageController.applyCropLayout`), so all
- * coordinate math funnels through such a projector instead of the canvas rect.
+ * depends on the crop cover-fit, so all coordinate math funnels through such a
+ * projector instead of the canvas rect.
  */
 export type ProjectWorld = (worldX: number, worldY: number) => Point2D;
 
@@ -90,6 +95,43 @@ export function projectBoundsToRect(bounds: Bounds, project: ProjectWorld): Rect
   return boundsToRect({ minX, minY, maxX, maxY });
 }
 
+function attachmentWorldBounds(
+  slot: ReturnType<Skeleton["findSlot"]>,
+  attachment: NonNullable<ReturnType<NonNullable<ReturnType<Skeleton["findSlot"]>>["getAttachment"]>>,
+): Bounds | null {
+  if (!slot) return null;
+
+  let verts: Float32Array;
+  if (attachment instanceof MeshAttachment) {
+    verts = new Float32Array(attachment.worldVerticesLength);
+    attachment.computeWorldVertices(slot, 0, attachment.worldVerticesLength / 2, verts, 0, 2);
+  } else if (attachment instanceof RegionAttachment) {
+    verts = new Float32Array(8);
+    attachment.computeWorldVertices(slot, verts, 0, 2);
+  } else {
+    return null;
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let allZero = true;
+
+  for (let i = 0; i < verts.length; i += 2) {
+    const x = verts[i]!;
+    const y = verts[i + 1]!;
+    if (x !== 0 || y !== 0) allZero = false;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+
+  if (verts.length === 0 || allZero) return null;
+  return { minX, minY, maxX, maxY };
+}
+
 /** World-space AABB of the given slots' current attachments (null if none drawable). */
 export function slotsWorldBounds(skeleton: Skeleton, slotNames: string[]): Bounds | null {
   let minX = Infinity;
@@ -102,26 +144,14 @@ export function slotsWorldBounds(skeleton: Skeleton, slotNames: string[]): Bound
     const slot = skeleton.findSlot(name);
     if (!slot) continue;
     const attachment = slot.getAttachment();
-    let verts: Float32Array;
-    if (attachment instanceof MeshAttachment) {
-      verts = new Float32Array(attachment.worldVerticesLength);
-      attachment.computeWorldVertices(slot, 0, attachment.worldVerticesLength / 2, verts, 0, 2);
-    } else if (attachment instanceof RegionAttachment) {
-      verts = new Float32Array(8);
-      attachment.computeWorldVertices(slot, verts, 0, 2);
-    } else {
-      continue;
-    }
-    for (let i = 0; i < verts.length; i += 2) {
-      const x = verts[i];
-      const y = verts[i + 1];
-      if (x === 0 && y === 0) continue;
-      any = true;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    }
+    if (!attachment) continue;
+    const bounds = attachmentWorldBounds(slot, attachment);
+    if (!bounds) continue;
+    any = true;
+    minX = Math.min(minX, bounds.minX);
+    minY = Math.min(minY, bounds.minY);
+    maxX = Math.max(maxX, bounds.maxX);
+    maxY = Math.max(maxY, bounds.maxY);
   }
 
   return any ? { minX, minY, maxX, maxY } : null;
@@ -158,17 +188,10 @@ interface SavedBoneRotation {
   setupRotation: number;
 }
 
-interface SavedSlotAttachment {
-  slotName: string;
-  attachmentName: string | null;
-}
-
 export class PetInteractionController {
   private phase: PetInteractionPhase = "idle";
   private readonly config: CharacterPetInteraction;
   private savedBoneRotations: SavedBoneRotation[] = [];
-  private savedSlotAttachments: SavedSlotAttachment[] = [];
-  private targetRotationDeg = 0;
   private currentRotationDeg = 0;
   private returnElapsedMs = 0;
   private pointerId: number | null = null;
@@ -190,8 +213,7 @@ export class PetInteractionController {
   /**
    * Resolved head hit region in the projector's output space. Prefers `hitSlots`
    * (live AABB of head slots), then a manual `hitRegionCropNormalized` rect, else
-   * null (caller uses the `hitBone` radius fallback). Returns null in the same
-   * space as `project` so it can drive screen hit-testing and a debug overlay.
+   * null (caller uses the `hitBone` radius fallback).
    */
   resolveHeadRect(
     skeleton: Skeleton,
@@ -234,27 +256,6 @@ export class PetInteractionController {
     return null;
   }
 
-  /** Screen-space hit test: head rect (slots/crop rect) preferred, else bone radius. */
-  hitTestHead(
-    skeleton: Skeleton,
-    project: ProjectWorld,
-    pointerClientX: number,
-    pointerClientY: number,
-    crop: StageCropRect | null,
-  ): boolean {
-    const rect = this.resolveHeadRect(skeleton, project, crop);
-    if (rect) return rectContains(pointerClientX, pointerClientY, rect);
-
-    const bone = skeleton.findBone(this.config.hitBone);
-    if (!bone) {
-      console.warn(`[PetInteraction] hitBone not found: ${this.config.hitBone}`);
-      return false;
-    }
-    const p = project(bone.worldX, bone.worldY);
-    const radius = this.config.hitRadiusPx;
-    return distanceSq(pointerClientX, pointerClientY, p.x, p.y) <= radius * radius;
-  }
-
   /** Client X the head turn pivots around: head rect center, else look/hit bone. */
   resolveLookCenterClientX(
     skeleton: Skeleton,
@@ -274,6 +275,45 @@ export class PetInteractionController {
     return project(bone.worldX, bone.worldY).x;
   }
 
+  /**
+   * Single-pass head hit test plus look-center resolution for pointer down.
+   * Resolves the head rect once when available.
+   */
+  resolveHeadHit(
+    skeleton: Skeleton,
+    project: ProjectWorld,
+    pointerClientX: number,
+    pointerClientY: number,
+    crop: StageCropRect | null,
+    fallbackLookCenterX: number,
+  ): HeadHitContext {
+    const rect = this.resolveHeadRect(skeleton, project, crop);
+    if (rect) {
+      return {
+        hit: rectContains(pointerClientX, pointerClientY, rect),
+        lookCenterClientX: rect.x + rect.width / 2,
+      };
+    }
+
+    const bone = skeleton.findBone(this.config.hitBone);
+    if (!bone) {
+      console.warn(`[PetInteraction] hitBone not found: ${this.config.hitBone}`);
+      return { hit: false, lookCenterClientX: fallbackLookCenterX };
+    }
+    const p = project(bone.worldX, bone.worldY);
+    const radius = this.config.hitRadiusPx;
+    const hit = distanceSq(pointerClientX, pointerClientY, p.x, p.y) <= radius * radius;
+    if (!hit) {
+      return { hit: false, lookCenterClientX: fallbackLookCenterX };
+    }
+    const lookBoneName = this.config.lookBone ?? this.config.hitBone;
+    const lookBone = skeleton.findBone(lookBoneName);
+    const lookCenterClientX = lookBone
+      ? project(lookBone.worldX, lookBone.worldY).x
+      : p.x;
+    return { hit: true, lookCenterClientX };
+  }
+
   beginPetting(
     skeleton: Skeleton,
     pointerId: number,
@@ -285,7 +325,6 @@ export class PetInteractionController {
     this.pointerId = pointerId;
     this.headCenterClientX = headCenterClientX;
     this.lookSwingSpanPx = lookSwingSpanPx;
-    this.targetRotationDeg = 0;
     this.currentRotationDeg = 0;
     this.returnElapsedMs = 0;
 
@@ -298,30 +337,15 @@ export class PetInteractionController {
       }
       this.savedBoneRotations.push({ bone, setupRotation: bone.rotation });
     }
-
-    // When a pet animation drives the face, skip the one-shot slot swap so the
-    // two mechanisms don't fight; expression is the fallback for assets without one.
-    if (!this.config.petAnimation) this.applyExpression(skeleton);
   }
 
   updatePettingCursor(cursorClientX: number): void {
     if (this.phase !== "petting") return;
-    this.targetRotationDeg = computeHeadRotationDeg(
+    this.currentRotationDeg = computeHeadRotationDeg(
       cursorClientX,
       this.headCenterClientX,
       this.lookSwingSpanPx,
       this.config.maxRotationDeg,
-    );
-    this.currentRotationDeg = this.targetRotationDeg;
-  }
-
-  tickPetting(dtMs: number): void {
-    if (this.phase !== "petting") return;
-    this.currentRotationDeg = lerpRotation(
-      this.currentRotationDeg,
-      this.targetRotationDeg,
-      dtMs,
-      50,
     );
   }
 
@@ -329,7 +353,6 @@ export class PetInteractionController {
     if (this.phase === "idle") return;
     this.phase = "returning";
     this.pointerId = null;
-    this.targetRotationDeg = 0;
     this.returnElapsedMs = 0;
   }
 
@@ -344,23 +367,19 @@ export class PetInteractionController {
     );
     if (this.returnElapsedMs >= this.config.returnDurationMs) {
       this.currentRotationDeg = 0;
-      this.phase = "idle";
       return true;
     }
     return false;
   }
 
-  cancel(skeleton: Skeleton): void {
+  cancel(): void {
     if (this.phase === "idle") return;
     this.phase = "idle";
     this.pointerId = null;
-    this.targetRotationDeg = 0;
     this.currentRotationDeg = 0;
     this.returnElapsedMs = 0;
     this.restoreBoneRotations();
-    this.restoreExpression(skeleton);
     this.savedBoneRotations = [];
-    this.savedSlotAttachments = [];
   }
 
   getPointerId(): number | null {
@@ -375,6 +394,10 @@ export class PetInteractionController {
     return this.config.petAnimation;
   }
 
+  /**
+   * Distributes `currentRotationDeg` evenly across configured head bones so the
+   * combined visual turn matches `maxRotationDeg` at full deflection.
+   */
   applyBoneOverrides(): void {
     if (this.phase === "idle") return;
     const boneCount = this.savedBoneRotations.length;
@@ -386,52 +409,15 @@ export class PetInteractionController {
     }
   }
 
-  finishReturn(skeleton: Skeleton): void {
+  finishReturn(): void {
+    this.phase = "idle";
     this.restoreBoneRotations();
-    this.restoreExpression(skeleton);
     this.savedBoneRotations = [];
-    this.savedSlotAttachments = [];
   }
 
   private restoreBoneRotations(): void {
     for (const { bone, setupRotation } of this.savedBoneRotations) {
       bone.rotation = setupRotation;
     }
-  }
-
-  private applyExpression(skeleton: Skeleton): void {
-    this.savedSlotAttachments = [];
-    for (const { slot: slotName, attachment } of this.config.expression?.slots ?? []) {
-      const slot = skeleton.findSlot(slotName);
-      if (!slot) {
-        console.warn(`[PetInteraction] expression slot not found: ${slotName}`);
-        continue;
-      }
-      const current = slot.getAttachment();
-      this.savedSlotAttachments.push({
-        slotName,
-        attachmentName: current?.name ?? null,
-      });
-      const next = skeleton.getAttachment(slot.data.index, attachment);
-      if (!next) {
-        console.warn(`[PetInteraction] expression attachment not found: ${slotName}/${attachment}`);
-        continue;
-      }
-      slot.setAttachment(next);
-    }
-  }
-
-  private restoreExpression(skeleton: Skeleton): void {
-    for (const { slotName, attachmentName } of this.savedSlotAttachments) {
-      const slot = skeleton.findSlot(slotName);
-      if (!slot) continue;
-      if (attachmentName === null) {
-        slot.setAttachment(null);
-        continue;
-      }
-      const attachment = skeleton.getAttachment(slot.data.index, attachmentName);
-      slot.setAttachment(attachment ?? null);
-    }
-    this.savedSlotAttachments = [];
   }
 }

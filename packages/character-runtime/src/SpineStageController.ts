@@ -13,17 +13,16 @@ import {
 } from "./motionPools.js";
 import { resolveAvatarAnimations, usesIdleAnimationPool } from "./resolveAnimations.js";
 import { computeStageCropRect, maximalOpaqueRect, resolveStageCrop } from "./stageCrop.js";
-import { PetInteractionController } from "./petInteraction.js";
+import { SpinePetInteractionHost } from "./SpinePetInteractionHost.js";
 
 export interface SpineStageConfig {
   /** e.g. `mimica-asset://local/` — must end with `/` or will be normalized */
   assetBaseUrl: string;
   metadata: CharacterMetadata;
   motionMap: MotionMap;
+  /** Visualize pet head hit region (companion resolves localStorage / URL flags). */
+  petDebug?: boolean;
 }
-
-const RELEASE_TRACK_INDEX = 1;
-const RELEASE_MIX_DURATION = 0.15;
 
 export class SpineStageController {
   private static nextMountId = 0;
@@ -49,12 +48,7 @@ export class SpineStageController {
   private pendingFitFrames = 0;
   private lastLoopAnimationName: string | null = null;
   private activeLoopPool: "idle" | "talk" | null = null;
-  private petController: PetInteractionController | null = null;
-  private petTickerBound: (() => void) | null = null;
-  private petDebugOverlay: Graphics | null = null;
-  private readonly onPointerDown = (event: PointerEvent) => this.handlePointerDown(event);
-  private readonly onPointerMove = (event: PointerEvent) => this.handlePointerMove(event);
-  private readonly onPointerUp = (event: PointerEvent) => this.handlePointerUp(event);
+  private petHost: SpinePetInteractionHost | null = null;
 
   constructor() {
     this.skelKey = `mimica-skel-${this.mountId}`;
@@ -103,7 +97,7 @@ export class SpineStageController {
     spine.pivot.set(0, 0);
     spine.beforeUpdateWorldTransforms = (object) => {
       stripViewportLetterbox(object.skeleton);
-      this.petController?.applyBoneOverrides();
+      this.petHost?.applyBoneOverrides();
       object.spineAttachmentsDirty = true;
     };
     viewContainer.addChild(spine);
@@ -122,18 +116,13 @@ export class SpineStageController {
       this.resizeObserver.observe(layoutRoot);
     }
 
+    this.setupPetInteraction(config);
     this.setAvatarState("idle");
-
-    try {
-      this.setupPetInteraction(config.metadata, app.canvas);
-    } catch (err) {
-      console.error("[SpineStageController] pet interaction setup failed:", err);
-    }
   }
 
   setAvatarState(state: AvatarState): void {
     if (state !== "idle") {
-      this.cancelPetInteraction();
+      this.petHost?.onNonIdleState();
     }
     this.currentState = state;
     this.playState(state);
@@ -467,266 +456,33 @@ export class SpineStageController {
     this.setTrack(animName, loop);
   }
 
-  private setupPetInteraction(metadata: CharacterMetadata, canvas: HTMLCanvasElement): void {
-    const petConfig = metadata.interaction?.pet;
-    if (!petConfig) return;
-
-    this.petController = new PetInteractionController(petConfig);
-    canvas.style.touchAction = "none";
-    canvas.addEventListener("pointerdown", this.onPointerDown);
-    canvas.addEventListener("pointermove", this.onPointerMove);
-    canvas.addEventListener("pointerup", this.onPointerUp);
-    canvas.addEventListener("pointercancel", this.onPointerUp);
-
-    if (this.resolvePetDebugEnabled() && this.stageRoot) {
-      const overlay = new Graphics();
-      overlay.eventMode = "none";
-      this.stageRoot.addChild(overlay);
-      this.petDebugOverlay = overlay;
-    }
-
+  private setupPetInteraction(config: SpineStageConfig): void {
+    const petConfig = config.metadata.interaction?.pet;
     const app = this.app;
-    if (!app) return;
-    this.petTickerBound = () => {
-      if (this.disposed || !this.petController) return;
-      const dt = app.ticker.deltaMS;
-      const phase = this.petController.getPhase();
-      if (phase === "petting") {
-        this.petController.tickPetting(dt);
-      } else if (phase === "returning") {
-        const spine = this.spine;
-        if (!spine) return;
-        const done = this.petController.tickReturn(dt);
-        if (done) {
-          this.petController.finishReturn(spine.skeleton);
-        }
-      }
-      this.updatePetDebugOverlay();
-    };
-    app.ticker.add(this.petTickerBound);
-  }
-
-  /** Skeleton-world point → Pixi stage (logical) coordinates via the live transform. */
-  private worldToStage(worldX: number, worldY: number): { x: number; y: number } {
     const spine = this.spine;
-    if (!spine) return { x: 0, y: 0 };
-    const p = spine.toGlobal({ x: worldX, y: worldY });
-    return { x: p.x, y: p.y };
-  }
+    const stageRoot = this.stageRoot;
+    if (!petConfig || !app || !spine || !stageRoot) return;
 
-  /**
-   * Skeleton-world point → browser client (CSS) coordinates. Scales by
-   * `rect.width / screen.width` (logical), so it is correct on HiDPI displays —
-   * unlike scaling by the device-pixel canvas backing size.
-   */
-  private worldToClient(worldX: number, worldY: number): { x: number; y: number } {
-    const app = this.app;
-    if (!app) return { x: 0, y: 0 };
-    const stage = this.worldToStage(worldX, worldY);
-    const rect = app.canvas.getBoundingClientRect();
-    const sw = app.renderer.screen.width || rect.width;
-    const sh = app.renderer.screen.height || rect.height;
-    const fx = sw > 0 ? rect.width / sw : 1;
-    const fy = sh > 0 ? rect.height / sh : 1;
-    return { x: rect.left + stage.x * fx, y: rect.top + stage.y * fy };
-  }
-
-  /** Head-turn swing span (client px): full deflection over the crop's width. */
-  private lookSwingSpanClientPx(): number {
-    const crop = this.cachedCrop;
-    const app = this.app;
-    if (!crop) return app?.renderer.screen.width ?? 0;
-    const midY = crop.y + crop.height / 2;
-    const left = this.worldToClient(crop.x, midY);
-    const right = this.worldToClient(crop.x + crop.width, midY);
-    return Math.abs(right.x - left.x);
-  }
-
-  private resolvePetDebugEnabled(): boolean {
     try {
-      const g = globalThis as unknown as {
-        __MIMICA_PET_DEBUG__?: boolean;
-        localStorage?: { getItem?: (k: string) => string | null };
-        location?: { search?: string };
-      };
-      if (g.__MIMICA_PET_DEBUG__ === true) return true;
-      if (g.localStorage?.getItem?.("mimica:petDebug")) return true;
-      if (typeof g.location?.search === "string" && g.location.search.includes("petDebug")) {
-        return true;
-      }
-    } catch {
-      // non-browser / restricted context
+      this.petHost = new SpinePetInteractionHost(petConfig, { debug: config.petDebug });
+      this.petHost.attach({
+        app,
+        spine,
+        canvas: app.canvas,
+        stageRoot,
+        getCachedCrop: () => this.cachedCrop,
+        getAvatarState: () => this.currentState,
+      });
+    } catch (err) {
+      console.error("[SpineStageController] pet interaction setup failed:", err);
+      this.petHost = null;
     }
-    return false;
-  }
-
-  private updatePetDebugOverlay(): void {
-    const overlay = this.petDebugOverlay;
-    const spine = this.spine;
-    const petController = this.petController;
-    if (!overlay || !spine || !petController) return;
-
-    const rect = petController.resolveHeadRect(
-      spine.skeleton,
-      (x, y) => this.worldToStage(x, y),
-      this.cachedCrop,
-    );
-    overlay.clear();
-    if (!rect) return;
-    overlay.rect(rect.x, rect.y, rect.width, rect.height).stroke({
-      width: 2,
-      color: 0x36f5b0,
-      alpha: 0.9,
-    });
-    const cx = rect.x + rect.width / 2;
-    overlay
-      .moveTo(cx, rect.y)
-      .lineTo(cx, rect.y + rect.height)
-      .stroke({ width: 1, color: 0x36f5b0, alpha: 0.6 });
   }
 
   private teardownPetInteraction(): void {
-    const app = this.app;
-    const canvas = app?.canvas;
-    if (canvas) {
-      canvas.removeEventListener("pointerdown", this.onPointerDown);
-      canvas.removeEventListener("pointermove", this.onPointerMove);
-      canvas.removeEventListener("pointerup", this.onPointerUp);
-      canvas.removeEventListener("pointercancel", this.onPointerUp);
-    }
-    if (app && this.petTickerBound) {
-      app.ticker.remove(this.petTickerBound);
-    }
-    this.petTickerBound = null;
-    this.petController = null;
-    if (this.petDebugOverlay) {
-      this.petDebugOverlay.destroy();
-      this.petDebugOverlay = null;
-    }
-  }
-
-  private cancelPetInteraction(): void {
-    const spine = this.spine;
-    if (!this.petController || !spine) return;
-    this.petController.cancel(spine.skeleton);
-    this.clearReleaseTrack();
-  }
-
-  private handlePointerDown(event: PointerEvent): void {
-    if (this.currentState !== "idle") return;
-    const spine = this.spine;
-    const petController = this.petController;
-    const app = this.app;
-    if (!spine || !petController || !app) return;
-
-    spine.skeleton.updateWorldTransform(Physics.update);
-    const project = (x: number, y: number) => this.worldToClient(x, y);
-    if (
-      !petController.hitTestHead(
-        spine.skeleton,
-        project,
-        event.clientX,
-        event.clientY,
-        this.cachedCrop,
-      )
-    ) {
-      return;
-    }
-
-    const rect = app.canvas.getBoundingClientRect();
-    const headCenterX = petController.resolveLookCenterClientX(
-      spine.skeleton,
-      project,
-      this.cachedCrop,
-      rect.left + rect.width / 2,
-    );
-    petController.beginPetting(
-      spine.skeleton,
-      event.pointerId,
-      headCenterX,
-      this.lookSwingSpanClientPx(),
-    );
-    this.playPetAnimation();
-    app.canvas.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  }
-
-  /** Loop the authored "being patted" reaction on the release track while petting. */
-  private playPetAnimation(): void {
-    const spine = this.spine;
-    const petController = this.petController;
-    if (!spine || !petController) return;
-
-    const animName = petController.getPetAnimation();
-    if (!animName) return;
-
-    const onSkel = filterAnimationsOnSkeleton(spine.skeleton.data, [animName]);
-    if (onSkel.length === 0) return;
-
-    const entry = spine.state.setAnimation(RELEASE_TRACK_INDEX, onSkel[0]!, true);
-    entry.mixDuration = RELEASE_MIX_DURATION;
-    stripViewportLetterbox(spine.skeleton);
-  }
-
-  private handlePointerMove(event: PointerEvent): void {
-    const petController = this.petController;
-    if (!petController || petController.getPhase() !== "petting") return;
-    if (petController.getPointerId() !== event.pointerId) return;
-
-    petController.updatePettingCursor(event.clientX);
-  }
-
-  private handlePointerUp(event: PointerEvent): void {
-    const petController = this.petController;
-    const spine = this.spine;
-    const app = this.app;
-    if (!petController || !spine || !app) return;
-    if (petController.getPhase() !== "petting") return;
-    if (petController.getPointerId() !== event.pointerId) return;
-
-    try {
-      app.canvas.releasePointerCapture(event.pointerId);
-    } catch {
-      // capture may already be released
-    }
-
-    petController.beginReturn();
-    this.playReleaseAnimation();
-  }
-
-  private playReleaseAnimation(): void {
-    const spine = this.spine;
-    const petController = this.petController;
-    if (!spine || !petController) return;
-
-    const animName = petController.getReleaseAnimation();
-    if (!animName) return;
-
-    const onSkel = filterAnimationsOnSkeleton(spine.skeleton.data, [animName]);
-    if (onSkel.length === 0) return;
-
-    const entry = spine.state.setAnimation(RELEASE_TRACK_INDEX, onSkel[0]!, false);
-    entry.mixDuration = RELEASE_MIX_DURATION;
-    // Empty the release track once PatEnd finishes so the idle face (track 0)
-    // shows through again instead of freezing on PatEnd's last frame.
-    entry.listener = {
-      complete: () => {
-        const current = spine.state.getCurrent(RELEASE_TRACK_INDEX);
-        if (current === entry) {
-          spine.state.setEmptyAnimation(RELEASE_TRACK_INDEX, RELEASE_MIX_DURATION);
-        }
-      },
-    };
-    stripViewportLetterbox(spine.skeleton);
-  }
-
-  private clearReleaseTrack(): void {
-    const spine = this.spine;
-    if (!spine) return;
-    const track = spine.state.getCurrent(RELEASE_TRACK_INDEX);
-    if (track) track.listener = {};
-    spine.state.clearTrack(RELEASE_TRACK_INDEX);
-    stripViewportLetterbox(spine.skeleton);
+    this.petHost?.cancel();
+    this.petHost?.detach();
+    this.petHost = null;
   }
 
   private async loadSpineAssets(base: string, metadata: CharacterMetadata): Promise<void> {
