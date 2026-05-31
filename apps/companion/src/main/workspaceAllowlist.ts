@@ -16,6 +16,30 @@ const SENSITIVE_HOME_RELATIVE = [
   "Library/Application Support",
 ];
 
+/** Absolute system prefixes that must never be used as agent workspaces. */
+const BLOCKED_SYSTEM_PREFIXES = [
+  "/etc",
+  "/System",
+  "/private/etc",
+  "/private/var",
+  "/bin",
+  "/sbin",
+  "/dev",
+  "/proc",
+  "/Library",
+  "/Applications",
+  "/var/log",
+  "/var/root",
+  "/var/db",
+  "/var/audit",
+];
+
+function isBlockedSystemPath(resolved: string): boolean {
+  const abs = resolve(resolved);
+  if (abs === "/") return true;
+  return BLOCKED_SYSTEM_PREFIXES.some((prefix) => abs === prefix || abs.startsWith(`${prefix}/`));
+}
+
 function isSensitiveHomePath(resolved: string): boolean {
   const home = resolve(homedir());
   const abs = resolve(resolved);
@@ -28,8 +52,12 @@ export function seedWorkspaceAllowlist(paths: Iterable<string>): void {
   for (const raw of paths) {
     try {
       registerWorkspaceRoot(raw);
-    } catch {
-      /* skip invalid or disallowed persisted paths */
+    } catch (err) {
+      console.warn(
+        "[mimica] Skipping disallowed or invalid persisted workspace path:",
+        raw,
+        err instanceof Error ? err.message : err,
+      );
     }
   }
 }
@@ -37,6 +65,9 @@ export function seedWorkspaceAllowlist(paths: Iterable<string>): void {
 /** Register and return a workspace root for agent runs (bridge context or session create). */
 export function registerWorkspaceRoot(raw: string): string {
   const resolved = resolveExpandedPath(raw);
+  if (isBlockedSystemPath(resolved)) {
+    throw new Error(`Workspace path is not allowed: ${raw}`);
+  }
   if (isSensitiveHomePath(resolved)) {
     throw new Error(`Workspace path is not allowed: ${raw}`);
   }
