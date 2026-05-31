@@ -4,12 +4,9 @@ import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import { createCursorAgent, type CursorSdkConversationMode } from "./createCursorAgent.js";
 import { ensureReadOnlyHooks } from "./ensureReadOnlyHooks.js";
 import { buildContextPrompt } from "./eventMapper.js";
-import {
-  handleSendToolDelta,
-  processAgentStream,
-  resolveFinalAssistantText,
-} from "./processAgentStream.js";
-import { READ_ONLY_HOOK_INSTALL_WARNING, READ_ONLY_TOOL_ERROR } from "./readOnlyPolicy.js";
+import { processAgentStream, resolveFinalAssistantText } from "./processAgentStream.js";
+import { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
+import { READ_ONLY_HOOK_INSTALL_WARNING } from "./readOnlyPolicy.js";
 import { resolveCursorApiKey } from "./resolveApiKey.js";
 
 export type { AgentRunCallbacks } from "./agentCallbacks.js";
@@ -112,28 +109,15 @@ export class AgentRunner {
     }
 
     try {
-      let writeToolBlocked = false;
-      const blockWriteTool = async (name: string): Promise<void> => {
-        if (!enforceReadOnly || writeToolBlocked) return;
-        writeToolBlocked = true;
-        await this.activeRun?.cancel();
-        params.callbacks.onState("failed");
-        params.callbacks.onError(READ_ONLY_TOOL_ERROR(name));
-      };
+      let readOnlyGuard: ReadOnlyRunGuard | undefined;
+      if (enforceReadOnly) {
+        readOnlyGuard = new ReadOnlyRunGuard(() => this.activeRun, params.callbacks);
+      }
 
       const run = await agent.send(fullPrompt, {
         mode: sdkMode,
         onDelta: async ({ update }) => {
-          if (!enforceReadOnly) return;
-          const blocked = await handleSendToolDelta({
-            update,
-            run,
-            writeToolBlocked,
-            isCancelled: () => this.cancelled,
-            signal: params.signal,
-            blockWriteTool,
-          });
-          if (blocked) writeToolBlocked = true;
+          await readOnlyGuard?.handleSendDelta(update, () => this.cancelled, params.signal);
         },
       });
       this.activeRun = run;
@@ -143,10 +127,10 @@ export class AgentRunner {
         callbacks: params.callbacks,
         signal: params.signal,
         isCancelled: () => this.cancelled,
-        enforceReadOnly,
+        readOnlyGuard,
       });
 
-      if (streamResult.writeToolBlocked || writeToolBlocked) {
+      if (readOnlyGuard?.isBlocked) {
         return;
       }
 

@@ -1,15 +1,13 @@
 import type { Run } from "@cursor/sdk";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
-import { isWriteTool, READ_ONLY_TOOL_ERROR } from "./readOnlyPolicy.js";
+import type { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { streamVisibleText } from "./streamVisibleText.js";
-import { isBlockedToolCallStatus, toolCallName } from "./toolCallName.js";
 import { stripMetaNarration } from "./userFacingText.js";
 
 export interface ProcessAgentStreamResult {
   sawToolCall: boolean;
   preToolText: string;
   postToolText: string;
-  writeToolBlocked: boolean;
 }
 
 export async function processAgentStream(params: {
@@ -17,31 +15,22 @@ export async function processAgentStream(params: {
   callbacks: AgentRunCallbacks;
   signal?: AbortSignal;
   isCancelled: () => boolean;
-  enforceReadOnly?: boolean;
+  readOnlyGuard?: ReadOnlyRunGuard;
 }): Promise<ProcessAgentStreamResult> {
-  const { run, callbacks, signal, isCancelled, enforceReadOnly = false } = params;
-  let writeToolBlocked = false;
+  const { run, callbacks, signal, isCancelled, readOnlyGuard } = params;
   let sawToolCall = false;
   let preToolText = "";
   let postToolText = "";
   let preToolVisible = "";
   let postToolVisible = "";
 
-  const blockWriteTool = async (name: string): Promise<void> => {
-    if (writeToolBlocked) return;
-    writeToolBlocked = true;
-    await run.cancel();
-    callbacks.onState("failed");
-    callbacks.onError(READ_ONLY_TOOL_ERROR(name));
-  };
-
   for await (const event of run.stream()) {
-    if (writeToolBlocked) break;
+    if (readOnlyGuard?.isBlocked) break;
 
     if (isCancelled() || signal?.aborted) {
       await run.cancel();
       callbacks.onState("cancelled");
-      return { sawToolCall, preToolText, postToolText, writeToolBlocked: true };
+      return { sawToolCall, preToolText, postToolText };
     }
 
     if (event.type === "request") {
@@ -50,9 +39,9 @@ export async function processAgentStream(params: {
     }
 
     if (event.type === "tool_call") {
-      if (enforceReadOnly && isWriteTool(event.name) && isBlockedToolCallStatus(event.status)) {
-        await blockWriteTool(event.name);
-        break;
+      if (readOnlyGuard) {
+        const blocked = await readOnlyGuard.handleStreamToolCall(event.name, event.status);
+        if (blocked) break;
       }
 
       if (event.status === "running") {
@@ -86,7 +75,7 @@ export async function processAgentStream(params: {
     }
   }
 
-  return { sawToolCall, preToolText, postToolText, writeToolBlocked };
+  return { sawToolCall, preToolText, postToolText };
 }
 
 export function resolveFinalAssistantText(
@@ -100,25 +89,4 @@ export function resolveFinalAssistantText(
     finalText = stripMetaNarration(resultText ?? preToolText + postToolText);
   }
   return finalText;
-}
-
-export async function handleSendToolDelta(params: {
-  update: { type: string; toolCall?: unknown };
-  run: Run;
-  writeToolBlocked: boolean;
-  isCancelled: () => boolean;
-  signal?: AbortSignal;
-  blockWriteTool: (name: string) => Promise<void>;
-}): Promise<boolean> {
-  const { update, writeToolBlocked, isCancelled, signal } = params;
-  if (writeToolBlocked || isCancelled() || signal?.aborted) return true;
-  if (update.type !== "tool-call-started" && update.type !== "partial-tool-call") {
-    return false;
-  }
-  const name = toolCallName(update.toolCall);
-  if (name && isWriteTool(name)) {
-    await params.blockWriteTool(name);
-    return true;
-  }
-  return false;
 }
