@@ -47,9 +47,7 @@ export function distanceSq(x1: number, y1: number, x2: number, y2: number): numb
 }
 
 export function rectContains(px: number, py: number, rect: Rect): boolean {
-  return (
-    px >= rect.x && px <= rect.x + rect.width && py >= rect.y && py <= rect.y + rect.height
-  );
+  return px >= rect.x && px <= rect.x + rect.width && py >= rect.y && py <= rect.y + rect.height;
 }
 
 export function expandRect(rect: Rect, padX: number, padY: number): Rect {
@@ -66,11 +64,7 @@ export function boundsToRect(b: Bounds): Rect {
 }
 
 /** Map a crop-normalized (0–1) coordinate to skeleton-world space. */
-export function cropNormalizedToWorld(
-  crop: StageCropRect,
-  nx: number,
-  ny: number,
-): Point2D {
+export function cropNormalizedToWorld(crop: StageCropRect, nx: number, ny: number): Point2D {
   return { x: crop.x + nx * crop.width, y: crop.y + ny * crop.height };
 }
 
@@ -97,7 +91,9 @@ export function projectBoundsToRect(bounds: Bounds, project: ProjectWorld): Rect
 
 function attachmentWorldBounds(
   slot: ReturnType<Skeleton["findSlot"]>,
-  attachment: NonNullable<ReturnType<NonNullable<ReturnType<Skeleton["findSlot"]>>["getAttachment"]>>,
+  attachment: NonNullable<
+    ReturnType<NonNullable<ReturnType<Skeleton["findSlot"]>>["getAttachment"]>
+  >,
 ): Bounds | null {
   if (!slot) return null;
 
@@ -308,9 +304,7 @@ export class PetInteractionController {
     }
     const lookBoneName = this.config.lookBone ?? this.config.hitBone;
     const lookBone = skeleton.findBone(lookBoneName);
-    const lookCenterClientX = lookBone
-      ? project(lookBone.worldX, lookBone.worldY).x
-      : p.x;
+    const lookCenterClientX = lookBone ? project(lookBone.worldX, lookBone.worldY).x : p.x;
     return { hit: true, lookCenterClientX };
   }
 
