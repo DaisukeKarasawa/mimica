@@ -77,6 +77,9 @@ export const DEFAULT_WS_PORT = 43721;
 
 export const AGENT_DISPLAY_NAME = "Mimica - 調月リオ";
 
+/** Fallback when the Cursor extension has not yet sent workspace context. */
+export const DEFAULT_WORKSPACE_FALLBACK = "~/dev/mimica";
+
 export const DEFAULT_SETTINGS: MimicaSettings = {
   theme: "kanagawa-dragon",
   activeCharacterId: "rio",

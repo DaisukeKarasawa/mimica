@@ -1,6 +1,7 @@
 export {
   DEFAULT_WS_PORT,
   AGENT_DISPLAY_NAME,
+  DEFAULT_WORKSPACE_FALLBACK,
   DEFAULT_SETTINGS,
   type AvatarState,
   type AgentRunState,
@@ -23,6 +24,8 @@ export {
   avatarStatusLabel,
   avatarBadgeLabel,
 } from "./avatar.js";
+
+export { type CharacterAssetStatus } from "./assets.js";
 
 export {
   type EditorContext,
