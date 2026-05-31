@@ -133,7 +133,8 @@ When changing how Mimica loads or maps Spine assets:
 - For commit-message history cleanup on unpushed work, preserve commit granularity and commit trees unless the user explicitly asks to squash or change content.
 - Prefer project-local, shared sources of truth over hidden global references when codifying repository behavior; avoid keeping duplicate commit-message rule sources.
 - When a path should clearly not be committed (e.g. `__pycache__/`, `*.py[cod]`), add the matching `.gitignore` entry directly instead of asking whether to add it.
-- Keep mimica dev-repo Cursor hooks focused on supply-chain and execution security (package installs, remote-to-shell, risky MCP), not MVP read-only Agent policy.
+- Do not install or commit MVP read-only hooks (`mimica-read-only-guard.mjs`, `denied-hook-tools.mjs`) in the mimica dev workspace; dev `.cursor/hooks` is `security-guard.mjs` only.
+- For Ask-mode read-only hook testing, use a separate workspace directory—not the mimica monorepo dev root.
 
 ## Learned Workspace Facts
 
@@ -153,8 +154,10 @@ When changing how Mimica loads or maps Spine assets:
   defaults to `~/MimicaAssets/characters/rio/persona/SKILL.md`.
 - Validation defaults: `pnpm typecheck`, `pnpm build`, and `pnpm security` when
   touching runtime or dependency surfaces.
-- Dev-repo Cursor hooks: `.cursor/hooks.json` + `.cursor/hooks/security-guard.mjs`
-  gate `beforeShellExecution` / `beforeMCPExecution` (deny remote-to-shell patterns;
-  ask on package installs and risky MCP). Do not put MVP read-only guard here.
+- Dev-repo Cursor hooks: `.cursor/hooks.json` + `.cursor/hooks/security-guard.mjs` only
+  (supply-chain / execution security). Companion Ask must not persist read-only hook files
+  or merge read-only entries into this repo.
 - Companion Agent modes: **Ask** (read-only hooks + write-tool block), **Agent** (full
-  SDK tools), **Plan** (`mode: "plan"`). `ensureReadOnlyHooks()` runs only for Ask.
+  SDK tools), **Plan** (`mode: "plan"`). `ensureReadOnlyHooks()` runs for Ask in external
+  workspaces only; it skips the mimica monorepo dev root (package.json name `mimica`,
+  `packages/agent-orchestrator`, `apps/companion`).

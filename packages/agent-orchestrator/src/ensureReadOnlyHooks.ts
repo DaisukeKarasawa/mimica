@@ -1,6 +1,11 @@
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  allowsReadOnlyHooksInDev,
+  isMimicaMonorepoDevRoot,
+  stripMimicaReadOnlyHooksFromWorkspace,
+} from "./mimicaDevWorkspace.js";
 import { MIMICA_READ_ONLY_HOOK_SCRIPT } from "./readOnlyPolicy.js";
 
 const HOOK_GUARD_MARKER = "mimica-read-only-guard";
@@ -63,6 +68,11 @@ export async function ensureReadOnlyHooks(
   workspacePath: string,
 ): Promise<EnsureReadOnlyHooksResult> {
   try {
+    if ((await isMimicaMonorepoDevRoot(workspacePath)) && !allowsReadOnlyHooksInDev()) {
+      await stripMimicaReadOnlyHooksFromWorkspace(workspacePath);
+      return { ok: true };
+    }
+
     const scriptPath = bundledHookScriptPath();
     const cursorDir = join(workspacePath, ".cursor");
     const hooksDir = join(cursorDir, "hooks");
