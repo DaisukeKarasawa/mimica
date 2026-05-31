@@ -64,11 +64,11 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
 
   const openSessionTab = useCallback(
     (id: string) => {
-      setOpenTabs(openTabIds.includes(id) ? openTabIds : [...openTabIds, id]);
+      setOpenTabs((prev) => (prev.includes(id) ? prev : [...prev, id]));
       setActiveSessionId(id);
       setPanelMode("chat");
     },
-    [openTabIds, setOpenTabs],
+    [setOpenTabs],
   );
 
   const handleNewSession = useCallback(

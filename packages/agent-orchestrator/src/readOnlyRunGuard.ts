@@ -19,9 +19,12 @@ export class ReadOnlyRunGuard {
   async blockWriteTool(name: string): Promise<void> {
     if (this.blocked) return;
     this.blocked = true;
-    await this.getRun()?.cancel();
-    this.callbacks.onState("failed");
-    this.callbacks.onError(READ_ONLY_TOOL_ERROR(name));
+    try {
+      await this.getRun()?.cancel();
+    } finally {
+      this.callbacks.onState("failed");
+      this.callbacks.onError(READ_ONLY_TOOL_ERROR(name));
+    }
   }
 
   async handleSendDelta(

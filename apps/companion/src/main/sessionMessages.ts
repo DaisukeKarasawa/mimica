@@ -14,7 +14,11 @@ export function appendAssistantMessage(
     createdAt: new Date().toISOString(),
     agentRunId: runId,
   };
-  return { ...session, messages: [...session.messages, assistantMsg] };
+  return {
+    ...session,
+    updatedAt: new Date().toISOString(),
+    messages: [...session.messages, assistantMsg],
+  };
 }
 
 /**
