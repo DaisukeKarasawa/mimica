@@ -33,17 +33,38 @@ export function applyAgentComplete(
   streamId: string,
   content: string,
 ): ChatSession[] {
-  const assistantMsg: ChatMessage = {
-    id: uuidv4(),
-    role: "assistant",
-    content,
-    createdAt: new Date().toISOString(),
-    agentRunId: runId,
-  };
   return sessions.map((s) => {
     if (s.id !== sessionId) return s;
-    const rest = s.messages.filter((m) => m.id !== streamId);
-    return { ...s, messages: [...rest, assistantMsg] };
+
+    const streamIndex = s.messages.findIndex((m) => m.id === streamId);
+    const runIndex = s.messages.findIndex(
+      (m) => m.role === "assistant" && m.agentRunId === runId,
+    );
+    const targetIndex = streamIndex >= 0 ? streamIndex : runIndex;
+
+    if (targetIndex >= 0) {
+      const messages = s.messages.map((m, i) =>
+        i === targetIndex ? { ...m, content, agentRunId: runId } : m,
+      );
+      const keepId = messages[targetIndex]!.id;
+      return {
+        ...s,
+        messages: messages.filter(
+          (m) =>
+            m.id === keepId ||
+            !(m.role === "assistant" && m.agentRunId === runId),
+        ),
+      };
+    }
+
+    const assistantMsg: ChatMessage = {
+      id: uuidv4(),
+      role: "assistant",
+      content,
+      createdAt: new Date().toISOString(),
+      agentRunId: runId,
+    };
+    return { ...s, messages: [...s.messages, assistantMsg] };
   });
 }
 

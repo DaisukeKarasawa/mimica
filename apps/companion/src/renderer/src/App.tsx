@@ -161,6 +161,7 @@ export default function App() {
     tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
 
     beginStream();
+    director.setState("thinking", true);
     setIsStreaming(true);
     try {
       await window.mimica.submitAgent({
