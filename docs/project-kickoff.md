@@ -2,7 +2,7 @@
 
 要件定義 v0.3（`docs/requirements.md`）とキックオフ時 Q&A に基づく、**確定方針・開始前タスク・実装順序**のまとめ。
 
-最終更新: 2026-05-30
+最終更新: 2026-05-31
 
 ---
 
@@ -15,7 +15,7 @@
 | 初期キャラクター | 調月リオ                                                                                                   |
 | 初期 MVP         | Phase 4 まで（Agent チャット + ストリーミング + キャンセル + コンテキスト + Avatar 連動 + セッション保存） |
 | 対象 OS          | **macOS のみ**（他 OS 向けの考慮・実装は不要）                                                             |
-| UI 言語          | **日本語のみ**                                                                                             |
+| UI 言語          | **二層** — プロダクト文言は日本語、Chrome 風 chrome（タブ・履歴・コンポーザー placeholder 等）は英語（§7.3.1） |
 | 配布             | なし（個人利用、素材非同梱）                                                                               |
 
 ---
@@ -46,16 +46,17 @@ Cursor Extension          Electron Companion App
 | Ask              | 読取専用（hook + ストリーム遮断）                                          |
 | Agent / Plan     | Cursor SDK の `mode: "agent"` / `"plan"`（編集・シェル可）                 |
 | 差分 UI          | Accept/Reject は Phase 5 以降                                              |
-| ツール実行 UI    | **基本ツールカード**（`docs/ui-mock.html` 風、`read_file` 等をカード表示） |
+| ツール実行 UI    | **イベントは記録**（`toolCalls`）。**チャット上のカード表示は現行スコープ外**（将来 `docs/ui-mock.html` 参照、§7.3.1） |
 | Avatar `waiting` | **MVP で使用**（ユーザー入力待ち・確認質問時）                             |
 
 ### 2.3 UI・表示
 
 | 項目             | 決定                                                         |
 | ---------------- | ------------------------------------------------------------ |
-| レイアウト       | Character Stage 70% / Chat Panel 30%                         |
+| レイアウト       | Character Stage + **リサイズ可能** Chat Panel（`MainSplitLayout`、幅は localStorage） |
+| チャットシェル   | **Chrome 風**（タブ D&D、⌘T/W/Y/B、履歴パネル、新コンポーザー）。詳細は `docs/requirements.md` §7.3.1 |
 | テーマ           | Kanagawa Dragon 風（メモロビ・キャラ素材の色は上書きしない） |
-| Agent 表示名     | **`Mimica - 調月リオ`**                                      |
+| Agent 表示名     | チャットヘッダ **`調月リオ`**（`AGENT_DISPLAY_NAME`）。バブル内の名前行は出さない |
 | Agent アイコン   | 表示する（`icon.png`）                                       |
 | ユーザーアイコン | 非表示                                                       |
 | persona 反映     | 口調・口癖・短いリアクションのみ。技術回答本文は通常品質     |
