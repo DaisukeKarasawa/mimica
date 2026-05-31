@@ -2,6 +2,8 @@
 
 Cursor 上の開発体験を、キャラクターエージェント（調月リオ）との会話体験として再構成する Companion アプリ。
 
+<img width="1455" height="909" alt="スクリーンショット 2026-06-01 4 22 06" src="https://github.com/user-attachments/assets/f87b9686-00b2-442b-9492-0e2413007d37" />
+
 ## ドキュメント
 
 - [要件定義](docs/requirements.md)
