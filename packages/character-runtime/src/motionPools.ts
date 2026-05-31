@@ -1,6 +1,9 @@
 import type { MotionMap } from "@mimica/shared";
 
-/** カメラ／シーン移動付きのため常時ループに使わない */
+/**
+ * カメラ／シーン移動付きのため常時ループに使わない。
+ * `Start_Idle_*` 全体を regex で除外する（docs/requirements.md §8.5 参照）。
+ */
 export const BLOCKED_ANIMATION_NAMES = new Set(["Start_Idle_01"]);
 
 export function isBlockedAnimation(name: string): boolean {

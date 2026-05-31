@@ -294,7 +294,8 @@ type AvatarState = "idle" | "thinking" | "talking" | "success" | "error" | "wait
 確認すべきこと:
 
 - `CH0158_MemorialLobby_5_*` がtalking用途に使えるか
-- 常時 idle は `Idle_01`（`Start_Idle_01` は画面移動ありのため非推奨）
+- 常時 idle は `Idle_01`（`Start_Idle_*` は画面移動ありのため非推奨）
+- ランタイムの idle/talk ランダムプール（`motionPools.isBlockedAnimation`）は **`Start_Idle_*` 名前空間全体**を除外する。`Start_Idle_01` だけでなく将来追加される同系クリップもループ候補に入れない
 - `Pat_01_*` がsuccess/reactionに適しているか
 - `Look_01_M` がthinkingに適しているか
 - 明示的なTalk系アニメーションが存在するか
@@ -926,7 +927,7 @@ idle
 
 - motion-mapに存在しない状態はidleへfallbackする
 - 1回再生モーション後はreturnToへ戻る
-- 状態切替にクールダウンを設ける
+- 状態切替にクールダウンを設ける（**`idle` への復帰要求はクールダウンをバイパス**し、cancel/failed/success 後の idle 復帰を確実にする）
 - 回答中は頻繁に状態を切り替えない
 - talking状態は回答ストリーミング中に継続する
 
