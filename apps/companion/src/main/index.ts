@@ -12,6 +12,7 @@ import { CursorBridgeServer } from "./cursorBridge.js";
 import { AgentService } from "./agentService.js";
 import type { BrowserWindow as BrowserWindowType } from "electron";
 import { openAllowedExternalUrl } from "./openExternal.js";
+import { seedWorkspaceAllowlist } from "./workspaceAllowlist.js";
 
 const electronApis = electron();
 
@@ -47,6 +48,7 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     setupAssetProtocolHandler();
     sessionStore.load();
+    seedWorkspaceAllowlist(sessionStore.list().map((s) => s.workspacePath));
     bridgeServer = new CursorBridgeServer(DEFAULT_WS_PORT, (context) => {
       mainWindow?.webContents.send("editor-context", context);
     });

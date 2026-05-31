@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { ChatSession } from "@mimica/shared";
 import { DEFAULT_SETTINGS } from "@mimica/shared";
 import { userDataJoin } from "./userDataPaths.js";
+import { registerWorkspaceRoot } from "./workspaceAllowlist.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -59,6 +60,7 @@ export class SessionStore {
   }
 
   create(workspacePath: string): ChatSession {
+    const resolvedWorkspace = registerWorkspaceRoot(workspacePath);
     const max = DEFAULT_SETTINGS.maxChatSessions;
     const existing = this.list();
     if (existing.length >= max) {
@@ -71,7 +73,7 @@ export class SessionStore {
       title: "新規チャット",
       createdAt: now,
       updatedAt: now,
-      workspacePath,
+      workspacePath: resolvedWorkspace,
       characterId: "rio",
       messages: [],
     };

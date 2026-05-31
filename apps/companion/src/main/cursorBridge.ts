@@ -2,7 +2,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { WebSocketServer, WebSocket } from "ws";
 import type { ClientMessage, EditorContext, ServerMessage } from "@mimica/shared";
-import { resolveWorkspacePath } from "./paths.js";
+import { registerWorkspaceRoot } from "./workspaceAllowlist.js";
 import { userDataJoin } from "./userDataPaths.js";
 
 function bridgeTokenPath(): string {
@@ -32,7 +32,7 @@ function isEditorContext(value: unknown): value is EditorContext {
   const ctx = value as Record<string, unknown>;
   if (typeof ctx.workspacePath !== "string" || ctx.workspacePath.length === 0) return false;
   try {
-    resolveWorkspacePath(ctx.workspacePath);
+    registerWorkspaceRoot(ctx.workspacePath);
     return true;
   } catch {
     return false;
