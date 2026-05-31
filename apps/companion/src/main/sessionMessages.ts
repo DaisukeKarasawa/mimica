@@ -21,10 +21,7 @@ export function appendAssistantMessage(
  * History for the agent prompt: the current user turn is sent separately in
  * `## User message`, so omit it when it matches the submitted prompt.
  */
-export function historyForAgentPrompt(
-  messages: ChatMessage[],
-  prompt: string,
-): ChatMessage[] {
+export function historyForAgentPrompt(messages: ChatMessage[], prompt: string): ChatMessage[] {
   const last = messages.at(-1);
   if (last?.role === "user" && last.content === prompt) {
     return messages.slice(0, -1);

@@ -98,13 +98,7 @@ export function reduceAgentEvent(
     }
     case "agent_complete": {
       const streamId = streamMessageId(event.runId, stream.streamId);
-      return applyAgentComplete(
-        sessions,
-        event.sessionId,
-        event.runId,
-        streamId,
-        event.content,
-      );
+      return applyAgentComplete(sessions, event.sessionId, event.runId, streamId, event.content);
     }
     case "agent_tool": {
       const streamId = streamMessageId(event.runId, stream.streamId);
