@@ -4,5 +4,19 @@
   "shortDisplayName": "リオ",
   "shortDisplayNameEn": "Rio",
   "skelFile": "CH0158_home.skel",
-  "atlasFile": "CH0158_home.atlas"
+  "atlasFile": "CH0158_home.atlas",
+  "interaction": {
+    "pet": {
+      "hitSlots": ["Head"],
+      "hitPaddingPx": 24,
+      "hitBone": "Touch_Point",
+      "lookBone": "Face_rot",
+      "headRotationBones": ["Head_Rot", "Head_Rot2", "Head_Rot3"],
+      "maxRotationDeg": 22,
+      "returnDurationMs": 320,
+      "hitRadiusPx": 100,
+      "petAnimation": "Pat_01_A",
+      "releaseAnimation": "PatEnd_01_A"
+    }
+  }
 }
