@@ -1,16 +1,11 @@
 import { access, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  DENIED_HOOK_TOOLS_FILE,
+  HOOK_GUARD_MARKER,
+  type HooksConfig,
   MIMICA_READ_ONLY_HOOK_SCRIPT,
 } from "./readOnlyPolicy.js";
-
-const HOOK_GUARD_MARKER = "mimica-read-only-guard";
-const DENIED_HOOK_TOOLS_FILE = "denied-hook-tools.mjs";
-
-interface HooksConfig {
-  version: number;
-  hooks: Record<string, Array<Record<string, unknown>>>;
-}
 
 /** True when workspace is the mimica monorepo dev root (Companion must not persist read-only hooks here). */
 export async function isMimicaMonorepoDevRoot(workspacePath: string): Promise<boolean> {

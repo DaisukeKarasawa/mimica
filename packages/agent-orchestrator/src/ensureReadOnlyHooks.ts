@@ -6,15 +6,12 @@ import {
   isMimicaMonorepoDevRoot,
   stripMimicaReadOnlyHooksFromWorkspace,
 } from "./mimicaDevWorkspace.js";
-import { MIMICA_READ_ONLY_HOOK_SCRIPT } from "./readOnlyPolicy.js";
-
-const HOOK_GUARD_MARKER = "mimica-read-only-guard";
-const DENIED_HOOK_TOOLS_FILE = "denied-hook-tools.mjs";
-
-interface HooksConfig {
-  version: number;
-  hooks: Record<string, Array<Record<string, unknown>>>;
-}
+import {
+  DENIED_HOOK_TOOLS_FILE,
+  HOOK_GUARD_MARKER,
+  type HooksConfig,
+  MIMICA_READ_ONLY_HOOK_SCRIPT,
+} from "./readOnlyPolicy.js";
 
 export type EnsureReadOnlyHooksResult = { ok: true } | { ok: false; message: string };
 

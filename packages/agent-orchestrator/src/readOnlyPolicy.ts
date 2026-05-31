@@ -7,6 +7,16 @@ const DENIED_HOOK_TOOL_RE = /^(Write|Delete|Shell|Task|Edit|ApplyPatch|Create)$/
 
 export const MIMICA_READ_ONLY_HOOK_SCRIPT = "mimica-read-only-guard.mjs";
 
+/** Substring matched in hooks.json command strings to identify Mimica read-only entries. */
+export const HOOK_GUARD_MARKER = "mimica-read-only-guard";
+
+export const DENIED_HOOK_TOOLS_FILE = "denied-hook-tools.mjs";
+
+export interface HooksConfig {
+  version: number;
+  hooks: Record<string, Array<Record<string, unknown>>>;
+}
+
 export function isWriteTool(name: string): boolean {
   return WRITE_TOOL_RE.test(name);
 }
