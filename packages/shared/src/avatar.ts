@@ -41,6 +41,10 @@ export interface StageCropRect {
 export interface CharacterMetadata {
   id: string;
   displayName: string;
+  /** Short name for UI copy (e.g. 調月リオ → リオ). Falls back to displayName when omitted. */
+  shortDisplayName?: string;
+  /** Romanized short name for English UI copy (e.g. Rio). */
+  shortDisplayNameEn?: string;
   skelFile: string;
   atlasFile: string;
   /** Optional fixed crop; otherwise computed from drawable slots (letterbox excluded). */

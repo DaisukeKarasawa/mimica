@@ -10,7 +10,6 @@
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 0 16px;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -29,8 +28,11 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-3));
-  box-shadow: 0 0 34px rgba(135, 169, 135, 0.34);
+  background: var(--chrome-mark-bg);
+  border: 1px solid var(--chrome-mark-border);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.24) inset,
+    0 0 24px var(--chrome-mark-glow);
 }
 
 .brand h1 {
@@ -40,49 +42,53 @@
   letter-spacing: 0.04em;
 }
 
-.brand span {
-  display: block;
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.top-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 11px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(197, 201, 197, 0.055);
-  color: var(--text);
-  white-space: nowrap;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--ok);
-  box-shadow: 0 0 18px var(--ok);
-}
-
-.dot.disconnected {
-  background: var(--error);
-  box-shadow: 0 0 18px var(--error);
-}
-
 .main {
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 32vw);
-  gap: 14px;
+  display: flex;
+  align-items: stretch;
+}
+
+.main > .stage {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.main--split-pending .chat {
+  flex: 0 0 min(32vw, 100%);
+  width: min(32vw, 100%);
+}
+
+.main:not(.main--split-pending) .chat {
+  flex: 0 0 var(--chat-panel-width);
+  width: var(--chat-panel-width);
+}
+
+.main-split-handle {
+  flex: 0 0 14px;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.main-split-handle::before {
+  content: "";
+  position: absolute;
+  inset: 4px 5px;
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+.main-split-handle:hover::before,
+.main-split-handle:focus-visible::before,
+body.is-split-dragging .main-split-handle::before {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+body.is-split-dragging {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.is-split-dragging * {
+  cursor: col-resize !important;
 }

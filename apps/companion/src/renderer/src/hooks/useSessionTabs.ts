@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatPanelMode } from "../components/ChatPanel";
 import type { ChatSession } from "@mimica/shared";
+import { hasSessionHistory } from "@mimica/shared";
 import { loadOpenTabIds, persistOpenTabIds } from "../lib/openTabs";
+import { reorderTabIds } from "../lib/reorderTabIds";
 
 export interface UseSessionTabsOptions {
   isStreaming: boolean;
@@ -35,16 +37,18 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     });
   }, []);
 
+  const historySessions = useMemo(() => allSessions.filter(hasSessionHistory), [allSessions]);
+
   useEffect(() => {
     void refreshSessions();
   }, [refreshSessions]);
 
   useEffect(() => {
-    if (allSessions.length === 0 || openTabIds.length > 0) return;
-    const id = allSessions[0].id;
+    if (historySessions.length === 0 || openTabIds.length > 0) return;
+    const id = historySessions[0]!.id;
     setOpenTabs([id]);
     if (!activeSessionId) setActiveSessionId(id);
-  }, [allSessions, openTabIds.length, activeSessionId, setOpenTabs]);
+  }, [historySessions, openTabIds.length, activeSessionId, setOpenTabs]);
 
   useEffect(() => {
     if (panelMode !== "chat") return;
@@ -98,31 +102,53 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     [openTabIds],
   );
 
-  const handleCloseTab = useCallback(
-    async (id: string) => {
-      await stopStreamingIfActive(id);
-      const nextIds = openTabIds.filter((tabId) => tabId !== id);
-      setOpenTabs(nextIds);
-      if (activeSessionId === id) {
-        setActiveSessionId(nextIds[nextIds.length - 1] ?? null);
-      }
+  const reorderOpenTab = useCallback(
+    (draggedId: string, toIndex: number) => {
+      setOpenTabs((prev) => {
+        const fromIndex = prev.indexOf(draggedId);
+        if (fromIndex === -1) return prev;
+        return reorderTabIds(prev, fromIndex, toIndex);
+      });
     },
-    [activeSessionId, openTabIds, setOpenTabs, stopStreamingIfActive],
+    [setOpenTabs],
   );
 
-  const handleDeleteSession = useCallback(
-    async (id: string) => {
-      await stopStreamingIfActive(id);
-      await window.mimica.deleteSession(id);
+  const removeTabFromUi = useCallback(
+    (id: string) => {
       const nextIds = openTabIds.filter((tabId) => tabId !== id);
       setOpenTabs(nextIds);
       if (activeSessionId === id) {
         setActiveSessionId(nextIds[nextIds.length - 1] ?? null);
       }
-      await refreshSessions();
     },
-    [activeSessionId, openTabIds, refreshSessions, setOpenTabs, stopStreamingIfActive],
+    [activeSessionId, openTabIds, setOpenTabs],
   );
+
+  const detachTab = useCallback(
+    async (id: string, deleteFromBackend: boolean | "ifEmpty") => {
+      await stopStreamingIfActive(id);
+
+      let shouldRefresh = false;
+      if (deleteFromBackend === true) {
+        await window.mimica.deleteSession(id);
+        shouldRefresh = true;
+      } else if (deleteFromBackend === "ifEmpty") {
+        const session = allSessions.find((s) => s.id === id);
+        if (session && !hasSessionHistory(session)) {
+          await window.mimica.deleteSession(id);
+          shouldRefresh = true;
+        }
+      }
+
+      removeTabFromUi(id);
+      if (shouldRefresh) await refreshSessions();
+    },
+    [allSessions, refreshSessions, removeTabFromUi, stopStreamingIfActive],
+  );
+
+  const handleCloseTab = useCallback((id: string) => detachTab(id, "ifEmpty"), [detachTab]);
+
+  const handleDeleteSession = useCallback((id: string) => detachTab(id, true), [detachTab]);
 
   const openSessions = useMemo(
     () =>
@@ -138,6 +164,7 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     allSessions,
     setAllSessions,
     openSessions,
+    historySessions,
     openTabIds,
     activeSessionId,
     activeSession,
@@ -151,5 +178,6 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     handleCloseTab,
     handleDeleteSession,
     cycleTab,
+    reorderOpenTab,
   };
 }
