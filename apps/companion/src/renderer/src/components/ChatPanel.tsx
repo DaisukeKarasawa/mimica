@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AgentMode, AvatarState, ChatSession } from "@mimica/shared";
 import { AGENT_DISPLAY_NAME } from "@mimica/shared";
+import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
 import { ChatComposer } from "./ChatComposer";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
@@ -62,19 +63,25 @@ export function ChatPanel({
       onReorderTab,
     });
 
-  const handleSubmit = () => {
-    const text = input.trim();
-    if (!text || isStreaming) return;
-    setInput("");
-    onSend(text);
-  };
-
   const showChat = panelMode === "chat";
   const lastMessage = activeSession?.messages.at(-1);
   const awaitingAssistantReply =
     lastMessage?.role === "user" ||
     (lastMessage?.role === "assistant" && !lastMessage.content.trim());
   const showThinkingIndicator = avatarState === "thinking" && awaitingAssistantReply;
+  const { containerRef: messagesRef, scrollToBottom } = useStickToBottomScroll({
+    enabled: showChat,
+    resetKey: activeSessionId,
+    contentVersion: [activeSession?.messages, showThinkingIndicator, isStreaming],
+  });
+
+  const handleSubmit = () => {
+    const text = input.trim();
+    if (!text || isStreaming) return;
+    setInput("");
+    scrollToBottom({ force: true });
+    onSend(text);
+  };
 
   return (
     <aside className="chat" aria-label="チャットパネル">
@@ -133,7 +140,7 @@ export function ChatPanel({
       <div className="chat-body">
         {showChat ? (
           <>
-            <div className="messages">
+            <div className="messages" ref={messagesRef}>
               {!activeSession && (
                 <p className="chat-empty">
                   タブがありません。⌘T（Ctrl+T）で New Chat
