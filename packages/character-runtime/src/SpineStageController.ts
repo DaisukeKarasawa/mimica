@@ -30,6 +30,7 @@ export class SpineStageController {
   private cachedCrop: StageCropRect | null = null;
   private currentState: AvatarState = "idle";
   private resizeObserver: ResizeObserver | null = null;
+  private resizeFrameId = 0;
   private readonly trackIndex = 0;
   private disposed = false;
   private assetsLoaded = false;
@@ -90,9 +91,13 @@ export class SpineStageController {
     this.scheduleStageFitRetries();
 
     this.resizeObserver = new ResizeObserver(() => {
-      this.fitSpineToStage();
+      this.scheduleHostResize();
     });
     this.resizeObserver.observe(host);
+    const layoutRoot = host.parentElement;
+    if (layoutRoot) {
+      this.resizeObserver.observe(layoutRoot);
+    }
 
     this.setAvatarState("idle");
   }
@@ -110,6 +115,10 @@ export class SpineStageController {
   destroy(): void {
     this.disposed = true;
     this.pendingFitFrames = 0;
+    if (this.resizeFrameId !== 0) {
+      cancelAnimationFrame(this.resizeFrameId);
+      this.resizeFrameId = 0;
+    }
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     if (this.spine) {
@@ -137,12 +146,23 @@ export class SpineStageController {
     this.cachedCrop = null;
   }
 
+  /** Layout size from the mount host (not stale renderer.screen). */
   private stageSize(): { w: number; h: number } {
     const host = this.host;
-    const app = this.app;
-    const w = Math.max(host?.clientWidth ?? 0, app?.screen.width ?? 0);
-    const h = Math.max(host?.clientHeight ?? 0, app?.screen.height ?? 0);
-    return { w, h };
+    if (!host) return { w: 0, h: 0 };
+    return { w: host.clientWidth, h: host.clientHeight };
+  }
+
+  /** Sync Pixi canvas to host layout, then refit crop — runs after layout settles. */
+  private scheduleHostResize(): void {
+    if (this.disposed) return;
+    if (this.resizeFrameId !== 0) cancelAnimationFrame(this.resizeFrameId);
+    this.resizeFrameId = requestAnimationFrame(() => {
+      this.resizeFrameId = 0;
+      if (this.disposed) return;
+      this.app?.resize();
+      this.fitSpineToStage();
+    });
   }
 
   /** Host layout can settle after mount; retry fit until dimensions are stable. */
@@ -152,6 +172,7 @@ export class SpineStageController {
     const tick = () => {
       if (this.disposed || this.pendingFitFrames <= 0) return;
       this.pendingFitFrames -= 1;
+      this.app?.resize();
       this.fitSpineToStage();
       if (this.pendingFitFrames === 0) {
         const { w, h } = this.stageSize();
