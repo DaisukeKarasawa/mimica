@@ -38,7 +38,7 @@ export function upsertAssistantTurn(
   }
 
   const assistantMsg: ChatMessage = {
-    id: streamId ?? crypto.randomUUID(),
+    id: streamId ?? `assistant-${runId}`,
     role: "assistant",
     content,
     createdAt: new Date().toISOString(),
