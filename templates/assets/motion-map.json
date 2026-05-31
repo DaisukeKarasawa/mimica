@@ -19,8 +19,8 @@
     "  loop:true — persistent loop states: idle, thinking, waiting, talking",
     "    Entered only by explicit setState() / setAvatarState() (agent events, UI, dev preview).",
     "    Animation loops until the next setState(); do not use returnTo (ignored when loop is true).",
-    "    Runtime (SpineStageController): thinking/waiting use idle.animations pool (random loop).",
-    "    talking uses Talk_* from talking.animations (random loop). idle uses Idle_* only;",
+    "    Runtime (SpineStageController): thinking/waiting/idle share Idle_* pool (random loop).",
+    "    talking uses Talk_* from talking.animations (random loop).",
     "    Start_Idle_01 is always excluded. Extra names in arrays are rotated randomly.",
     "",
     "  loop:false — one-shot reactions: success, error",
@@ -66,15 +66,11 @@
   },
   "thinking": {
     "loop": true,
-    "animations": ["Look_01_M"],
-    "fallback": ["Idle_01"],
-    "//note": "Avatar thinking; Spine runtime plays idle pool above (not Look_01_M)."
+    "animations": ["Idle_01", "Idle_02", "Idle_03"]
   },
   "waiting": {
     "loop": true,
-    "animations": ["LookEnd_01_M"],
-    "fallback": ["Idle_01"],
-    "//note": "Avatar waiting; Spine runtime plays idle pool (not LookEnd_01_M)."
+    "animations": ["Idle_01", "Idle_02", "Idle_03"]
   },
   "talking": {
     "loop": true,

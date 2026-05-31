@@ -9,12 +9,18 @@ export function isNearScrollBottom(
   return element.scrollHeight - element.scrollTop - element.clientHeight <= thresholdPx;
 }
 
+export interface StickToBottomContentVersion {
+  messageCount: number;
+  /** Last message body length; changes during stream reveal without messageCount changing. */
+  trailingContentLength: number;
+  showThinkingIndicator: boolean;
+  isStreaming: boolean;
+}
+
 interface UseStickToBottomScrollOptions {
   enabled?: boolean;
-  /** Changes when the message list height may grow (messages, streaming indicator, etc.). */
-  contentVersion: unknown;
-  /** When this changes, jump to the bottom (e.g. active session id). */
-  resetKey?: unknown;
+  contentVersion: StickToBottomContentVersion;
+  resetKey?: string | null;
 }
 
 export function useStickToBottomScroll({
@@ -61,7 +67,14 @@ export function useStickToBottomScroll({
 
   useLayoutEffect(() => {
     followIfStuck();
-  }, [contentVersion, enabled, followIfStuck]);
+  }, [
+    contentVersion.messageCount,
+    contentVersion.trailingContentLength,
+    contentVersion.showThinkingIndicator,
+    contentVersion.isStreaming,
+    enabled,
+    followIfStuck,
+  ]);
 
   useEffect(() => {
     const el = containerRef.current;

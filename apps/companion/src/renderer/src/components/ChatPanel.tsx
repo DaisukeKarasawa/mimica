@@ -72,7 +72,12 @@ export function ChatPanel({
   const { containerRef: messagesRef, scrollToBottom } = useStickToBottomScroll({
     enabled: showChat,
     resetKey: activeSessionId,
-    contentVersion: [activeSession?.messages, showThinkingIndicator, isStreaming],
+    contentVersion: {
+      messageCount: activeSession?.messages.length ?? 0,
+      trailingContentLength: activeSession?.messages.at(-1)?.content.length ?? 0,
+      showThinkingIndicator,
+      isStreaming,
+    },
   });
 
   const handleSubmit = () => {
