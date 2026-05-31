@@ -55,7 +55,6 @@ export class SpinePetInteractionHost {
       if (!this.deps) return;
       const phase = this.controller.getPhase();
       if (phase === "returning") {
-        const spine = this.deps.spine;
         const done = this.controller.tickReturn(app.ticker.deltaMS);
         if (done) {
           this.controller.finishReturn();
