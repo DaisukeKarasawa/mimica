@@ -23,10 +23,8 @@ export class CharacterDirector {
 
   setState(next: AvatarState): void {
     if (next === this.state) return;
-    const isTerminalToIdle =
-      next === "idle" &&
-      (this.state === "error" || this.state === "success" || this.state === "cancelled");
-    if (!isTerminalToIdle && Date.now() - this.lastChangeAt < this.cooldownMs) {
+    const bypassCooldown = next === "idle";
+    if (!bypassCooldown && Date.now() - this.lastChangeAt < this.cooldownMs) {
       return;
     }
     this.state = next;
