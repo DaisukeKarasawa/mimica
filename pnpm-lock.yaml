@@ -5,8 +5,8 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  tar: ">=7.5.10"
-  undici: ">=6.24.0"
+  tar: 7.5.15
+  undici: 8.3.0
 
 importers:
 
@@ -65,8 +65,8 @@ importers:
         version: 8.21.0
     devDependencies:
       '@types/node':
-        specifier: ^22.10.2
-        version: 22.19.19
+        specifier: ^20.17.0
+        version: 20.19.41
       '@types/react':
         specifier: ^19.0.2
         version: 19.2.15
@@ -78,19 +78,19 @@ importers:
         version: 8.18.1
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.2(@types/node@22.19.19))
+        version: 4.7.0(vite@6.4.2(@types/node@20.19.41))
       electron:
         specifier: ^39.8.5
         version: 39.8.10
       electron-vite:
         specifier: ^5.0.0
-        version: 5.0.0(vite@6.4.2(@types/node@22.19.19))
+        version: 5.0.0(vite@6.4.2(@types/node@20.19.41))
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
       vite:
         specifier: ^6.4.2
-        version: 6.4.2(@types/node@22.19.19)
+        version: 6.4.2(@types/node@20.19.41)
 
   apps/cursor-extension:
     dependencies:
@@ -102,8 +102,8 @@ importers:
         version: 8.21.0
     devDependencies:
       '@types/node':
-        specifier: ^22.10.2
-        version: 22.19.19
+        specifier: ^20.17.0
+        version: 20.19.41
       '@types/vscode':
         specifier: ^1.85.0
         version: 1.120.0
@@ -124,8 +124,8 @@ importers:
         version: link:../shared
     devDependencies:
       '@types/node':
-        specifier: ^22.10.2
-        version: 22.19.19
+        specifier: ^20.17.0
+        version: 20.19.41
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
@@ -146,8 +146,8 @@ importers:
         version: 8.18.1
     devDependencies:
       '@types/node':
-        specifier: ^22.10.2
-        version: 22.19.19
+        specifier: ^20.17.0
+        version: 20.19.41
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
@@ -790,6 +790,9 @@ packages:
 
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
+
+  '@types/node@20.19.41':
+    resolution: {integrity: sha512-ECymXOukMnOoVkC2bb1Vc/w/836DXncOg5m8Xj1RH7xSHZJWNYY6Zh7EH477vcnD5egKNNfy2RpNOmuChhFPgQ==}
 
   '@types/node@22.19.19':
     resolution: {integrity: sha512-dyh/xO2Fh5bYrfWaaqGrRQQGkNdmYw6AmaAUvYeUMNTWQtvb796ikLdmTchRmOlOiIJ1TDXfWgVx1QkUlQ6Hew==}
@@ -2802,7 +2805,7 @@ snapshots:
     dependencies:
       '@types/http-cache-semantics': 4.2.0
       '@types/keyv': 3.1.4
-      '@types/node': 22.19.19
+      '@types/node': 20.19.41
       '@types/responselike': 1.0.3
 
   '@types/debug@4.1.13':
@@ -2829,13 +2832,17 @@ snapshots:
 
   '@types/keyv@3.1.4':
     dependencies:
-      '@types/node': 22.19.19
+      '@types/node': 20.19.41
 
   '@types/mdast@4.0.4':
     dependencies:
       '@types/unist': 3.0.3
 
   '@types/ms@2.1.0': {}
+
+  '@types/node@20.19.41':
+    dependencies:
+      undici-types: 6.21.0
 
   '@types/node@22.19.19':
     dependencies:
@@ -2851,7 +2858,7 @@ snapshots:
 
   '@types/responselike@1.0.3':
     dependencies:
-      '@types/node': 22.19.19
+      '@types/node': 20.19.41
 
   '@types/unist@2.0.11': {}
 
@@ -2861,11 +2868,11 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 22.19.19
+      '@types/node': 20.19.41
 
   '@types/yauzl@2.10.3':
     dependencies:
-      '@types/node': 22.19.19
+      '@types/node': 20.19.41
     optional: true
 
   '@typescript-eslint/eslint-plugin@8.60.0(@typescript-eslint/parser@8.60.0(eslint@9.39.4)(typescript@5.9.3))(eslint@9.39.4)(typescript@5.9.3)':
@@ -2961,7 +2968,7 @@ snapshots:
 
   '@ungap/structured-clone@1.3.1': {}
 
-  '@vitejs/plugin-react@4.7.0(vite@6.4.2(@types/node@22.19.19))':
+  '@vitejs/plugin-react@4.7.0(vite@6.4.2(@types/node@20.19.41))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.7)
@@ -2969,7 +2976,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 6.4.2(@types/node@22.19.19)
+      vite: 6.4.2(@types/node@20.19.41)
     transitivePeerDependencies:
       - supports-color
 
@@ -3223,7 +3230,7 @@ snapshots:
 
   electron-to-chromium@1.5.364: {}
 
-  electron-vite@5.0.0(vite@6.4.2(@types/node@22.19.19)):
+  electron-vite@5.0.0(vite@6.4.2(@types/node@20.19.41)):
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-arrow-functions': 7.29.7(@babel/core@7.29.7)
@@ -3231,7 +3238,7 @@ snapshots:
       esbuild: 0.25.12
       magic-string: 0.30.21
       picocolors: 1.1.1
-      vite: 6.4.2(@types/node@22.19.19)
+      vite: 6.4.2(@types/node@20.19.41)
     transitivePeerDependencies:
       - supports-color
 
@@ -4715,7 +4722,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite@6.4.2(@types/node@22.19.19):
+  vite@6.4.2(@types/node@20.19.41):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.4)
@@ -4724,7 +4731,7 @@ snapshots:
       rollup: 4.60.4
       tinyglobby: 0.2.16
     optionalDependencies:
-      '@types/node': 22.19.19
+      '@types/node': 20.19.41
       fsevents: 2.3.3
 
   which@2.0.2:
