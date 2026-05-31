@@ -1,5 +1,5 @@
-import { v4 as uuidv4 } from "uuid";
 import type { ChatMessage, ChatSession } from "@mimica/shared";
+import { upsertAssistantTurn } from "@mimica/shared";
 
 /** Persist the final assistant turn after an agent run completes (idempotent per runId). */
 export function appendAssistantMessage(
@@ -7,32 +7,7 @@ export function appendAssistantMessage(
   content: string,
   runId: string,
 ): ChatSession {
-  const existingIndex = session.messages.findIndex(
-    (m) => m.role === "assistant" && m.agentRunId === runId,
-  );
-  if (existingIndex >= 0) {
-    const messages = session.messages.map((m, i) =>
-      i === existingIndex ? { ...m, content, agentRunId: runId } : m,
-    );
-    return {
-      ...session,
-      updatedAt: new Date().toISOString(),
-      messages,
-    };
-  }
-
-  const assistantMsg: ChatMessage = {
-    id: uuidv4(),
-    role: "assistant",
-    content,
-    createdAt: new Date().toISOString(),
-    agentRunId: runId,
-  };
-  return {
-    ...session,
-    updatedAt: new Date().toISOString(),
-    messages: [...session.messages, assistantMsg],
-  };
+  return upsertAssistantTurn(session, { runId, content });
 }
 
 /**

@@ -3,13 +3,14 @@ import { v4 as uuidv4 } from "uuid";
 import type { AgentEventMessage, ChatSession } from "@mimica/shared";
 import { mapAgentRunToAvatar } from "@mimica/shared";
 import type { CharacterDirector } from "@mimica/character-runtime";
-import { applyAgentDelta, applyAgentComplete, reduceAgentEvent } from "../lib/agentSessionUpdate";
 import {
-  advanceRevealCount,
-  codePointCount,
-  sliceByCodePoints,
-  STREAM_REVEAL_CHARS_PER_SECOND,
-} from "../lib/streamReveal";
+  applyAgentComplete,
+  applyAgentDelta,
+  applyAgentTool,
+  streamMessageId,
+} from "../lib/agentSessionUpdate";
+import type { PendingStreamComplete, StreamRevealContext } from "../lib/streamRevealController";
+import { StreamRevealController } from "../lib/streamRevealController";
 
 export interface UseAgentEventsOptions {
   director: CharacterDirector;
@@ -23,26 +24,17 @@ export interface UseAgentEventsResult {
   beginStream: () => string;
 }
 
-interface PendingComplete {
-  sessionId: string;
-  runId: string;
-  streamId: string;
-  content: string;
-}
-
 export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsResult {
   const { director, setAllSessions, setIsStreaming } = options;
 
-  const receivedContentRef = useRef("");
-  const revealedCountRef = useRef(0);
-  const revealCarryRef = useRef(0);
-  const lastRevealTickAtRef = useRef(0);
   const activeStreamIdRef = useRef<string | null>(null);
-  const activeSessionIdRef = useRef<string | null>(null);
-  const activeRunIdRef = useRef<string | null>(null);
-  const revealRafRef = useRef(0);
-  const pendingCompleteRef = useRef<PendingComplete | null>(null);
   const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const directorRef = useRef(director);
+  const setAllSessionsRef = useRef(setAllSessions);
+  const setIsStreamingRef = useRef(setIsStreaming);
+  directorRef.current = director;
+  setAllSessionsRef.current = setAllSessions;
+  setIsStreamingRef.current = setIsStreaming;
 
   const clearCompletionTimeout = () => {
     if (completionTimeoutRef.current !== null) {
@@ -51,132 +43,62 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     }
   };
 
-  const scheduleReturnToIdle = (delayMs: number) => {
+  const scheduleReturnToIdleRef = useRef((delayMs: number) => {
     clearCompletionTimeout();
     completionTimeoutRef.current = setTimeout(() => {
       completionTimeoutRef.current = null;
-      director.setState("idle", true);
+      directorRef.current.setState("idle");
     }, delayMs);
-  };
+  });
 
-  const stopRevealLoop = useCallback(() => {
-    if (revealRafRef.current !== 0) {
-      cancelAnimationFrame(revealRafRef.current);
-      revealRafRef.current = 0;
-    }
-  }, []);
+  const revealRef = useRef<StreamRevealController | null>(null);
+  if (!revealRef.current) {
+    revealRef.current = new StreamRevealController({
+      onFrame: (ctx: StreamRevealContext, content: string) => {
+        setAllSessionsRef.current((prev) =>
+          applyAgentDelta(prev, ctx.sessionId, ctx.runId, ctx.streamId, content),
+        );
+      },
+      onFinalize: (pending: PendingStreamComplete) => {
+        activeStreamIdRef.current = null;
+        setAllSessionsRef.current((prev) =>
+          applyAgentComplete(
+            prev,
+            pending.sessionId,
+            pending.runId,
+            pending.streamId,
+            pending.content,
+          ),
+        );
+        directorRef.current.setState("success");
+        setIsStreamingRef.current(false);
+        scheduleReturnToIdleRef.current(1200);
+      },
+    });
+  }
+  const reveal = revealRef.current;
 
-  const displayedContent = useCallback(
-    () => sliceByCodePoints(receivedContentRef.current, revealedCountRef.current),
-    [],
+  const syncRevealContext = useCallback(
+    (event: AgentEventMessage & { runId: string }) => {
+      const streamId = activeStreamIdRef.current ?? streamMessageId(event.runId, null);
+      reveal.setContext({
+        sessionId: event.sessionId,
+        runId: event.runId,
+        streamId,
+      });
+    },
+    [reveal],
   );
 
-  const pushDisplayedToSession = useCallback(() => {
-    const sessionId = activeSessionIdRef.current;
-    const streamId = activeStreamIdRef.current;
-    const runId = activeRunIdRef.current;
-    if (!sessionId || !streamId || !runId) return;
-
-    const content = displayedContent();
-    setAllSessions((prev) =>
-      applyAgentDelta(prev, sessionId, runId, streamId, content),
-    );
-  }, [displayedContent, setAllSessions]);
-
-  const finalizeComplete = useCallback(() => {
-    const pending = pendingCompleteRef.current;
-    if (!pending) return;
-
-    stopRevealLoop();
-    pendingCompleteRef.current = null;
-
-    setAllSessions((prev) => {
-      const next = applyAgentComplete(
-        prev,
-        pending.sessionId,
-        pending.runId,
-        pending.streamId,
-        pending.content,
-      );
-      const session = next.find((s) => s.id === pending.sessionId);
-      if (session) {
-        void window.mimica.saveSession(session);
-      }
-      return next;
-    });
-
-    receivedContentRef.current = "";
-    revealedCountRef.current = 0;
-    revealCarryRef.current = 0;
-    lastRevealTickAtRef.current = 0;
-    activeStreamIdRef.current = null;
-    activeSessionIdRef.current = null;
-    activeRunIdRef.current = null;
-
-    director.setState("success", true);
-    setIsStreaming(false);
-    scheduleReturnToIdle(1200);
-  }, [director, setAllSessions, setIsStreaming, stopRevealLoop]);
-
-  const revealTick = useCallback(() => {
-    revealRafRef.current = 0;
-
-    const now = Date.now();
-    if (lastRevealTickAtRef.current === 0) {
-      lastRevealTickAtRef.current = now;
-    }
-    const deltaMs = now - lastRevealTickAtRef.current;
-    lastRevealTickAtRef.current = now;
-
-    const receivedCount = codePointCount(receivedContentRef.current);
-    const advanced = advanceRevealCount(
-      revealedCountRef.current,
-      receivedCount,
-      deltaMs,
-      STREAM_REVEAL_CHARS_PER_SECOND,
-      revealCarryRef.current,
-    );
-    revealCarryRef.current = advanced.carry;
-
-    if (advanced.revealed > revealedCountRef.current) {
-      revealedCountRef.current = advanced.revealed;
-      pushDisplayedToSession();
-    }
-
-    const caughtUp = revealedCountRef.current >= receivedCount;
-    if (pendingCompleteRef.current && caughtUp) {
-      finalizeComplete();
-      return;
-    }
-
-    if (!caughtUp || pendingCompleteRef.current) {
-      revealRafRef.current = requestAnimationFrame(revealTick);
-    }
-  }, [finalizeComplete, pushDisplayedToSession]);
-
-  const startRevealLoop = useCallback(() => {
-    if (revealRafRef.current !== 0) return;
-    if (lastRevealTickAtRef.current === 0) {
-      lastRevealTickAtRef.current = Date.now();
-    }
-    revealRafRef.current = requestAnimationFrame(revealTick);
-  }, [revealTick]);
-
   const resetStream = useCallback(() => {
-    stopRevealLoop();
-    pendingCompleteRef.current = null;
-    receivedContentRef.current = "";
-    revealedCountRef.current = 0;
-    revealCarryRef.current = 0;
-    lastRevealTickAtRef.current = 0;
+    reveal.reset();
     activeStreamIdRef.current = null;
-    activeSessionIdRef.current = null;
-    activeRunIdRef.current = null;
-  }, [stopRevealLoop]);
+  }, [reveal]);
 
   const beginStream = useCallback(() => {
     clearCompletionTimeout();
     resetStream();
+    directorRef.current.setState("thinking");
     const id = uuidv4();
     activeStreamIdRef.current = id;
     return id;
@@ -185,74 +107,74 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
   useEffect(
     () => () => {
       clearCompletionTimeout();
-      stopRevealLoop();
+      reveal.stop();
     },
-    [stopRevealLoop],
+    [reveal],
   );
-
-  const bindStreamContext = useCallback((event: AgentEventMessage & { runId: string }) => {
-    activeSessionIdRef.current = event.sessionId;
-    activeRunIdRef.current = event.runId;
-  }, []);
 
   const handleAgentEvent = useCallback(
     (event: AgentEventMessage) => {
       switch (event.type) {
         case "agent_state": {
           if (event.state !== "completed") {
-            const avatar = mapAgentRunToAvatar(event.state);
-            director.setState(avatar, true);
+            directorRef.current.setState(mapAgentRunToAvatar(event.state));
           }
-          if (event.state === "streaming") setIsStreaming(true);
+          if (event.state === "streaming") setIsStreamingRef.current(true);
           if (event.state === "failed" || event.state === "cancelled") {
-            stopRevealLoop();
+            reveal.stop();
             resetStream();
-            setIsStreaming(false);
+            setIsStreamingRef.current(false);
           }
           break;
         }
         case "agent_warning":
           break;
         case "agent_delta": {
-          bindStreamContext(event);
-          receivedContentRef.current += event.content;
-          startRevealLoop();
+          syncRevealContext(event);
+          reveal.appendReceived(event.content);
+          reveal.start();
           break;
         }
         case "agent_tool": {
-          bindStreamContext(event);
-          setAllSessions((prev) =>
-            reduceAgentEvent(prev, event, {
-              streamId: activeStreamIdRef.current,
-              content: displayedContent(),
-            }),
+          syncRevealContext(event);
+          const ctx = reveal.getContext();
+          if (!ctx) break;
+          setAllSessionsRef.current((prev) =>
+            applyAgentTool(
+              prev,
+              ctx.sessionId,
+              ctx.runId,
+              ctx.streamId,
+              reveal.getDisplayedContent(),
+              event.name,
+              event.detail,
+            ),
           );
           break;
         }
         case "agent_complete": {
-          bindStreamContext(event);
-          const streamId = activeStreamIdRef.current ?? `stream-${event.runId}`;
-          if (codePointCount(event.content) >= codePointCount(receivedContentRef.current)) {
-            receivedContentRef.current = event.content;
-          }
-          pendingCompleteRef.current = {
+          syncRevealContext(event);
+          const streamId =
+            activeStreamIdRef.current ?? streamMessageId(event.runId, null);
+          reveal.setReceivedIfLonger(event.content);
+          reveal.queueComplete({
             sessionId: event.sessionId,
             runId: event.runId,
             streamId,
             content: event.content,
-          };
-          startRevealLoop();
+          });
+          reveal.start();
           break;
         }
         case "agent_error": {
-          stopRevealLoop();
+          reveal.stop();
           resetStream();
-          setIsStreaming(false);
-          director.setState("error", true);
+          setIsStreamingRef.current(false);
+          directorRef.current.setState("error");
           clearCompletionTimeout();
           completionTimeoutRef.current = setTimeout(() => {
             completionTimeoutRef.current = null;
-            director.setState("idle", true);
+            directorRef.current.setState("idle");
           }, 2000);
           break;
         }
@@ -260,16 +182,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
       }
     },
-    [
-      bindStreamContext,
-      director,
-      displayedContent,
-      resetStream,
-      setAllSessions,
-      setIsStreaming,
-      startRevealLoop,
-      stopRevealLoop,
-    ],
+    [resetStream, reveal, syncRevealContext],
   );
 
   return { handleAgentEvent, resetStream, beginStream };

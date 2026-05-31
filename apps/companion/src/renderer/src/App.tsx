@@ -161,7 +161,6 @@ export default function App() {
     tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
 
     beginStream();
-    director.setState("thinking", true);
     setIsStreaming(true);
     try {
       await window.mimica.submitAgent({
@@ -174,13 +173,13 @@ export default function App() {
     } catch {
       setIsStreaming(false);
       resetStreamRef.current();
-      director.setState("idle", true);
+      director.setState("idle");
     }
   };
 
   const handleCancel = async () => {
     await handleStopStreaming();
-    director.setState("idle", true);
+    director.setState("idle");
   };
 
   return (
