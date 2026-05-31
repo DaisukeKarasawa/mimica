@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import type { BrowserWindow as BrowserWindowType } from "electron";
 import { electron } from "./electron.js";
@@ -56,11 +57,11 @@ function saveWindowState(win: BrowserWindowType): void {
   );
 }
 
-function isAllowedNavigation(url: string, devServerUrl?: string): boolean {
+function isAllowedNavigation(url: string, devServerUrl?: string, appIndexUrl?: string): boolean {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol === "file:") return true;
     if (devServerUrl && parsed.origin === new URL(devServerUrl).origin) return true;
+    if (appIndexUrl && url === appIndexUrl) return true;
     return false;
   } catch {
     return false;
@@ -92,11 +93,13 @@ export function createMainWindow(): BrowserWindowType {
   });
 
   const devServerUrl = process.env.ELECTRON_RENDERER_URL ?? process.env.VITE_DEV_SERVER_URL;
+  const appIndexPath = join(__dirname, "../renderer/index.html");
+  const appIndexUrl = pathToFileURL(appIndexPath).href;
 
   if (devServerUrl) {
     void win.loadURL(devServerUrl);
   } else {
-    void win.loadFile(join(__dirname, "../renderer/index.html"));
+    void win.loadFile(appIndexPath);
   }
 
   win.on("close", () => saveWindowState(win));
@@ -107,7 +110,7 @@ export function createMainWindow(): BrowserWindowType {
   });
 
   win.webContents.on("will-navigate", (event, url) => {
-    if (!isAllowedNavigation(url, devServerUrl)) {
+    if (!isAllowedNavigation(url, devServerUrl, appIndexUrl)) {
       event.preventDefault();
       void openAllowedExternalUrl(url);
     }

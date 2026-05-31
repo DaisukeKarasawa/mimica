@@ -5,6 +5,9 @@ import WebSocket from "ws";
 import type { ClientMessage, ServerMessage } from "@mimica/shared";
 import { DEFAULT_WS_PORT } from "@mimica/shared";
 import { getEditorContext } from "./contextProvider";
+import { loadRepoDotEnv } from "./loadRepoDotEnv";
+
+loadRepoDotEnv(join(__dirname, "..", "..", ".."));
 
 let companionProcess: ChildProcess | null = null;
 let wsClient: WebSocket | null = null;
