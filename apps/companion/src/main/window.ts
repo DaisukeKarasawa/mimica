@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import type { BrowserWindow as BrowserWindowType } from "electron";
 import { electron } from "./electron.js";
 import { userDataJoin } from "./userDataPaths.js";
+import { openAllowedExternalUrl } from "./openExternal.js";
 
 const MIN_WIDTH = 960;
 const MIN_HEIGHT = 640;
@@ -55,6 +56,17 @@ function saveWindowState(win: BrowserWindowType): void {
   );
 }
 
+function isAllowedNavigation(url: string, devServerUrl?: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "file:") return true;
+    if (devServerUrl && parsed.origin === new URL(devServerUrl).origin) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function createMainWindow(): BrowserWindowType {
   const { BrowserWindow, screen } = electron();
   const state = loadWindowState();
@@ -88,6 +100,18 @@ export function createMainWindow(): BrowserWindowType {
   }
 
   win.on("close", () => saveWindowState(win));
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    void openAllowedExternalUrl(url);
+    return { action: "deny" };
+  });
+
+  win.webContents.on("will-navigate", (event, url) => {
+    if (!isAllowedNavigation(url, devServerUrl)) {
+      event.preventDefault();
+      void openAllowedExternalUrl(url);
+    }
+  });
 
   // Electron closes the window on Cmd/Ctrl+W by default; suppress so chat tab shortcuts can use it.
   win.webContents.on("before-input-event", (event, input) => {

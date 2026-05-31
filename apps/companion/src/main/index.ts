@@ -11,6 +11,7 @@ import { SessionStore } from "./sessionStore.js";
 import { CursorBridgeServer } from "./cursorBridge.js";
 import { AgentService } from "./agentService.js";
 import type { BrowserWindow as BrowserWindowType } from "electron";
+import { openAllowedExternalUrl } from "./openExternal.js";
 
 const { app, BrowserWindow, ipcMain } = electron();
 
@@ -67,6 +68,10 @@ if (!gotLock) {
       connected: bridgeServer?.hasClient() ?? false,
       port: DEFAULT_WS_PORT,
     }));
+    ipcMain.handle("shell:openExternal", (_e, url: unknown) => {
+      if (typeof url !== "string") return false;
+      return openAllowedExternalUrl(url);
+    });
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -85,10 +90,6 @@ if (!gotLock) {
   });
 }
 
-if (
-  process.env.NODE_ENV === "development" ||
-  process.env.ELECTRON_RENDERER_URL ||
-  process.env.VITE_DEV_SERVER_URL
-) {
+if (process.env.NODE_ENV === "development") {
   process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "true";
 }

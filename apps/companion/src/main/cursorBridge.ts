@@ -1,16 +1,29 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { WebSocketServer, WebSocket } from "ws";
 import type { ClientMessage, EditorContext, ServerMessage } from "@mimica/shared";
 import { resolveWorkspacePath } from "./paths.js";
+import { userDataJoin } from "./userDataPaths.js";
+
+function bridgeTokenPath(): string {
+  return userDataJoin("bridge-token");
+}
 
 function resolveBridgeToken(): string {
   const fromEnv = process.env.MIMICA_BRIDGE_TOKEN?.trim();
   if (fromEnv) return fromEnv;
+
+  const tokenPath = bridgeTokenPath();
+  if (existsSync(tokenPath)) {
+    const persisted = readFileSync(tokenPath, "utf8").trim();
+    if (persisted) return persisted;
+  }
+
   const generated = randomBytes(24).toString("hex");
+  writeFileSync(tokenPath, `${generated}\n`, { encoding: "utf8", mode: 0o600 });
   console.warn(
-    "[mimica] MIMICA_BRIDGE_TOKEN is not set; set it in .env so the Cursor extension can authenticate.",
+    `[mimica] MIMICA_BRIDGE_TOKEN is not set; dev token written to ${tokenPath} (mode 0600). Copy it into .env so the Cursor extension can authenticate.`,
   );
-  console.warn(`[mimica] Generated bridge token (dev only, not sent over WebSocket): ${generated}`);
   return generated;
 }
 

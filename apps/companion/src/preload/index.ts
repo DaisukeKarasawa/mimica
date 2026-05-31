@@ -36,6 +36,7 @@ export interface MimicaApi {
   getCharacterAssets: () => Promise<CharacterAssetStatus>;
   submitAgent: (payload: AgentSubmitPayload) => Promise<void>;
   cancelAgent: () => Promise<void>;
+  openExternal: (url: string) => Promise<boolean>;
   onEditorContext: (cb: (context: EditorContext) => void) => () => void;
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
 }
@@ -50,6 +51,7 @@ const api: MimicaApi = {
   getCharacterAssets: () => ipcRenderer.invoke("character:assets"),
   submitAgent: (payload) => ipcRenderer.invoke("agent:submit", payload),
   cancelAgent: () => ipcRenderer.invoke("agent:cancel"),
+  openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
   onEditorContext: (cb) => {
     const handler = (_: unknown, context: EditorContext) => cb(context);
     ipcRenderer.on("editor-context", handler);
