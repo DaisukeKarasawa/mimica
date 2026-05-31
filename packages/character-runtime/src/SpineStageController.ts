@@ -350,11 +350,7 @@ export class SpineStageController {
     return filterAnimationsOnSkeleton(spine.skeleton.data, fallback);
   }
 
-  private setTrack(
-    animName: string,
-    loop: boolean,
-    onComplete?: () => void,
-  ): boolean {
+  private setTrack(animName: string, loop: boolean, onComplete?: () => void): boolean {
     const spine = this.spine;
     if (!spine) return false;
 
@@ -377,7 +373,11 @@ export class SpineStageController {
     return true;
   }
 
-  private playRandomLoop(pool: "idle" | "talk", avatarState: AvatarState, preferDifferent = false): void {
+  private playRandomLoop(
+    pool: "idle" | "talk",
+    avatarState: AvatarState,
+    preferDifferent = false,
+  ): void {
     const spine = this.spine;
     if (!spine) return;
 

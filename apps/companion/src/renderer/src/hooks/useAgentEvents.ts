@@ -154,8 +154,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
         }
         case "agent_complete": {
           syncRevealContext(event);
-          const streamId =
-            activeStreamIdRef.current ?? streamMessageId(event.runId, null);
+          const streamId = activeStreamIdRef.current ?? streamMessageId(event.runId, null);
           reveal.setReceivedIfLonger(event.content);
           reveal.queueComplete({
             sessionId: event.sessionId,

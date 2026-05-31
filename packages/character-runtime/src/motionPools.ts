@@ -38,10 +38,7 @@ export function collectTalkPool(motionMap: MotionMap): string[] {
   return listed.filter((n) => !isBlockedAnimation(n));
 }
 
-export function pickRandomAnimation(
-  candidates: string[],
-  avoid?: string,
-): string | undefined {
+export function pickRandomAnimation(candidates: string[], avoid?: string): string | undefined {
   if (candidates.length === 0) return undefined;
   let pool = avoid ? candidates.filter((n) => n !== avoid) : candidates;
   if (pool.length === 0) pool = candidates;
