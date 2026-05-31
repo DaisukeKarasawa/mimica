@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
 import type { ChatSession, EditorContext } from "@mimica/shared";
-import { DEFAULT_SESSION_TITLE, DEFAULT_WS_PORT } from "@mimica/shared";
+import { DEFAULT_SESSION_TITLE, DEFAULT_WS_PORT, hasSessionHistory } from "@mimica/shared";
 import type { AgentSubmitPayload, MimicaApi } from "../../../preload/index";
+import { OPEN_TAB_IDS_STORAGE_KEY } from "../lib/openTabs";
 import {
   createUiLabSampleSessions,
   UI_LAB_EDITOR_CONTEXT,
@@ -49,6 +50,10 @@ export function installUiLabStub(): void {
 
     saveSession: async (session) => {
       const updated = { ...session, updatedAt: new Date().toISOString() };
+      if (!hasSessionHistory(updated)) {
+        sessions = sessions.filter((s) => s.id !== session.id);
+        return structuredClone(updated);
+      }
       const idx = sessions.findIndex((s) => s.id === session.id);
       if (idx >= 0) {
         const next = [...sessions];
@@ -104,10 +109,9 @@ export function installUiLabStub(): void {
   queueMicrotask(emitEditorContext);
 
   // Seed open tabs when localStorage is empty (Design Mode baseline).
-  const tabKey = "mimica.openTabIds";
-  if (!localStorage.getItem(tabKey)) {
+  if (!localStorage.getItem(OPEN_TAB_IDS_STORAGE_KEY)) {
     localStorage.setItem(
-      tabKey,
+      OPEN_TAB_IDS_STORAGE_KEY,
       JSON.stringify([
         UI_LAB_SESSION_IDS.impl,
         UI_LAB_SESSION_IDS.bug,

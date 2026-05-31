@@ -1,8 +1,8 @@
-const STORAGE_KEY = "mimica.openTabIds";
+export const OPEN_TAB_IDS_STORAGE_KEY = "mimica.openTabIds";
 
 export function loadOpenTabIds(): string[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(OPEN_TAB_IDS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
@@ -12,5 +12,5 @@ export function loadOpenTabIds(): string[] {
 }
 
 export function persistOpenTabIds(ids: string[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+  localStorage.setItem(OPEN_TAB_IDS_STORAGE_KEY, JSON.stringify(ids));
 }

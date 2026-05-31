@@ -116,35 +116,47 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     [setOpenTabs],
   );
 
-  const handleCloseTab = useCallback(
-    async (id: string) => {
-      await stopStreamingIfActive(id);
-      const session = allSessions.find((s) => s.id === id);
+  const removeTabFromUi = useCallback(
+    (id: string) => {
       const nextIds = openTabIds.filter((tabId) => tabId !== id);
       setOpenTabs(nextIds);
       if (activeSessionId === id) {
         setActiveSessionId(nextIds[nextIds.length - 1] ?? null);
       }
-      if (session && !hasSessionHistory(session)) {
-        await window.mimica.deleteSession(id);
-        await refreshSessions();
-      }
     },
-    [activeSessionId, allSessions, openTabIds, refreshSessions, setOpenTabs, stopStreamingIfActive],
+    [activeSessionId, openTabIds, setOpenTabs],
+  );
+
+  const detachTab = useCallback(
+    async (id: string, deleteFromBackend: boolean | "ifEmpty") => {
+      await stopStreamingIfActive(id);
+
+      let shouldRefresh = false;
+      if (deleteFromBackend === true) {
+        await window.mimica.deleteSession(id);
+        shouldRefresh = true;
+      } else if (deleteFromBackend === "ifEmpty") {
+        const session = allSessions.find((s) => s.id === id);
+        if (session && !hasSessionHistory(session)) {
+          await window.mimica.deleteSession(id);
+          shouldRefresh = true;
+        }
+      }
+
+      removeTabFromUi(id);
+      if (shouldRefresh) await refreshSessions();
+    },
+    [allSessions, refreshSessions, removeTabFromUi, stopStreamingIfActive],
+  );
+
+  const handleCloseTab = useCallback(
+    (id: string) => detachTab(id, "ifEmpty"),
+    [detachTab],
   );
 
   const handleDeleteSession = useCallback(
-    async (id: string) => {
-      await stopStreamingIfActive(id);
-      await window.mimica.deleteSession(id);
-      const nextIds = openTabIds.filter((tabId) => tabId !== id);
-      setOpenTabs(nextIds);
-      if (activeSessionId === id) {
-        setActiveSessionId(nextIds[nextIds.length - 1] ?? null);
-      }
-      await refreshSessions();
-    },
-    [activeSessionId, openTabIds, refreshSessions, setOpenTabs, stopStreamingIfActive],
+    (id: string) => detachTab(id, true),
+    [detachTab],
   );
 
   const openSessions = useMemo(

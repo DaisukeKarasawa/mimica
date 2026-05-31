@@ -2,6 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatSession } from "@mimica/shared";
 import { groupSessionsByDate } from "../lib/sessionGroups";
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  return target.isContentEditable;
+}
+
 interface ChatHistoryPanelProps {
   sessions: ChatSession[];
   activeSessionId: string | null;
@@ -75,6 +82,7 @@ export function ChatHistoryPanel({
 
       if (mod || event.altKey) return;
       if (flatSessions.length === 0) return;
+      if (isEditableTarget(event.target)) return;
 
       if (event.key === "ArrowUp" || event.key === "ArrowDown") {
         event.preventDefault();

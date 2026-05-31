@@ -83,6 +83,7 @@ export class SessionStore {
       const oldest = history[history.length - 1];
       if (oldest) this.delete(oldest.id);
     }
+    this.evictOldestEmptyDrafts(max);
     const now = new Date().toISOString();
     const session: ChatSession = {
       id: uuidv4(),
@@ -130,6 +131,19 @@ export class SessionStore {
       unlinkSync(path);
     } catch (err) {
       console.error(`Failed to delete session file: ${path}`, err);
+    }
+  }
+
+  /** Drop oldest in-memory drafts so spamming New Chat cannot grow the map without bound. */
+  private evictOldestEmptyDrafts(maxEmptyDrafts: number): void {
+    const emptyDrafts = sortSessions(
+      [...this.sessions.values()].filter((session) => !hasSessionHistory(session)),
+    );
+    while (emptyDrafts.length >= maxEmptyDrafts) {
+      const oldest = emptyDrafts.pop();
+      if (!oldest) break;
+      this.sessions.delete(oldest.id);
+      this.removePersistedFile(oldest.id);
     }
   }
 
