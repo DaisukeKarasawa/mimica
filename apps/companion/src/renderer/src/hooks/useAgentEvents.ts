@@ -90,10 +90,28 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     [reveal],
   );
 
+  const applyPendingCompleteWithoutSuccess = useCallback(() => {
+    const pending = reveal.drainPendingComplete();
+    if (!pending) return false;
+    activeStreamIdRef.current = null;
+    setAllSessionsRef.current((prev) =>
+      applyAgentComplete(
+        prev,
+        pending.sessionId,
+        pending.runId,
+        pending.streamId,
+        pending.content,
+      ),
+    );
+    setIsStreamingRef.current(false);
+    return true;
+  }, [reveal]);
+
   const resetStream = useCallback(() => {
+    applyPendingCompleteWithoutSuccess();
     reveal.reset();
     activeStreamIdRef.current = null;
-  }, [reveal]);
+  }, [applyPendingCompleteWithoutSuccess, reveal]);
 
   const beginStream = useCallback(() => {
     clearCompletionTimeout();
@@ -124,6 +142,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             reveal.stop();
             resetStream();
             setIsStreamingRef.current(false);
+            scheduleReturnToIdleRef.current(event.state === "failed" ? 2000 : 1200);
           }
           break;
         }
@@ -160,7 +179,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             sessionId: event.sessionId,
             runId: event.runId,
             streamId,
-            content: event.content,
+            content: reveal.getReceivedContent(),
           });
           reveal.start();
           break;

@@ -52,6 +52,22 @@ export class StreamRevealController {
     }
   }
 
+  getReceivedContent(): string {
+    return this.receivedContent;
+  }
+
+  /** 表示中の reveal を止め、キュー済み complete があれば最長本文で返す（success 演出は呼び出し側） */
+  drainPendingComplete(): PendingStreamComplete | null {
+    const pending = this.pendingComplete;
+    if (!pending) return null;
+    this.pendingComplete = null;
+    this.stop();
+    return {
+      ...pending,
+      content: this.resolveFinalizeContent(pending.content),
+    };
+  }
+
   queueComplete(pending: PendingStreamComplete): void {
     this.pendingComplete = pending;
   }
@@ -122,7 +138,10 @@ export class StreamRevealController {
     if (pending && caughtUp) {
       this.pendingComplete = null;
       this.stop();
-      this.options.onFinalize(pending);
+      this.options.onFinalize({
+        ...pending,
+        content: this.resolveFinalizeContent(pending.content),
+      });
       this.reset();
       return;
     }
@@ -130,5 +149,11 @@ export class StreamRevealController {
     if (!caughtUp || pending) {
       this.rafId = requestAnimationFrame(() => this.tick());
     }
+  }
+
+  private resolveFinalizeContent(queuedContent: string): string {
+    return codePointCount(this.receivedContent) >= codePointCount(queuedContent)
+      ? this.receivedContent
+      : queuedContent;
   }
 }
