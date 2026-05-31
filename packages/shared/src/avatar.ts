@@ -38,11 +38,6 @@ export interface StageCropRect {
   height: number;
 }
 
-export interface CharacterPetExpressionSlot {
-  slot: string;
-  attachment: string;
-}
-
 export interface CharacterPetHitRegion {
   /** Left edge, 0–1 relative to the stage crop rect (not the full canvas) */
   x: number;
@@ -69,6 +64,7 @@ export interface CharacterPetInteraction {
   hitPaddingPx?: number;
   /** Point hit fallback when neither hitSlots nor hitRegionCropNormalized resolves */
   hitBone: string;
+  /** Bones rotated together during petting; rotation is split evenly across them. */
   headRotationBones: string[];
   maxRotationDeg: number;
   returnDurationMs: number;
@@ -78,14 +74,9 @@ export interface CharacterPetInteraction {
   /**
    * Authored "being patted" reaction looped on the release track while petting
    * (e.g. `"Pat_01_A"`). Drives the face/blush/closed-eyes; head-turn bones are
-   * still overridden for cursor follow. Preferred over `expression` when present.
+   * still overridden for cursor follow.
    */
   petAnimation?: string;
-  /**
-   * One-shot slot swaps applied on pet start (fallback for assets without a
-   * `petAnimation`). Ignored when `petAnimation` is set.
-   */
-  expression?: { slots: CharacterPetExpressionSlot[] };
   releaseAnimation?: string;
 }
 

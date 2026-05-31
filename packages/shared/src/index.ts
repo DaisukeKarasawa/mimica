@@ -32,7 +32,6 @@ export {
   type CharacterMetadata,
   type CharacterInteractionConfig,
   type CharacterPetInteraction,
-  type CharacterPetExpressionSlot,
   type CharacterPetHitRegion,
   type StageCropRect,
   AVATAR_STATE_LABELS,
