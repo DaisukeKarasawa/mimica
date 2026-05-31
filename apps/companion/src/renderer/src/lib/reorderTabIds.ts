@@ -24,16 +24,17 @@ export function computeTabTargetIndex(
   const fromIndex = ids.indexOf(draggedId);
   if (fromIndex === -1) return null;
 
-  let targetIndex = ids.length - 1;
+  let insertionIndex = ids.length;
   for (let i = 0; i < ids.length; i++) {
     const rect = getTabRect(ids[i]!);
     if (!rect) continue;
     if (pointerX < rect.left + rect.width / 2) {
-      targetIndex = i;
+      insertionIndex = i;
       break;
     }
   }
 
+  const targetIndex = insertionIndex > fromIndex ? insertionIndex - 1 : insertionIndex;
   if (targetIndex === fromIndex) return null;
   return targetIndex;
 }

@@ -36,7 +36,10 @@ export function useTabPointerReorder({
     };
   }, []);
 
-  const getTabRect = useCallback((id: string) => tabRefs.current.get(id)?.getBoundingClientRect(), []);
+  const getTabRect = useCallback(
+    (id: string) => tabRefs.current.get(id)?.getBoundingClientRect(),
+    [],
+  );
 
   const clearDropTarget = useCallback(() => {
     pendingTargetIndexRef.current = null;
@@ -48,6 +51,9 @@ export function useTabPointerReorder({
       const state = dragState.current;
       if (state?.active) {
         suppressClickRef.current = true;
+        window.setTimeout(() => {
+          suppressClickRef.current = false;
+        }, 0);
         const targetIndex = pendingTargetIndexRef.current;
         if (targetIndex !== null) onReorderTab(state.id, targetIndex);
       }

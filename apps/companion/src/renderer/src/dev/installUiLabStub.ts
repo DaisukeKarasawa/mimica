@@ -77,7 +77,8 @@ export function installUiLabStub(): void {
       chatIconUrl: null,
     }),
 
-    submitAgent: async (_payload: AgentSubmitPayload) => {
+    submitAgent: async (payload: AgentSubmitPayload) => {
+      void payload;
       console.info("[ui-lab] submitAgent ignored (browser preview only)");
     },
 
@@ -93,8 +94,14 @@ export function installUiLabStub(): void {
       return () => editorListeners.delete(cb);
     },
 
-    onAgentEvent: (_cb) => () => {},
-    onChatTabShortcut: (_cb) => () => {},
+    onAgentEvent: (cb) => {
+      void cb;
+      return () => {};
+    },
+    onChatTabShortcut: (cb) => {
+      void cb;
+      return () => {};
+    },
   };
 
   window.mimica = api;
@@ -112,11 +119,7 @@ export function installUiLabStub(): void {
   if (!localStorage.getItem(OPEN_TAB_IDS_STORAGE_KEY)) {
     localStorage.setItem(
       OPEN_TAB_IDS_STORAGE_KEY,
-      JSON.stringify([
-        UI_LAB_SESSION_IDS.impl,
-        UI_LAB_SESSION_IDS.bug,
-        UI_LAB_SESSION_IDS.review,
-      ]),
+      JSON.stringify([UI_LAB_SESSION_IDS.impl, UI_LAB_SESSION_IDS.bug, UI_LAB_SESSION_IDS.review]),
     );
   }
 

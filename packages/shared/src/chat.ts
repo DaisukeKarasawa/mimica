@@ -78,7 +78,7 @@ export interface ChatSession {
   messages: ChatMessage[];
 }
 
-/** True once the user has sent at least one message in the session. */
+/** True when the session has any persisted messages (user or assistant). */
 export function hasSessionHistory(session: Pick<ChatSession, "messages">): boolean {
   return session.messages.length > 0;
 }
@@ -125,11 +125,7 @@ function resolveShortName(
     if (shortEn) return shortEn;
     const short = metadata?.shortDisplayName?.trim();
     const display = metadata?.displayName?.trim();
-    if (
-      short === AGENT_SHORT_NAME ||
-      display === AGENT_DISPLAY_NAME ||
-      metadata?.id === "rio"
-    ) {
+    if (short === AGENT_SHORT_NAME || display === AGENT_DISPLAY_NAME || metadata?.id === "rio") {
       return AGENT_SHORT_NAME_EN;
     }
     if (short) return short;
