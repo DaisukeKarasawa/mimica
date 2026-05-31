@@ -18,10 +18,16 @@
   overflow: hidden;
 }
 
+/* idle 撫で: Spine canvas が pointer を受け取れるようにする */
+.stage--spine-active .spine-host {
+  pointer-events: auto;
+}
+
 .spine-host canvas {
   display: block;
   width: 100%;
   height: 100%;
+  pointer-events: auto;
 }
 
 .stage--spine-active::before {
@@ -44,10 +50,12 @@
   position: absolute;
   top: 16px;
   right: 16px;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
+  pointer-events: none;
 }
 
 .stage-hint {
