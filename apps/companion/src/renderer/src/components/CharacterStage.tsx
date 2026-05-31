@@ -7,11 +7,32 @@ interface CharacterStageProps {
   assets: CharacterAssetStatus | null;
 }
 
+function resolvePetDebug(): boolean {
+  try {
+    const g = globalThis as {
+      __MIMICA_PET_DEBUG__?: boolean;
+      localStorage?: { getItem?: (k: string) => string | null };
+      location?: { search?: string };
+    };
+    if (g.__MIMICA_PET_DEBUG__ === true) return true;
+    if (g.localStorage?.getItem?.("mimica:petDebug")) return true;
+    if (typeof g.location?.search === "string" && g.location.search.includes("petDebug")) {
+      return true;
+    }
+  } catch {
+    // restricted context
+  }
+  return false;
+}
+
 export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<SpineStageController | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [spineReady, setSpineReady] = useState(false);
+
+  const petEnabled = Boolean(assets?.metadata?.interaction?.pet);
+  const petIdle = avatarState === "idle";
 
   useEffect(() => {
     const host = hostRef.current;
@@ -29,6 +50,7 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
         assetBaseUrl: assets.baseUrl,
         metadata: assets.metadata,
         motionMap: assets.motionMap,
+        petDebug: resolvePetDebug(),
       })
       .then(() => {
         if (!cancelled) {
@@ -68,12 +90,17 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
   }, [avatarState, spineReady]);
 
   const showPlaceholder = !assets?.ready || !spineReady;
+  const stageClassName = [
+    "stage",
+    spineReady ? "stage--spine-active" : "",
+    petEnabled ? "stage--pet-enabled" : "",
+    petEnabled && petIdle ? "stage--pet-idle" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <section
-      className={`stage${spineReady ? " stage--spine-active" : ""}`}
-      aria-label="キャラクターステージ"
-    >
+    <section className={stageClassName} aria-label="キャラクターステージ">
       {showPlaceholder && (
         <>
           <div className="window-glow" />

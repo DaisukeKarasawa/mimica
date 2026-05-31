@@ -18,6 +18,12 @@
   overflow: hidden;
 }
 
+/* idle 撫で: pet 設定かつ idle のときだけ canvas が pointer を受け取る */
+.stage--spine-active.stage--pet-enabled.stage--pet-idle .spine-host,
+.stage--spine-active.stage--pet-enabled.stage--pet-idle .spine-host canvas {
+  pointer-events: auto;
+}
+
 .spine-host canvas {
   display: block;
   width: 100%;
@@ -44,10 +50,12 @@
   position: absolute;
   top: 16px;
   right: 16px;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
+  pointer-events: none;
 }
 
 .stage-hint {

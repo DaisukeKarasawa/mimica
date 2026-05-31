@@ -13,18 +13,23 @@ import {
 } from "./motionPools.js";
 import { resolveAvatarAnimations, usesIdleAnimationPool } from "./resolveAnimations.js";
 import { computeStageCropRect, maximalOpaqueRect, resolveStageCrop } from "./stageCrop.js";
+import { SpinePetInteractionHost } from "./SpinePetInteractionHost.js";
 
 export interface SpineStageConfig {
   /** e.g. `mimica-asset://local/` — must end with `/` or will be normalized */
   assetBaseUrl: string;
   metadata: CharacterMetadata;
   motionMap: MotionMap;
+  /** Visualize pet head hit region (companion resolves localStorage / URL flags). */
+  petDebug?: boolean;
 }
 
-const SKEL_KEY = "mimica-skel";
-const ATLAS_KEY = "mimica-atlas";
-
 export class SpineStageController {
+  private static nextMountId = 0;
+  private readonly mountId = ++SpineStageController.nextMountId;
+  private readonly skelKey: string;
+  private readonly atlasKey: string;
+
   private app: Application | null = null;
   private host: HTMLElement | null = null;
   private stageRoot: Container | null = null;
@@ -43,6 +48,12 @@ export class SpineStageController {
   private pendingFitFrames = 0;
   private lastLoopAnimationName: string | null = null;
   private activeLoopPool: "idle" | "talk" | null = null;
+  private petHost: SpinePetInteractionHost | null = null;
+
+  constructor() {
+    this.skelKey = `mimica-skel-${this.mountId}`;
+    this.atlasKey = `mimica-atlas-${this.mountId}`;
+  }
 
   async mount(host: HTMLElement, config: SpineStageConfig): Promise<void> {
     if (this.disposed) throw new Error("SpineStageController is disposed");
@@ -75,20 +86,18 @@ export class SpineStageController {
     const base = config.assetBaseUrl.endsWith("/")
       ? config.assetBaseUrl
       : `${config.assetBaseUrl}/`;
-    Assets.add({ alias: SKEL_KEY, src: `${base}${config.metadata.skelFile}` });
-    Assets.add({ alias: ATLAS_KEY, src: `${base}${config.metadata.atlasFile}` });
-    await Assets.load([SKEL_KEY, ATLAS_KEY]);
-    this.assetsLoaded = true;
+    await this.loadSpineAssets(base, config.metadata);
 
     const spine = Spine.from({
-      skeleton: SKEL_KEY,
-      atlas: ATLAS_KEY,
+      skeleton: this.skelKey,
+      atlas: this.atlasKey,
       scale: ATLAS_SCALE,
       autoUpdate: true,
     });
     spine.pivot.set(0, 0);
     spine.beforeUpdateWorldTransforms = (object) => {
       stripViewportLetterbox(object.skeleton);
+      this.petHost?.applyBoneOverrides();
       object.spineAttachmentsDirty = true;
     };
     viewContainer.addChild(spine);
@@ -107,10 +116,14 @@ export class SpineStageController {
       this.resizeObserver.observe(layoutRoot);
     }
 
+    this.setupPetInteraction(config);
     this.setAvatarState("idle");
   }
 
   setAvatarState(state: AvatarState): void {
+    if (state !== "idle") {
+      this.petHost?.onNonIdleState();
+    }
     this.currentState = state;
     this.playState(state);
   }
@@ -129,6 +142,7 @@ export class SpineStageController {
 
   destroy(): void {
     this.disposed = true;
+    this.teardownPetInteraction();
     this.pendingFitFrames = 0;
     if (this.resizeFrameId !== 0) {
       cancelAnimationFrame(this.resizeFrameId);
@@ -152,7 +166,7 @@ export class SpineStageController {
       this.app = null;
     }
     if (this.assetsLoaded) {
-      void Assets.unload([SKEL_KEY, ATLAS_KEY]);
+      void Assets.unload([this.skelKey, this.atlasKey]);
       this.assetsLoaded = false;
     }
     this.host = null;
@@ -440,5 +454,43 @@ export class SpineStageController {
     }
 
     this.setTrack(animName, loop);
+  }
+
+  private setupPetInteraction(config: SpineStageConfig): void {
+    const petConfig = config.metadata.interaction?.pet;
+    const app = this.app;
+    const spine = this.spine;
+    const stageRoot = this.stageRoot;
+    if (!petConfig || !app || !spine || !stageRoot) return;
+
+    try {
+      this.petHost = new SpinePetInteractionHost(petConfig, { debug: config.petDebug });
+      this.petHost.attach({
+        app,
+        spine,
+        canvas: app.canvas,
+        stageRoot,
+        getCachedCrop: () => this.cachedCrop,
+        getAvatarState: () => this.currentState,
+      });
+    } catch (err) {
+      console.error("[SpineStageController] pet interaction setup failed:", err);
+      this.petHost = null;
+    }
+  }
+
+  private teardownPetInteraction(): void {
+    this.petHost?.cancel();
+    this.petHost?.detach();
+    this.petHost = null;
+  }
+
+  private async loadSpineAssets(base: string, metadata: CharacterMetadata): Promise<void> {
+    const skelSrc = `${base}${metadata.skelFile}`;
+    const atlasSrc = `${base}${metadata.atlasFile}`;
+    Assets.add({ alias: this.skelKey, src: skelSrc });
+    Assets.add({ alias: this.atlasKey, src: atlasSrc });
+    await Assets.load([this.skelKey, this.atlasKey]);
+    this.assetsLoaded = true;
   }
 }

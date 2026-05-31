@@ -256,6 +256,26 @@ ls ~/MimicaAssets/characters/rio/textures/
 - [ ] `metadata.json` / `motion-map.json` がある
 - [ ] ファイルを Git に add していない
 
+### interaction.pet（idle 撫で＋首追従）
+
+`metadata.json` に optional な `interaction.pet` を書くと、Companion の **idle 中**にステージ上の頭を撫でたとき、首がカーソル左右に追従し、表情（Blush / 目閉じ等）が変わります。離すと正面へ戻ります。
+
+- 骨名・slot 名は **キャラごと**に `.skel` 内の実名へ合わせる（CH0158 向けの例は `templates/assets/metadata.json`）
+- ヒット判定は **crop（実際に描画される矩形）基準**。canvas 全体ではない点に注意（crop は cover フィットで中央寄せ＋はみ出しのため、canvas 0–1 とはずれる）
+- `hitSlots`（推奨）— 頭まわり slot 名の配列（例: `["Head"]`）。idle の生スケルトンから AABB を計算 → 画面座標へ変換してヒット判定。リサイズ・cover フィットに自動追従
+- `hitPaddingPx` — 解決したヒット矩形の周囲に足す余白（px）。撫でやすさ調整用
+- `hitRegionCropNormalized` — 手動の矩形（crop 0–1）。`hitSlots` 未設定/解決不可のときの fallback
+- `hitBone` / `hitRadiusPx` — 上記いずれも解決できないときの最終 fallback（例: `Touch_Point`）
+- `lookBone` — 首追従の基準 X（例: `Face_rot`）。未設定時はヒット矩形中心、なければ `hitBone`。首振りの可動幅は crop 幅基準
+- `headRotationBones`（例: `Head_Rot` 系）は素材依存
+- `maxRotationDeg` — 首追従の最大回転角（度）。カーソル追従の可動範囲を制限（例: `22`）
+- `returnDurationMs` — 離脱後、正面へ戻るアニメの時間（ミリ秒）（例: `320`）
+- `petAnimation`（推奨）— 撫で中に release track でループ再生する「撫でられ」アニメ（例: `Pat_01_A`）。頬染め・目閉じ・反応動作を作者データで駆動する。`Head_Rot` 系は毎フレーム上書きされるためカーソル追従が優先される
+- `releaseAnimation` — 離したときの one-shot（例: `PatEnd_01_A`）
+- 未設定のキャラは従来どおり idle ループのみ（後方互換）
+- デバッグ: DevTools で `localStorage.setItem('mimica:petDebug','1')` → リロードでヒット矩形を緑枠で可視化（`window.__MIMICA_PET_DEBUG__ = true` や URL `?petDebug` でも可）
+- 反映: `metadata.json` 保存後、`pnpm dev:companion` を再起動
+
 ---
 
 ## 6.1 Spine ランタイムのバージョン（重要）
