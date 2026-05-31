@@ -7,6 +7,7 @@
   --surface-2: #282727;
   --surface-3: #393836;
   --line: rgba(98, 94, 90, 0.54);
+  --line-subtle: rgba(98, 94, 90, 0.22);
   --text: #c5c9c5;
   --muted: #9e9b93;
   --subtle: #7a8382;
@@ -20,6 +21,7 @@
   --bubble-agent: rgba(40, 39, 39, 0.78);
   --panel: rgba(29, 28, 25, 0.82);
   --panel-strong: rgba(18, 18, 15, 0.94);
+  --tabs-bar: rgba(24, 23, 20, 0.94);
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.56);
   /* Muted chrome marks (orb, avatar placeholder, status pulse) */
   --chrome-mark-bg: radial-gradient(
