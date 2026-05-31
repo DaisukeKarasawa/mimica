@@ -95,13 +95,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     if (!pending) return false;
     activeStreamIdRef.current = null;
     setAllSessionsRef.current((prev) =>
-      applyAgentComplete(
-        prev,
-        pending.sessionId,
-        pending.runId,
-        pending.streamId,
-        pending.content,
-      ),
+      applyAgentComplete(prev, pending.sessionId, pending.runId, pending.streamId, pending.content),
     );
     setIsStreamingRef.current(false);
     return true;
