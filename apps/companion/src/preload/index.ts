@@ -27,6 +27,7 @@ export interface MimicaApi {
   openExternal: (url: string) => Promise<boolean>;
   onEditorContext: (cb: (context: EditorContext) => void) => () => void;
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
+  onChatTabShortcut: (cb: (action: "new" | "close" | "next" | "prev" | "history" | "tabsBar") => void) => () => void;
 }
 
 const api: MimicaApi = {
@@ -48,6 +49,12 @@ const api: MimicaApi = {
     const handler = (_: unknown, event: AgentEventMessage) => cb(event);
     ipcRenderer.on("agent-event", handler);
     return () => ipcRenderer.removeListener("agent-event", handler);
+  },
+  onChatTabShortcut: (cb) => {
+    const handler = (_: unknown, action: "new" | "close" | "next" | "prev" | "history" | "tabsBar") =>
+      cb(action);
+    ipcRenderer.on("chat-tab-shortcut", handler);
+    return () => ipcRenderer.removeListener("chat-tab-shortcut", handler);
   },
 };
 

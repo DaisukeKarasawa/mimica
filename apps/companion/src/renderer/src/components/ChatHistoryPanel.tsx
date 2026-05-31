@@ -30,14 +30,14 @@ export function ChatHistoryPanel({
       <div className="history-search">
         <input
           type="search"
-          placeholder="セッションを検索…"
+          placeholder="Search sessions…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           aria-label="履歴検索"
         />
       </div>
       {groups.length === 0 ? (
-        <p className="history-empty">履歴がありません</p>
+        <p className="history-empty">No history</p>
       ) : (
         <ul className="history-groups">
           {groups.map((group) => (

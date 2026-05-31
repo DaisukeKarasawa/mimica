@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { AgentEventMessage, ChatSession } from "@mimica/shared";
-import { avatarStatusLabel, mapAgentRunToAvatar } from "@mimica/shared";
+import { mapAgentRunToAvatar } from "@mimica/shared";
 import type { CharacterDirector } from "@mimica/character-runtime";
 import { reduceAgentEvent } from "../lib/agentSessionUpdate";
 
 export interface UseAgentEventsOptions {
-  devPreview: boolean;
   director: CharacterDirector;
   setAllSessions: React.Dispatch<React.SetStateAction<ChatSession[]>>;
   setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
-  setStatusText: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export interface UseAgentEventsResult {
@@ -20,7 +18,7 @@ export interface UseAgentEventsResult {
 }
 
 export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsResult {
-  const { devPreview, director, setAllSessions, setIsStreaming, setStatusText } = options;
+  const { director, setAllSessions, setIsStreaming } = options;
 
   const streamingContentRef = useRef("");
   const activeStreamIdRef = useRef<string | null>(null);
@@ -38,7 +36,6 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     completionTimeoutRef.current = setTimeout(() => {
       completionTimeoutRef.current = null;
       director.setState("idle", true);
-      setStatusText(avatarStatusLabel("idle"));
     }, delayMs);
   };
 
@@ -59,13 +56,10 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
 
   const handleAgentEvent = useCallback(
     (event: AgentEventMessage) => {
-      if (devPreview) return;
-
       switch (event.type) {
         case "agent_state": {
           const avatar = mapAgentRunToAvatar(event.state);
           director.setState(avatar, true);
-          setStatusText(avatarStatusLabel(avatar));
           if (event.state === "streaming") setIsStreaming(true);
           if (
             event.state === "completed" ||
@@ -77,7 +71,6 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
         }
         case "agent_warning":
-          setStatusText(event.message);
           break;
         case "agent_delta": {
           streamingContentRef.current += event.content;
@@ -108,7 +101,6 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           streamingContentRef.current = "";
           activeStreamIdRef.current = null;
           director.setState("success", true);
-          setStatusText(avatarStatusLabel("success"));
           setIsStreaming(false);
           scheduleReturnToIdle(1200);
           break;
@@ -117,12 +109,10 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           resetStream();
           setIsStreaming(false);
           director.setState("error", true);
-          setStatusText(event.message);
           clearCompletionTimeout();
           completionTimeoutRef.current = setTimeout(() => {
             completionTimeoutRef.current = null;
             director.setState("idle", true);
-            setStatusText(avatarStatusLabel("idle"));
           }, 2000);
           break;
         }
@@ -130,7 +120,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
       }
     },
-    [devPreview, director, resetStream, setAllSessions, setIsStreaming, setStatusText],
+    [director, resetStream, setAllSessions, setIsStreaming],
   );
 
   return { handleAgentEvent, resetStream, beginStream };

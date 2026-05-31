@@ -1,5 +1,3 @@
-import { AGENT_DISPLAY_NAME } from "@mimica/shared";
-
 interface ThinkingIndicatorProps {
   chatIconUrl?: string | null;
 }
@@ -12,15 +10,14 @@ export function ThinkingIndicator({ chatIconUrl }: ThinkingIndicatorProps) {
       ) : (
         <div className="agent-icon" title="キャラクターアイコン（未配置）" />
       )}
-      <div className="bubble thinking-bubble">
-        <div className="agent-name-row">
-          <span className="meta">{AGENT_DISPLAY_NAME} · thinking</span>
+      <div className="bubble-shell">
+        <div className="bubble thinking-bubble">
+          <span className="thinking-dots" aria-hidden="true">
+            <span>・</span>
+            <span>・</span>
+            <span>・</span>
+          </span>
         </div>
-        <span className="thinking-dots" aria-hidden="true">
-          <span>・</span>
-          <span>・</span>
-          <span>・</span>
-        </span>
       </div>
     </div>
   );

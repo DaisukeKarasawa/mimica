@@ -1,5 +1,5 @@
 /** ブラウザ系タブ操作（Chrome 相当） */
-export type ChatTabShortcutAction = "new" | "close" | "next" | "prev";
+export type ChatTabShortcutAction = "new" | "close" | "next" | "prev" | "history" | "tabsBar";
 
 export function matchChatTabShortcut(event: KeyboardEvent): ChatTabShortcutAction | null {
   if (event.repeat) return null;
@@ -23,6 +23,8 @@ export function matchChatTabShortcut(event: KeyboardEvent): ChatTabShortcutActio
   const k = key.toLowerCase();
   if (k === "t" && !event.shiftKey) return "new";
   if (k === "w" && !event.shiftKey) return "close";
+  if (k === "y" && !event.shiftKey) return "history";
+  if (k === "b" && !event.shiftKey) return "tabsBar";
 
   return null;
 }

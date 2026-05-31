@@ -26,8 +26,8 @@ export function groupSessionsByDate(sessions: ChatSession[]): SessionGroup[] {
   }
 
   const groups: SessionGroup[] = [];
-  if (today.length) groups.push({ label: "今日", sessions: today });
-  if (yesterday.length) groups.push({ label: "昨日", sessions: yesterday });
-  if (older.length) groups.push({ label: "それ以前", sessions: older });
+  if (today.length) groups.push({ label: "Today", sessions: today });
+  if (yesterday.length) groups.push({ label: "Yesterday", sessions: yesterday });
+  if (older.length) groups.push({ label: "Earlier", sessions: older });
   return groups;
 }

@@ -1,25 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { AvatarState, CharacterAssetStatus } from "@mimica/shared";
-import { avatarBadgeLabel } from "@mimica/shared";
 import { SpineStageController } from "@mimica/character-runtime";
 
 interface CharacterStageProps {
   avatarState: AvatarState;
-  statusText: string;
-  agentName: string;
   assets: CharacterAssetStatus | null;
-  onPreviewState?: (state: AvatarState) => void;
 }
 
-const previewStates: AvatarState[] = ["idle", "thinking", "talking", "waiting", "success", "error"];
-
-export function CharacterStage({
-  avatarState,
-  statusText,
-  agentName,
-  assets,
-  onPreviewState,
-}: CharacterStageProps) {
+export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<SpineStageController | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -102,7 +90,6 @@ export function CharacterStage({
       )}
 
       <div className="stage-overlay">
-        <span className="stage-badge">{avatarBadgeLabel(avatarState)}</span>
         <span className="stage-hint">
           {loadError
             ? `Spine 読込エラー: ${loadError}`
@@ -112,31 +99,6 @@ export function CharacterStage({
                 : "Spine 読込中…"
               : `素材未配置: ${assets?.missing.join(", ") ?? "metadata.json"}`}
         </span>
-      </div>
-
-      {onPreviewState && (
-        <div className="stage-dev-controls" aria-label="アニメーション手動切替">
-          {previewStates.map((state) => (
-            <button
-              key={state}
-              type="button"
-              className={`stage-dev-btn ${avatarState === state ? "active" : ""}`}
-              onClick={() => onPreviewState(state)}
-            >
-              {avatarBadgeLabel(state)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="status-card">
-        <div className="pulse" />
-        <div>
-          <strong>
-            {agentName}: {avatarBadgeLabel(avatarState)}
-          </strong>
-          <span>{statusText}</span>
-        </div>
       </div>
     </section>
   );

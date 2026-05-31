@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatPanelMode } from "../components/ChatPanel";
 import type { ChatSession } from "@mimica/shared";
+import { hasSessionHistory } from "@mimica/shared";
 import { loadOpenTabIds, persistOpenTabIds } from "../lib/openTabs";
+import { reorderTabIds } from "../lib/reorderTabIds";
 
 export interface UseSessionTabsOptions {
   isStreaming: boolean;
@@ -35,16 +37,21 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     });
   }, []);
 
+  const historySessions = useMemo(
+    () => allSessions.filter(hasSessionHistory),
+    [allSessions],
+  );
+
   useEffect(() => {
     void refreshSessions();
   }, [refreshSessions]);
 
   useEffect(() => {
-    if (allSessions.length === 0 || openTabIds.length > 0) return;
-    const id = allSessions[0].id;
+    if (historySessions.length === 0 || openTabIds.length > 0) return;
+    const id = historySessions[0]!.id;
     setOpenTabs([id]);
     if (!activeSessionId) setActiveSessionId(id);
-  }, [allSessions, openTabIds.length, activeSessionId, setOpenTabs]);
+  }, [historySessions, openTabIds.length, activeSessionId, setOpenTabs]);
 
   useEffect(() => {
     if (panelMode !== "chat") return;
@@ -98,16 +105,32 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     [openTabIds],
   );
 
+  const reorderOpenTab = useCallback(
+    (draggedId: string, toIndex: number) => {
+      setOpenTabs((prev) => {
+        const fromIndex = prev.indexOf(draggedId);
+        if (fromIndex === -1) return prev;
+        return reorderTabIds(prev, fromIndex, toIndex);
+      });
+    },
+    [setOpenTabs],
+  );
+
   const handleCloseTab = useCallback(
     async (id: string) => {
       await stopStreamingIfActive(id);
+      const session = allSessions.find((s) => s.id === id);
       const nextIds = openTabIds.filter((tabId) => tabId !== id);
       setOpenTabs(nextIds);
       if (activeSessionId === id) {
         setActiveSessionId(nextIds[nextIds.length - 1] ?? null);
       }
+      if (session && !hasSessionHistory(session)) {
+        await window.mimica.deleteSession(id);
+        await refreshSessions();
+      }
     },
-    [activeSessionId, openTabIds, setOpenTabs, stopStreamingIfActive],
+    [activeSessionId, allSessions, openTabIds, refreshSessions, setOpenTabs, stopStreamingIfActive],
   );
 
   const handleDeleteSession = useCallback(
@@ -138,6 +161,7 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     allSessions,
     setAllSessions,
     openSessions,
+    historySessions,
     openTabIds,
     activeSessionId,
     activeSession,
@@ -151,5 +175,6 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     handleCloseTab,
     handleDeleteSession,
     cycleTab,
+    reorderOpenTab,
   };
 }

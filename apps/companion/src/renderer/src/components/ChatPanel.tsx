@@ -1,6 +1,8 @@
 import { useState } from "react";
-import type { AgentMode, AvatarState, ChatSession, EditorContext } from "@mimica/shared";
-import { AGENT_DISPLAY_NAME, AGENT_MODE_LABELS } from "@mimica/shared";
+import type { AgentMode, AvatarState, ChatSession } from "@mimica/shared";
+import { AGENT_DISPLAY_NAME } from "@mimica/shared";
+import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
+import { ChatComposer } from "./ChatComposer";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
@@ -13,26 +15,20 @@ interface ChatPanelProps {
   activeSessionId: string | null;
   activeSession: ChatSession | null;
   panelMode: ChatPanelMode;
-  editorContext: EditorContext | null;
+  tabsBarVisible: boolean;
   isStreaming: boolean;
   avatarState: AvatarState;
   agentMode: AgentMode;
+  characterShortName: string;
   onAgentModeChange: (mode: AgentMode) => void;
   chatIconUrl?: string | null;
   onSelectSession: (id: string) => void;
   onCloseTab: (id: string) => void;
-  onShowHistory: () => void;
+  onReorderTab: (draggedId: string, toIndex: number) => void;
   onSelectHistorySession: (id: string) => void;
   onDeleteSession: (id: string) => void;
-  onNewSession: () => void;
   onSend: (text: string) => void;
   onCancel: () => void;
-}
-
-function basename(path?: string): string {
-  if (!path) return "—";
-  const parts = path.split(/[/\\]/);
-  return parts[parts.length - 1] ?? path;
 }
 
 export function ChatPanel({
@@ -41,22 +37,30 @@ export function ChatPanel({
   activeSessionId,
   activeSession,
   panelMode,
-  editorContext,
+  tabsBarVisible,
   isStreaming,
   avatarState,
   agentMode,
+  characterShortName,
   onAgentModeChange,
   chatIconUrl,
   onSelectSession,
   onCloseTab,
-  onShowHistory,
+  onReorderTab,
   onSelectHistorySession,
   onDeleteSession,
-  onNewSession,
   onSend,
   onCancel,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
+  const tabsReorderable = openSessions.length > 1;
+  const tabIds = openSessions.map((session) => session.id);
+  const { draggingId, dropTargetIndex, registerTabRef, tabPointerHandlers, handleTabClick } =
+    useTabPointerReorder({
+      tabIds,
+      enabled: tabsReorderable,
+      onReorderTab,
+    });
 
   const handleSubmit = () => {
     const text = input.trim();
@@ -76,159 +80,108 @@ export function ChatPanel({
     <aside className="chat" aria-label="チャットパネル">
       <div className="chat-head">
         <div className="chat-title">
-          <h2>Agent チャット</h2>
-          <span className="chat-shortcuts-hint" title="タブ操作ショートカット">
-            {typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
-              ? "⌘T · ⌘W · ⌃Tab · ⌘⌥←→"
-              : "Ctrl+T · Ctrl+W · Ctrl+Tab"}
-          </span>
+          <h2>{AGENT_DISPLAY_NAME}</h2>
         </div>
-        <div className="tabs-bar">
-          <div className="tabs-scroll">
-            {openSessions.map((session) => (
-              <div
-                key={session.id}
-                className={`tab-wrap ${session.id === activeSessionId && showChat ? "active" : ""}`}
-              >
-                <button
-                  type="button"
-                  className="tab"
-                  onClick={() => onSelectSession(session.id)}
-                  title={session.title}
+        {tabsBarVisible ? (
+          <div className={`tabs-bar ${draggingId ? "is-reordering" : ""}`}>
+            <div className="tabs-scroll">
+              {openSessions.map((session, index) => (
+                <div
+                  key={session.id}
+                  ref={registerTabRef(session.id)}
+                  className={[
+                    "tab-wrap",
+                    session.id === activeSessionId && showChat ? "active" : "",
+                    draggingId === session.id ? "dragging" : "",
+                    dropTargetIndex === index ? "drop-before" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 >
-                  {session.title}
-                </button>
-                <button
-                  type="button"
-                  className="tab-close"
-                  aria-label={`${session.title} のタブを閉じる`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCloseTab(session.id);
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              className={`tab tab-history ${!showChat ? "active" : ""}`}
-              onClick={onShowHistory}
-            >
-              履歴
-            </button>
+                  <button
+                    type="button"
+                    className="tab"
+                    onPointerDown={(event) => tabPointerHandlers.onPointerDown(event, session.id)}
+                    onPointerMove={tabPointerHandlers.onPointerMove}
+                    onPointerUp={tabPointerHandlers.onPointerUp}
+                    onPointerCancel={tabPointerHandlers.onPointerCancel}
+                    onClick={(event) => handleTabClick(event, session.id, onSelectSession)}
+                    title={session.title}
+                  >
+                    {session.title}
+                  </button>
+                  {session.id === activeSessionId && showChat ? (
+                    <button
+                      type="button"
+                      className="tab-close"
+                      aria-label={`${session.title} のタブを閉じる`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCloseTab(session.id);
+                      }}
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
           </div>
-          <button
-            type="button"
-            className="tab-new"
-            onClick={onNewSession}
-            aria-label="新規チャット"
-            title="新規チャット"
-          >
-            +
-          </button>
-        </div>
+        ) : null}
       </div>
 
       <div className="chat-body">
         {showChat ? (
           <>
-            <div className="context">
-              <div className="chip">Workspace: {basename(editorContext?.workspacePath) ?? "—"}</div>
-              <div className="chip">Current: {basename(editorContext?.currentFilePath) ?? "—"}</div>
-              <div className="chip">
-                Selection:{" "}
-                {editorContext?.selectedText
-                  ? `${(editorContext.selectionEndLine ?? 0) - (editorContext.selectionStartLine ?? 0) + 1} lines`
-                  : "—"}
-              </div>
-            </div>
-
             <div className="messages">
               {!activeSession && (
                 <p className="chat-empty">
-                  タブがありません。「+」で新規チャットを開くか、「履歴」からセッションを選んでください。
+                  タブがありません。⌘T（Ctrl+T）で New Chat を開くか、⌘Y（Ctrl+Y）で履歴を開いてください。
                 </p>
               )}
-              {activeSession?.messages.map((msg) =>
-                msg.role === "user" ? (
-                  <div key={msg.id} className="msg user">
-                    <div className="bubble">{msg.content}</div>
-                  </div>
-                ) : (
+              {activeSession?.messages.map((msg) => {
+                if (msg.role === "user") {
+                  return (
+                    <div key={msg.id} className="msg user">
+                      <div className="bubble-shell">
+                        <div className="bubble">{msg.content}</div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (!msg.content.trim()) return null;
+
+                return (
                   <div key={msg.id} className="msg agent">
                     {chatIconUrl ? (
                       <img src={chatIconUrl} alt="" className="agent-icon" title="調月リオ" />
                     ) : (
                       <div className="agent-icon" title="キャラクターアイコン（未配置）" />
                     )}
-                    <div className="bubble">
-                      <div className="agent-name-row">
-                        <span className="meta">
-                          {AGENT_DISPLAY_NAME} · {msg.role === "assistant" ? avatarState : "system"}
-                        </span>
+                    <div className="bubble-shell">
+                      <div className="bubble">
+                        <MarkdownMessage content={msg.content} />
                       </div>
-                      <MarkdownMessage content={msg.content} />
-                      {msg.toolCalls?.map((tool) => (
-                        <div key={tool.id} className="tool-card">
-                          tool: {tool.name}
-                          {tool.detail ? ` · ${tool.detail}` : ""}
-                        </div>
-                      ))}
                     </div>
                   </div>
-                ),
-              )}
+                );
+              })}
               {showThinkingIndicator && <ThinkingIndicator chatIconUrl={chatIconUrl} />}
             </div>
 
             <div className="composer">
-              {isStreaming && (
-                <div className="runbar">
-                  <span>Agent 応答中… キャラクター状態: {avatarState}</span>
-                  <button type="button" className="cancel" onClick={onCancel}>
-                    キャンセル
-                  </button>
-                </div>
-              )}
-              <div className="mode-row" role="group" aria-label="Agent モード">
-                {(["ask", "agent", "plan"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    className={`mode-chip ${agentMode === mode ? "active" : ""}`}
-                    disabled={isStreaming}
-                    aria-pressed={agentMode === mode}
-                    onClick={() => onAgentModeChange(mode)}
-                  >
-                    {AGENT_MODE_LABELS[mode]}
-                  </button>
-                ))}
-              </div>
-              <div className="input-row">
-                <textarea
-                  placeholder="キャラクターに相談する…（Shift+Enter で送信）"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  disabled={!activeSession}
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter" || !e.shiftKey) return;
-                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-                    e.preventDefault();
-                    handleSubmit();
-                  }}
-                />
-                <button
-                  type="button"
-                  className="send"
-                  onClick={handleSubmit}
-                  disabled={isStreaming || !activeSession}
-                  title="Shift+Enter で送信"
-                >
-                  ↵
-                </button>
-              </div>
+              <ChatComposer
+                value={input}
+                agentMode={agentMode}
+                characterShortName={characterShortName}
+                disabled={!activeSession}
+                streaming={isStreaming}
+                onChange={setInput}
+                onAgentModeChange={onAgentModeChange}
+                onSubmit={handleSubmit}
+                onCancel={onCancel}
+              />
             </div>
           </>
         ) : (
