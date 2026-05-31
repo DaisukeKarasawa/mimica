@@ -9,7 +9,7 @@ import {
 import { join } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import type { ChatSession } from "@mimica/shared";
-import { DEFAULT_SETTINGS } from "@mimica/shared";
+import { DEFAULT_SESSION_TITLE, DEFAULT_SETTINGS, hasSessionHistory } from "@mimica/shared";
 import { userDataJoin } from "./userDataPaths.js";
 import { registerWorkspaceRoot } from "./workspaceAllowlist.js";
 
@@ -21,6 +21,12 @@ function sessionsDir(): string {
 
 function safeSessionId(id: string): string | null {
   return UUID_RE.test(id) ? id : null;
+}
+
+function sortSessions(sessions: ChatSession[]): ChatSession[] {
+  return sessions.sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  );
 }
 
 export class SessionStore {
@@ -37,11 +43,19 @@ export class SessionStore {
       if (!file.endsWith(".json")) continue;
       const id = file.slice(0, -".json".length);
       if (!safeSessionId(id)) continue;
+      const path = join(dir, file);
       try {
-        const session = JSON.parse(readFileSync(join(dir, file), "utf8")) as ChatSession;
-        if (safeSessionId(session.id)) {
-          this.sessions.set(session.id, session);
+        const session = JSON.parse(readFileSync(path, "utf8")) as ChatSession;
+        if (!safeSessionId(session.id)) continue;
+        if (!hasSessionHistory(session)) {
+          try {
+            unlinkSync(path);
+          } catch (err) {
+            console.error(`Failed to delete empty session file: ${path}`, err);
+          }
+          continue;
         }
+        this.sessions.set(session.id, session);
       } catch {
         /* skip corrupt files */
       }
@@ -49,9 +63,11 @@ export class SessionStore {
   }
 
   list(): ChatSession[] {
-    return [...this.sessions.values()].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    );
+    return sortSessions([...this.sessions.values()]);
+  }
+
+  listHistory(): ChatSession[] {
+    return sortSessions([...this.sessions.values()].filter(hasSessionHistory));
   }
 
   get(id: string): ChatSession | undefined {
@@ -62,15 +78,15 @@ export class SessionStore {
   create(workspacePath: string): ChatSession {
     const resolvedWorkspace = registerWorkspaceRoot(workspacePath);
     const max = DEFAULT_SETTINGS.maxChatSessions;
-    const existing = this.list();
-    if (existing.length >= max) {
-      const oldest = existing[existing.length - 1];
+    const history = this.listHistory();
+    if (history.length >= max) {
+      const oldest = history[history.length - 1];
       if (oldest) this.delete(oldest.id);
     }
     const now = new Date().toISOString();
     const session: ChatSession = {
       id: uuidv4(),
-      title: "新規チャット",
+      title: DEFAULT_SESSION_TITLE,
       createdAt: now,
       updatedAt: now,
       workspacePath: resolvedWorkspace,
@@ -78,7 +94,6 @@ export class SessionStore {
       messages: [],
     };
     this.sessions.set(session.id, session);
-    this.persist(session);
     return session;
   }
 
@@ -89,7 +104,11 @@ export class SessionStore {
     }
     const updated = { ...session, id: safeId, updatedAt: new Date().toISOString() };
     this.sessions.set(updated.id, updated);
-    this.persist(updated);
+    if (hasSessionHistory(updated)) {
+      this.persist(updated);
+    } else {
+      this.removePersistedFile(safeId);
+    }
     return updated;
   }
 
@@ -97,18 +116,21 @@ export class SessionStore {
     const safeId = safeSessionId(id);
     if (!safeId) return;
     this.sessions.delete(safeId);
-    const path = join(sessionsDir(), `${safeId}.json`);
-    if (existsSync(path)) {
-      try {
-        unlinkSync(path);
-      } catch (err) {
-        console.error(`Failed to delete session file: ${path}`, err);
-      }
-    }
+    this.removePersistedFile(safeId);
   }
 
   setSaveChatHistory(enabled: boolean): void {
     this.saveChatHistory = enabled;
+  }
+
+  private removePersistedFile(id: string): void {
+    const path = join(sessionsDir(), `${id}.json`);
+    if (!existsSync(path)) return;
+    try {
+      unlinkSync(path);
+    } catch (err) {
+      console.error(`Failed to delete session file: ${path}`, err);
+    }
   }
 
   private persist(session: ChatSession): void {
