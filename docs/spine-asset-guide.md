@@ -268,6 +268,8 @@ ls ~/MimicaAssets/characters/rio/textures/
 - `hitBone` / `hitRadiusPx` — 上記いずれも解決できないときの最終 fallback（例: `Touch_Point`）
 - `lookBone` — 首追従の基準 X（例: `Face_rot`）。未設定時はヒット矩形中心、なければ `hitBone`。首振りの可動幅は crop 幅基準
 - `headRotationBones`（例: `Head_Rot` 系）は素材依存
+- `maxRotationDeg` — 首追従の最大回転角（度）。カーソル追従の可動範囲を制限（例: `22`）
+- `returnDurationMs` — 離脱後、正面へ戻るアニメの時間（ミリ秒）（例: `320`）
 - `petAnimation`（推奨）— 撫で中に release track でループ再生する「撫でられ」アニメ（例: `Pat_01_A`）。頬染め・目閉じ・反応動作を作者データで駆動する。`Head_Rot` 系は毎フレーム上書きされるためカーソル追従が優先される
 - `releaseAnimation` — 離したときの one-shot（例: `PatEnd_01_A`）
 - 未設定のキャラは従来どおり idle ループのみ（後方互換）

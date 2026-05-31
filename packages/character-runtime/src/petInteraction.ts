@@ -315,6 +315,8 @@ export class PetInteractionController {
     lookSwingSpanPx: number,
   ): void {
     if (this.phase === "petting") return;
+    // Re-entering during return: bone.rotation may include partial look offset; restore true setup first.
+    this.restoreBoneRotations();
     this.phase = "petting";
     this.pointerId = pointerId;
     this.headCenterClientX = headCenterClientX;
