@@ -35,6 +35,15 @@
   transform-origin: 50% 82%;
 }
 
+.character.placeholder.thinking,
+.character.placeholder.waiting {
+  animation: thinking-sway 2.6s ease-in-out infinite;
+}
+
+.character.placeholder.talking {
+  animation: idle 4.8s ease-in-out infinite;
+}
+
 .character.talking .mouth {
   animation: talk 1.2s ease-in-out infinite;
 }
@@ -46,6 +55,16 @@
   }
   50% {
     transform: translateX(-50%) translateY(-9px) rotate(0.35deg);
+  }
+}
+
+@keyframes thinking-sway {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-6px) rotate(1deg);
   }
 }
 

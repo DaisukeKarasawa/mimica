@@ -24,6 +24,8 @@ export {
   type MimicaSettings,
 } from "./chat.js";
 
+export { upsertAssistantTurn, type UpsertAssistantTurnParams } from "./sessionMessages.js";
+
 export {
   type MotionMap,
   type MotionMapEntry,

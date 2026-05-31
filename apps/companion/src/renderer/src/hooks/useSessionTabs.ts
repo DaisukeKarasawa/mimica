@@ -102,6 +102,17 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     [openTabIds],
   );
 
+  const selectTabByIndex = useCallback(
+    (oneBased: number) => {
+      if (openTabIds.length === 0) return;
+      setPanelMode("chat");
+      const idx = oneBased === 9 ? openTabIds.length - 1 : oneBased - 1;
+      if (idx < 0 || idx >= openTabIds.length) return;
+      setActiveSessionId(openTabIds[idx]!);
+    },
+    [openTabIds],
+  );
+
   const reorderOpenTab = useCallback(
     (draggedId: string, toIndex: number) => {
       setOpenTabs((prev) => {
@@ -178,6 +189,7 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     handleCloseTab,
     handleDeleteSession,
     cycleTab,
+    selectTabByIndex,
     reorderOpenTab,
   };
 }

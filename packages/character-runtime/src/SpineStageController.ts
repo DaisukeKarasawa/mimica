@@ -5,7 +5,13 @@ import type { AvatarState, CharacterMetadata, MotionMap, StageCropRect } from "@
 import { Application, Assets, Container, Graphics, RenderTexture } from "pixi.js";
 import { ATLAS_SCALE } from "./atlasScale.js";
 import { applyFitPose, stripViewportLetterbox } from "./homeSceneSlots.js";
-import { resolveAvatarAnimations } from "./resolveAnimations.js";
+import {
+  collectIdlePool,
+  collectTalkPool,
+  filterAnimationsOnSkeleton,
+  pickRandomAnimation,
+} from "./motionPools.js";
+import { resolveAvatarAnimations, usesIdleAnimationPool } from "./resolveAnimations.js";
 import { computeStageCropRect, maximalOpaqueRect, resolveStageCrop } from "./stageCrop.js";
 
 export interface SpineStageConfig {
@@ -35,6 +41,8 @@ export class SpineStageController {
   private disposed = false;
   private assetsLoaded = false;
   private pendingFitFrames = 0;
+  private lastLoopAnimationName: string | null = null;
+  private activeLoopPool: "idle" | "talk" | null = null;
 
   async mount(host: HTMLElement, config: SpineStageConfig): Promise<void> {
     if (this.disposed) throw new Error("SpineStageController is disposed");
@@ -105,11 +113,18 @@ export class SpineStageController {
   setAvatarState(state: AvatarState): void {
     this.currentState = state;
     this.playState(state);
-    this.scheduleStageFitRetries();
   }
 
   getAvatarState(): AvatarState {
     return this.currentState;
+  }
+
+  /** Re-run layout after the host gains non-zero size (e.g. split pane ready). */
+  refreshLayout(): void {
+    if (this.disposed) return;
+    this.app?.resize();
+    this.fitSpineToStage();
+    this.scheduleStageFitRetries();
   }
 
   destroy(): void {
@@ -308,32 +323,122 @@ export class SpineStageController {
     const motionMap = this.motionMap;
     if (!spine || !motionMap) return;
 
-    const names = resolveAvatarAnimations(state, motionMap);
-    const animName = names[0];
-    if (!animName) return;
+    if (usesIdleAnimationPool(state)) {
+      this.activeLoopPool = "idle";
+      this.playRandomLoop("idle", state);
+      return;
+    }
 
-    const entry = motionMap[state];
-    const loop = entry?.loop ?? true;
+    if (state === "talking") {
+      this.activeLoopPool = "talk";
+      this.playRandomLoop("talk", state);
+      return;
+    }
+
+    this.activeLoopPool = null;
+    this.lastLoopAnimationName = null;
+    this.playOneShot(state);
+  }
+
+  private poolCandidates(pool: "idle" | "talk"): string[] {
+    const motionMap = this.motionMap!;
+    const spine = this.spine!;
+    const raw = pool === "idle" ? collectIdlePool(motionMap) : collectTalkPool(motionMap);
+    const onSkel = filterAnimationsOnSkeleton(spine.skeleton.data, raw);
+    if (onSkel.length > 0) return onSkel;
+    const fallback = resolveAvatarAnimations(pool === "idle" ? "idle" : "talking", motionMap);
+    return filterAnimationsOnSkeleton(spine.skeleton.data, fallback);
+  }
+
+  private setTrack(animName: string, loop: boolean, onComplete?: () => void): boolean {
+    const spine = this.spine;
+    if (!spine) return false;
 
     const existingTrack = spine.state.getCurrent(this.trackIndex);
+    if (existingTrack?.animation?.name === animName && existingTrack.loop === loop) {
+      return false;
+    }
+
     if (existingTrack) existingTrack.listener = {};
 
     spine.state.setAnimation(this.trackIndex, animName, loop);
     stripViewportLetterbox(spine.skeleton);
 
-    if (!loop && entry?.returnTo) {
-      const returnTo = entry.returnTo;
-      const expectedState = state;
+    if (onComplete) {
       const track = spine.state.getCurrent(this.trackIndex);
       if (track) {
-        track.listener = {
-          complete: () => {
-            if (this.currentState === expectedState) {
-              this.setAvatarState(returnTo);
-            }
-          },
-        };
+        track.listener = { complete: onComplete };
       }
     }
+    return true;
+  }
+
+  private playRandomLoop(
+    pool: "idle" | "talk",
+    avatarState: AvatarState,
+    preferDifferent = false,
+  ): void {
+    const spine = this.spine;
+    if (!spine) return;
+
+    const candidates = this.poolCandidates(pool);
+    const animName = pickRandomAnimation(
+      candidates,
+      preferDifferent ? (this.lastLoopAnimationName ?? undefined) : undefined,
+    );
+    if (!animName) return;
+
+    const existingTrack = spine.state.getCurrent(this.trackIndex);
+    if (
+      !preferDifferent &&
+      existingTrack?.animation?.name === animName &&
+      existingTrack.loop === true &&
+      this.activeLoopPool === pool &&
+      this.currentState === avatarState
+    ) {
+      return;
+    }
+
+    this.lastLoopAnimationName = animName;
+    const expectedPool = pool;
+    this.setTrack(animName, true, () => {
+      if (this.disposed) return;
+      if (this.activeLoopPool !== expectedPool) return;
+      if (expectedPool === "idle" && !usesIdleAnimationPool(this.currentState)) return;
+      if (expectedPool === "talk" && this.currentState !== "talking") return;
+      this.playRandomLoop(expectedPool, this.currentState, candidates.length > 1);
+    });
+  }
+
+  private playOneShot(state: AvatarState): void {
+    const spine = this.spine;
+    const motionMap = this.motionMap;
+    if (!spine || !motionMap) return;
+
+    const entry = motionMap[state];
+    let animName = resolveAvatarAnimations(state, motionMap)[0];
+    const loop = entry?.loop ?? true;
+    const returnTo = !loop ? entry?.returnTo : undefined;
+
+    if (!animName) {
+      animName = resolveAvatarAnimations("idle", motionMap)[0];
+      if (!animName) return;
+    }
+
+    const onSkel = filterAnimationsOnSkeleton(spine.skeleton.data, [animName]);
+    if (onSkel.length === 0) return;
+    animName = onSkel[0]!;
+
+    if (!loop && returnTo) {
+      const expectedState = state;
+      this.setTrack(animName, loop, () => {
+        if (this.currentState === expectedState) {
+          this.setAvatarState(returnTo);
+        }
+      });
+      return;
+    }
+
+    this.setTrack(animName, loop);
   }
 }

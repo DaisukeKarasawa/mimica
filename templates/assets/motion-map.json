@@ -19,6 +19,9 @@
     "  loop:true — persistent loop states: idle, thinking, waiting, talking",
     "    Entered only by explicit setState() / setAvatarState() (agent events, UI, dev preview).",
     "    Animation loops until the next setState(); do not use returnTo (ignored when loop is true).",
+    "    Runtime (SpineStageController): thinking/waiting/idle share Idle_* pool (random loop).",
+    "    talking uses Talk_* from talking.animations (random loop).",
+    "    Start_Idle_* (all variants) are excluded from idle/talk random pools — see motionPools.isBlockedAnimation.",
     "",
     "  loop:false — one-shot reactions: success, error",
     "    Play animations[0] once; on complete, auto setAvatarState(returnTo) when returnTo is set.",
@@ -59,17 +62,15 @@
   ],
   "idle": {
     "loop": true,
-    "animations": ["Idle_01"]
+    "animations": ["Idle_01", "Idle_02", "Idle_03"]
   },
   "thinking": {
     "loop": true,
-    "animations": ["Look_01_M"],
-    "fallback": ["Idle_01"]
+    "animations": ["Idle_01", "Idle_02", "Idle_03"]
   },
   "waiting": {
     "loop": true,
-    "animations": ["LookEnd_01_M"],
-    "fallback": ["Idle_01"]
+    "animations": ["Idle_01", "Idle_02", "Idle_03"]
   },
   "talking": {
     "loop": true,

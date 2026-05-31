@@ -21,17 +21,10 @@ export class CharacterDirector {
     return this.state;
   }
 
-  setState(next: AvatarState, force = false): void {
-    if (!force && next === this.state) return;
-    const isTerminalToIdle =
-      next === "idle" &&
-      (this.state === "error" || this.state === "success" || this.state === "cancelled");
-    if (
-      !force &&
-      !isTerminalToIdle &&
-      next !== this.state &&
-      Date.now() - this.lastChangeAt < this.cooldownMs
-    ) {
+  setState(next: AvatarState): void {
+    if (next === this.state) return;
+    const bypassCooldown = next === "idle";
+    if (!bypassCooldown && Date.now() - this.lastChangeAt < this.cooldownMs) {
       return;
     }
     this.state = next;

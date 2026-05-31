@@ -3,7 +3,14 @@ import { v4 as uuidv4 } from "uuid";
 import type { AgentEventMessage, ChatSession } from "@mimica/shared";
 import { mapAgentRunToAvatar } from "@mimica/shared";
 import type { CharacterDirector } from "@mimica/character-runtime";
-import { reduceAgentEvent } from "../lib/agentSessionUpdate";
+import {
+  applyAgentComplete,
+  applyAgentDelta,
+  applyAgentTool,
+  streamMessageId,
+} from "../lib/agentSessionUpdate";
+import type { PendingStreamComplete, StreamRevealContext } from "../lib/streamRevealController";
+import { StreamRevealController } from "../lib/streamRevealController";
 
 export interface UseAgentEventsOptions {
   director: CharacterDirector;
@@ -20,9 +27,14 @@ export interface UseAgentEventsResult {
 export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsResult {
   const { director, setAllSessions, setIsStreaming } = options;
 
-  const streamingContentRef = useRef("");
   const activeStreamIdRef = useRef<string | null>(null);
   const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const directorRef = useRef(director);
+  const setAllSessionsRef = useRef(setAllSessions);
+  const setIsStreamingRef = useRef(setIsStreaming);
+  directorRef.current = director;
+  setAllSessionsRef.current = setAllSessions;
+  setIsStreamingRef.current = setIsStreaming;
 
   const clearCompletionTimeout = () => {
     if (completionTimeoutRef.current !== null) {
@@ -31,88 +43,156 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     }
   };
 
-  const scheduleReturnToIdle = (delayMs: number) => {
+  const scheduleReturnToIdleRef = useRef((delayMs: number) => {
     clearCompletionTimeout();
     completionTimeoutRef.current = setTimeout(() => {
       completionTimeoutRef.current = null;
-      director.setState("idle", true);
+      directorRef.current.setState("idle");
     }, delayMs);
-  };
+  });
+
+  const revealRef = useRef<StreamRevealController | null>(null);
+  if (!revealRef.current) {
+    revealRef.current = new StreamRevealController({
+      onFrame: (ctx: StreamRevealContext, content: string) => {
+        setAllSessionsRef.current((prev) =>
+          applyAgentDelta(prev, ctx.sessionId, ctx.runId, ctx.streamId, content),
+        );
+      },
+      onFinalize: (pending: PendingStreamComplete) => {
+        activeStreamIdRef.current = null;
+        setAllSessionsRef.current((prev) =>
+          applyAgentComplete(
+            prev,
+            pending.sessionId,
+            pending.runId,
+            pending.streamId,
+            pending.content,
+          ),
+        );
+        directorRef.current.setState("success");
+        setIsStreamingRef.current(false);
+        scheduleReturnToIdleRef.current(1200);
+      },
+    });
+  }
+  const reveal = revealRef.current;
+
+  const syncRevealContext = useCallback(
+    (event: AgentEventMessage & { runId: string }) => {
+      const streamId = activeStreamIdRef.current ?? streamMessageId(event.runId, null);
+      reveal.setContext({
+        sessionId: event.sessionId,
+        runId: event.runId,
+        streamId,
+      });
+    },
+    [reveal],
+  );
+
+  const applyPendingCompleteWithoutSuccess = useCallback(() => {
+    const snapshot = reveal.drainForAbort();
+    if (!snapshot) return false;
+    activeStreamIdRef.current = null;
+    setAllSessionsRef.current((prev) =>
+      applyAgentComplete(
+        prev,
+        snapshot.sessionId,
+        snapshot.runId,
+        snapshot.streamId,
+        snapshot.content,
+      ),
+    );
+    setIsStreamingRef.current(false);
+    return true;
+  }, [reveal]);
 
   const resetStream = useCallback(() => {
-    streamingContentRef.current = "";
+    applyPendingCompleteWithoutSuccess();
+    reveal.reset();
     activeStreamIdRef.current = null;
-  }, []);
+  }, [applyPendingCompleteWithoutSuccess, reveal]);
 
   const beginStream = useCallback(() => {
     clearCompletionTimeout();
-    streamingContentRef.current = "";
+    resetStream();
+    directorRef.current.setState("thinking");
     const id = uuidv4();
     activeStreamIdRef.current = id;
     return id;
-  }, []);
+  }, [resetStream]);
 
-  useEffect(() => () => clearCompletionTimeout(), []);
+  useEffect(
+    () => () => {
+      clearCompletionTimeout();
+      reveal.stop();
+    },
+    [reveal],
+  );
 
   const handleAgentEvent = useCallback(
     (event: AgentEventMessage) => {
       switch (event.type) {
         case "agent_state": {
-          const avatar = mapAgentRunToAvatar(event.state);
-          director.setState(avatar, true);
-          if (event.state === "streaming") setIsStreaming(true);
-          if (
-            event.state === "completed" ||
-            event.state === "failed" ||
-            event.state === "cancelled"
-          ) {
-            setIsStreaming(false);
+          if (event.state !== "completed") {
+            directorRef.current.setState(mapAgentRunToAvatar(event.state));
+          }
+          if (event.state === "streaming") setIsStreamingRef.current(true);
+          if (event.state === "failed" || event.state === "cancelled") {
+            reveal.stop();
+            resetStream();
+            setIsStreamingRef.current(false);
+            scheduleReturnToIdleRef.current(event.state === "failed" ? 2000 : 1200);
           }
           break;
         }
         case "agent_warning":
           break;
         case "agent_delta": {
-          streamingContentRef.current += event.content;
-          setAllSessions((prev) =>
-            reduceAgentEvent(prev, event, {
-              streamId: activeStreamIdRef.current,
-              content: streamingContentRef.current,
-            }),
-          );
+          syncRevealContext(event);
+          reveal.appendReceived(event.content);
+          reveal.start();
           break;
         }
         case "agent_tool": {
-          setAllSessions((prev) =>
-            reduceAgentEvent(prev, event, {
-              streamId: activeStreamIdRef.current,
-              content: streamingContentRef.current,
-            }),
+          syncRevealContext(event);
+          const ctx = reveal.getContext();
+          if (!ctx) break;
+          setAllSessionsRef.current((prev) =>
+            applyAgentTool(
+              prev,
+              ctx.sessionId,
+              ctx.runId,
+              ctx.streamId,
+              reveal.getDisplayedContent(),
+              event.name,
+              event.detail,
+            ),
           );
           break;
         }
         case "agent_complete": {
-          setAllSessions((prev) =>
-            reduceAgentEvent(prev, event, {
-              streamId: activeStreamIdRef.current,
-              content: streamingContentRef.current,
-            }),
-          );
-          streamingContentRef.current = "";
-          activeStreamIdRef.current = null;
-          director.setState("success", true);
-          setIsStreaming(false);
-          scheduleReturnToIdle(1200);
+          syncRevealContext(event);
+          const streamId = activeStreamIdRef.current ?? streamMessageId(event.runId, null);
+          reveal.setReceivedIfLonger(event.content);
+          reveal.queueComplete({
+            sessionId: event.sessionId,
+            runId: event.runId,
+            streamId,
+            content: reveal.getReceivedContent(),
+          });
+          reveal.start();
           break;
         }
         case "agent_error": {
+          reveal.stop();
           resetStream();
-          setIsStreaming(false);
-          director.setState("error", true);
+          setIsStreamingRef.current(false);
+          directorRef.current.setState("error");
           clearCompletionTimeout();
           completionTimeoutRef.current = setTimeout(() => {
             completionTimeoutRef.current = null;
-            director.setState("idle", true);
+            directorRef.current.setState("idle");
           }, 2000);
           break;
         }
@@ -120,7 +200,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
       }
     },
-    [director, resetStream, setAllSessions, setIsStreaming],
+    [resetStream, reveal, syncRevealContext],
   );
 
   return { handleAgentEvent, resetStream, beginStream };
