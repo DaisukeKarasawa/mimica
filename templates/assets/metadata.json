@@ -1,6 +1,8 @@
 {
   "id": "rio",
   "displayName": "調月リオ",
+  "shortDisplayName": "リオ",
+  "shortDisplayNameEn": "Rio",
   "skelFile": "CH0158_home.skel",
   "atlasFile": "CH0158_home.atlas"
 }
