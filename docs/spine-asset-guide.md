@@ -269,7 +269,7 @@ ls ~/MimicaAssets/characters/rio/textures/
 - `lookBone` — 首追従の基準 X（例: `Face_rot`）。未設定時はヒット矩形中心、なければ `hitBone`。首振りの可動幅は crop 幅基準
 - `headRotationBones`（例: `Head_Rot` 系）は素材依存
 - `petAnimation`（推奨）— 撫で中に release track でループ再生する「撫でられ」アニメ（例: `Pat_01_A`）。頬染め・目閉じ・反応動作を作者データで駆動する。`Head_Rot` 系は毎フレーム上書きされるためカーソル追従が優先される
-- `expression.slots` — `petAnimation` が無い素材向けの fallback。撫で開始時に slot の attachment を 1 回差し替える（track 0 のループに上書きされるので、瞬き等のある idle では持続しない点に注意）。slot/attachment は実名で（CH0158 例: 目閉じは `L_Eye_lash`/`R_Eye_lash` の `*_Eye_closed`、追加チークは `Blush_02`）。`petAnimation` 設定時は無視される
+- `releaseAnimation` — 離したときの one-shot（例: `PatEnd_01_A`）
 - 未設定のキャラは従来どおり idle ループのみ（後方互換）
 - デバッグ: DevTools で `localStorage.setItem('mimica:petDebug','1')` → リロードでヒット矩形を緑枠で可視化（`window.__MIMICA_PET_DEBUG__ = true` や URL `?petDebug` でも可）
 - 反映: `metadata.json` 保存後、`pnpm dev:companion` を再起動
