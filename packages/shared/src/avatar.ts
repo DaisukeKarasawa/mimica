@@ -38,6 +38,61 @@ export interface StageCropRect {
   height: number;
 }
 
+export interface CharacterPetExpressionSlot {
+  slot: string;
+  attachment: string;
+}
+
+export interface CharacterPetHitRegion {
+  /** Left edge, 0–1 relative to the stage crop rect (not the full canvas) */
+  x: number;
+  /** Top edge, 0–1 relative to the stage crop rect (not the full canvas) */
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface CharacterPetInteraction {
+  /**
+   * Head hit region from the live AABB of these slots (preferred). Self-corrects
+   * across crop cover-fit and resize; e.g. `["Head"]`. Falls back to
+   * `hitRegionCropNormalized`, then the `hitBone` radius.
+   */
+  hitSlots?: string[];
+  /**
+   * Manual hit rect in stage-crop-normalized space (0–1 of the crop rect, which
+   * is what is actually drawn — NOT the full canvas). Used when `hitSlots` is
+   * unset or yields no bounds.
+   */
+  hitRegionCropNormalized?: CharacterPetHitRegion;
+  /** Extra forgiveness (px) added around the resolved head rect. */
+  hitPaddingPx?: number;
+  /** Point hit fallback when neither hitSlots nor hitRegionCropNormalized resolves */
+  hitBone: string;
+  headRotationBones: string[];
+  maxRotationDeg: number;
+  returnDurationMs: number;
+  hitRadiusPx: number;
+  /** Client-X origin for head turn; defaults to head-rect center, else this bone */
+  lookBone?: string;
+  /**
+   * Authored "being patted" reaction looped on the release track while petting
+   * (e.g. `"Pat_01_A"`). Drives the face/blush/closed-eyes; head-turn bones are
+   * still overridden for cursor follow. Preferred over `expression` when present.
+   */
+  petAnimation?: string;
+  /**
+   * One-shot slot swaps applied on pet start (fallback for assets without a
+   * `petAnimation`). Ignored when `petAnimation` is set.
+   */
+  expression?: { slots: CharacterPetExpressionSlot[] };
+  releaseAnimation?: string;
+}
+
+export interface CharacterInteractionConfig {
+  pet: CharacterPetInteraction;
+}
+
 export interface CharacterMetadata {
   id: string;
   displayName: string;
@@ -49,4 +104,6 @@ export interface CharacterMetadata {
   atlasFile: string;
   /** Optional fixed crop; otherwise computed from drawable slots (letterbox excluded). */
   stageCrop?: StageCropRect;
+  /** Memorial-lobby-style idle interactions (pet head follow, etc.). */
+  interaction?: CharacterInteractionConfig;
 }
