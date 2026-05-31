@@ -2,7 +2,7 @@
   --scrollbar-thumb: rgba(57, 56, 54, 0.72);
   --scrollbar-thumb-hover: rgba(122, 131, 130, 0.5);
   --scrollbar-track: transparent;
-  min-width: 0;
+  min-width: 360px;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -113,8 +113,7 @@
   display: flex;
   align-items: stretch;
   min-height: 35px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-soft);
+  background: var(--tabs-bar);
 }
 
 .tabs-bar.is-reordering {
@@ -126,6 +125,7 @@
 }
 
 .tabs-scroll {
+  position: relative;
   display: flex;
   align-items: stretch;
   gap: 0;
@@ -133,6 +133,20 @@
   flex: 1;
   min-width: 0;
   touch-action: pan-y;
+  border-top: 1px solid var(--line-subtle);
+  border-bottom: none;
+}
+
+.tabs-scroll::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--line-subtle);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .tabs-bar.is-reordering .tabs-scroll {
@@ -162,7 +176,19 @@
 }
 
 .tab-wrap.active {
-  background: var(--surface-2);
+  z-index: 1;
+  background: var(--surface);
+}
+
+.tab-wrap.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--surface);
+  z-index: 1;
 }
 
 .tab-wrap .tab {
@@ -246,6 +272,11 @@
   gap: 12px;
 }
 
+.history-panel:focus,
+.history-panel:focus-visible {
+  outline: none;
+}
+
 .history-search input {
   width: 100%;
   border: 1px solid var(--line);
@@ -303,7 +334,8 @@
   cursor: pointer;
 }
 
-.history-item:hover {
+.history-item:hover,
+.history-item.is-highlighted {
   background: rgba(197, 201, 197, 0.065);
 }
 
@@ -334,6 +366,7 @@
 }
 
 .history-group li:hover .history-item-delete,
+.history-item.is-highlighted + .history-item-delete,
 .history-item-delete:focus {
   opacity: 1;
 }

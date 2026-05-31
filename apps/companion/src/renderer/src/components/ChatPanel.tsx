@@ -82,7 +82,7 @@ export function ChatPanel({
         <div className="chat-title">
           <h2>{AGENT_DISPLAY_NAME}</h2>
         </div>
-        {tabsBarVisible ? (
+        {tabsBarVisible && showChat ? (
           <div className={`tabs-bar ${draggingId ? "is-reordering" : ""}`}>
             <div className="tabs-scroll">
               {openSessions.map((session, index) => (
