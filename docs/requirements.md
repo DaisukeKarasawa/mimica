@@ -248,7 +248,7 @@ Agentの状態に応じてキャラクターが動く
 初期motion-map対象状態:
 
 ```ts
-type AvatarState = "idle" | "thinking" | "talking" | "success" | "error" | "waiting";
+type AvatarState = "idle" | "thinking" | "talking" | "success" | "error" | "waiting" | "cancelled";
 ```
 
 暫定motion-map:
@@ -842,7 +842,7 @@ Chat Side Panel
 初期AvatarState:
 
 ```ts
-type AvatarState = "idle" | "thinking" | "talking" | "success" | "error" | "waiting";
+type AvatarState = "idle" | "thinking" | "talking" | "success" | "error" | "waiting" | "cancelled";
 ```
 
 ## 8.4 状態遷移
