@@ -114,7 +114,29 @@ type CharacterNameMetadata = {
   shortDisplayNameEn?: string;
 };
 
-export function resolveCharacterShortName(metadata?: CharacterNameMetadata | null): string {
+export type CharacterNameLocale = "ja" | "en";
+
+function resolveShortName(
+  metadata: CharacterNameMetadata | null | undefined,
+  locale: CharacterNameLocale,
+): string {
+  if (locale === "en") {
+    const shortEn = metadata?.shortDisplayNameEn?.trim();
+    if (shortEn) return shortEn;
+    const short = metadata?.shortDisplayName?.trim();
+    const display = metadata?.displayName?.trim();
+    if (
+      short === AGENT_SHORT_NAME ||
+      display === AGENT_DISPLAY_NAME ||
+      metadata?.id === "rio"
+    ) {
+      return AGENT_SHORT_NAME_EN;
+    }
+    if (short) return short;
+    if (display) return display;
+    return AGENT_SHORT_NAME_EN;
+  }
+
   const short = metadata?.shortDisplayName?.trim();
   if (short) return short;
   const display = metadata?.displayName?.trim();
@@ -123,21 +145,12 @@ export function resolveCharacterShortName(metadata?: CharacterNameMetadata | nul
   return AGENT_SHORT_NAME;
 }
 
+export function resolveCharacterShortName(metadata?: CharacterNameMetadata | null): string {
+  return resolveShortName(metadata, "ja");
+}
+
 export function resolveCharacterShortNameEn(metadata?: CharacterNameMetadata | null): string {
-  const shortEn = metadata?.shortDisplayNameEn?.trim();
-  if (shortEn) return shortEn;
-  const short = metadata?.shortDisplayName?.trim();
-  const display = metadata?.displayName?.trim();
-  if (
-    short === AGENT_SHORT_NAME ||
-    display === AGENT_DISPLAY_NAME ||
-    metadata?.id === "rio"
-  ) {
-    return AGENT_SHORT_NAME_EN;
-  }
-  if (short) return short;
-  if (display) return display;
-  return AGENT_SHORT_NAME_EN;
+  return resolveShortName(metadata, "en");
 }
 
 /** Fallback when the Cursor extension has not yet sent workspace context. */
