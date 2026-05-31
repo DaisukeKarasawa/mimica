@@ -11,9 +11,7 @@ export function MainSplitLayout({ stage, chat }: MainSplitLayoutProps) {
   const mainRef = useRef<HTMLElement>(null);
   const { chatWidth, onHandlePointerDown, isReady } = useChatPanelWidth(mainRef);
 
-  const style = isReady
-    ? ({ "--chat-panel-width": `${chatWidth}px` } as CSSProperties)
-    : undefined;
+  const style = isReady ? ({ "--chat-panel-width": `${chatWidth}px` } as CSSProperties) : undefined;
 
   return (
     <main ref={mainRef} className={`main${isReady ? "" : " main--split-pending"}`} style={style}>

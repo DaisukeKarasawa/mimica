@@ -19,10 +19,7 @@ import { ChatPanel } from "./components/ChatPanel";
 import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
 import { useSessionTabs } from "./hooks/useSessionTabs";
-import {
-  matchChatTabShortcut,
-  type ChatTabShortcutAction,
-} from "./lib/chatTabShortcuts";
+import { matchChatTabShortcut, type ChatTabShortcutAction } from "./lib/chatTabShortcuts";
 
 export default function App() {
   const [editorContext, setEditorContext] = useState<EditorContext | null>(null);

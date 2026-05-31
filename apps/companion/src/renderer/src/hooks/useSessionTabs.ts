@@ -37,10 +37,7 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     });
   }, []);
 
-  const historySessions = useMemo(
-    () => allSessions.filter(hasSessionHistory),
-    [allSessions],
-  );
+  const historySessions = useMemo(() => allSessions.filter(hasSessionHistory), [allSessions]);
 
   useEffect(() => {
     void refreshSessions();
@@ -149,15 +146,9 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
     [allSessions, refreshSessions, removeTabFromUi, stopStreamingIfActive],
   );
 
-  const handleCloseTab = useCallback(
-    (id: string) => detachTab(id, "ifEmpty"),
-    [detachTab],
-  );
+  const handleCloseTab = useCallback((id: string) => detachTab(id, "ifEmpty"), [detachTab]);
 
-  const handleDeleteSession = useCallback(
-    (id: string) => detachTab(id, true),
-    [detachTab],
-  );
+  const handleDeleteSession = useCallback((id: string) => detachTab(id, true), [detachTab]);
 
   const openSessions = useMemo(
     () =>

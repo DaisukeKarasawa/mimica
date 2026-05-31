@@ -24,9 +24,7 @@ function safeSessionId(id: string): string | null {
 }
 
 function sortSessions(sessions: ChatSession[]): ChatSession[] {
-  return sessions.sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-  );
+  return sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
 export class SessionStore {

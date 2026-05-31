@@ -1,4 +1,1 @@
-export {
-  type ChatTabShortcutAction,
-  matchChatTabShortcut,
-} from "../../../common/chatTabShortcuts";
+export { type ChatTabShortcutAction, matchChatTabShortcut } from "../../../common/chatTabShortcuts";

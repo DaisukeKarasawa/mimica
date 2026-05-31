@@ -136,7 +136,8 @@ export function ChatPanel({
             <div className="messages">
               {!activeSession && (
                 <p className="chat-empty">
-                  タブがありません。⌘T（Ctrl+T）で New Chat を開くか、⌘Y（Ctrl+Y）で履歴を開いてください。
+                  タブがありません。⌘T（Ctrl+T）で New Chat
+                  を開くか、⌘Y（Ctrl+Y）で履歴を開いてください。
                 </p>
               )}
               {activeSession?.messages.map((msg) => {

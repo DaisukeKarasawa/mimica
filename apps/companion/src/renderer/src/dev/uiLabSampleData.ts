@@ -82,7 +82,8 @@ export function createUiLabSampleSessions(): ChatSession[] {
         {
           id: "ui-lab-a2",
           role: "assistant",
-          content: "再現手順を教えてください。UI Lab では Agent は動きませんが、タブ UI の見た目は確認できます。",
+          content:
+            "再現手順を教えてください。UI Lab では Agent は動きませんが、タブ UI の見た目は確認できます。",
           createdAt: now,
         },
       ],
@@ -104,7 +105,8 @@ export function createUiLabSampleSessions(): ChatSession[] {
         {
           id: "ui-lab-a3",
           role: "assistant",
-          content: "`.top-actions .pill` の padding を調整する案が考えられます。Apply 後は `pnpm dev:companion` で実機も確認してください。",
+          content:
+            "`.top-actions .pill` の padding を調整する案が考えられます。Apply 後は `pnpm dev:companion` で実機も確認してください。",
           createdAt: now,
           toolCalls: [
             {

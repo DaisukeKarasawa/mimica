@@ -61,7 +61,8 @@ export function ChatHistoryPanel({
       if (flatSessions.length === 0) return;
       setHighlightedId((prev) => {
         const currentIndex = prev ? flatSessions.findIndex((session) => session.id === prev) : -1;
-        const startIndex = currentIndex < 0 ? (delta === 1 ? -1 : flatSessions.length) : currentIndex;
+        const startIndex =
+          currentIndex < 0 ? (delta === 1 ? -1 : flatSessions.length) : currentIndex;
         const nextIndex = Math.min(flatSessions.length - 1, Math.max(0, startIndex + delta));
         return flatSessions[nextIndex]!.id;
       });

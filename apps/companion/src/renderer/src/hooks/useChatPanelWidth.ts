@@ -49,10 +49,7 @@ export function useChatPanelWidth(mainRef: RefObject<HTMLElement | null>) {
 
       const onMove = (moveEvent: PointerEvent) => {
         const containerWidth = el.clientWidth;
-        const next = clampChatPanelWidth(
-          startWidth - (moveEvent.clientX - startX),
-          containerWidth,
-        );
+        const next = clampChatPanelWidth(startWidth - (moveEvent.clientX - startX), containerWidth);
         setChatWidth(next);
       };
 
@@ -63,10 +60,7 @@ export function useChatPanelWidth(mainRef: RefObject<HTMLElement | null>) {
         handle.removeEventListener("pointerup", onUp);
         handle.removeEventListener("pointercancel", onUp);
         const containerWidth = el.clientWidth;
-        const final = clampChatPanelWidth(
-          startWidth - (upEvent.clientX - startX),
-          containerWidth,
-        );
+        const final = clampChatPanelWidth(startWidth - (upEvent.clientX - startX), containerWidth);
         setChatWidth(final);
         persistChatPanelWidth(final);
       };
