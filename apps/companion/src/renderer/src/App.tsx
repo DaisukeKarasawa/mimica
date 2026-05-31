@@ -16,6 +16,7 @@ import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
 import { CharacterStage } from "./components/CharacterStage";
 import { ChatPanel } from "./components/ChatPanel";
+import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
 import { useSessionTabs } from "./hooks/useSessionTabs";
 import {
@@ -181,33 +182,35 @@ export default function App() {
   return (
     <div className="app">
       <TopBar />
-      <main className="main">
-        <CharacterStage avatarState={avatarState} assets={characterAssets} />
-        <ChatPanel
-          openSessions={tabs.openSessions}
-          historySessions={tabs.historySessions}
-          activeSessionId={tabs.activeSessionId}
-          activeSession={tabs.activeSession}
-          panelMode={tabs.panelMode}
-          tabsBarVisible={tabsBarVisible}
-          isStreaming={isStreaming}
-          avatarState={avatarState}
-          agentMode={agentMode}
-          characterShortName={characterShortName}
-          onAgentModeChange={setAgentMode}
-          chatIconUrl={characterAssets?.chatIconUrl}
-          onSelectSession={(id) => {
-            tabs.setActiveSessionId(id);
-            tabs.setPanelMode("chat");
-          }}
-          onCloseTab={(id) => void tabs.handleCloseTab(id)}
-          onReorderTab={tabs.reorderOpenTab}
-          onSelectHistorySession={tabs.openSessionTab}
-          onDeleteSession={(id) => void tabs.handleDeleteSession(id)}
-          onSend={(text) => void handleSend(text)}
-          onCancel={() => void handleCancel()}
-        />
-      </main>
+      <MainSplitLayout
+        stage={<CharacterStage avatarState={avatarState} assets={characterAssets} />}
+        chat={
+          <ChatPanel
+            openSessions={tabs.openSessions}
+            historySessions={tabs.historySessions}
+            activeSessionId={tabs.activeSessionId}
+            activeSession={tabs.activeSession}
+            panelMode={tabs.panelMode}
+            tabsBarVisible={tabsBarVisible}
+            isStreaming={isStreaming}
+            avatarState={avatarState}
+            agentMode={agentMode}
+            characterShortName={characterShortName}
+            onAgentModeChange={setAgentMode}
+            chatIconUrl={characterAssets?.chatIconUrl}
+            onSelectSession={(id) => {
+              tabs.setActiveSessionId(id);
+              tabs.setPanelMode("chat");
+            }}
+            onCloseTab={(id) => void tabs.handleCloseTab(id)}
+            onReorderTab={tabs.reorderOpenTab}
+            onSelectHistorySession={tabs.openSessionTab}
+            onDeleteSession={(id) => void tabs.handleDeleteSession(id)}
+            onSend={(text) => void handleSend(text)}
+            onCancel={() => void handleCancel()}
+          />
+        }
+      />
     </div>
   );
 }

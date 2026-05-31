@@ -44,7 +44,51 @@
 
 .main {
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 32vw);
-  gap: 14px;
+  display: flex;
+  align-items: stretch;
+}
+
+.main > .stage {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.main--split-pending .chat {
+  flex: 0 0 min(32vw, 100%);
+  width: min(32vw, 100%);
+}
+
+.main:not(.main--split-pending) .chat {
+  flex: 0 0 var(--chat-panel-width);
+  width: var(--chat-panel-width);
+}
+
+.main-split-handle {
+  flex: 0 0 14px;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.main-split-handle::before {
+  content: "";
+  position: absolute;
+  inset: 4px 5px;
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+.main-split-handle:hover::before,
+.main-split-handle:focus-visible::before,
+body.is-split-dragging .main-split-handle::before {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+body.is-split-dragging {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.is-split-dragging * {
+  cursor: col-resize !important;
 }
