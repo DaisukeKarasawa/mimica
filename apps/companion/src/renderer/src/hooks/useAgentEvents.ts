@@ -91,11 +91,17 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
   );
 
   const applyPendingCompleteWithoutSuccess = useCallback(() => {
-    const pending = reveal.drainPendingComplete();
-    if (!pending) return false;
+    const snapshot = reveal.drainForAbort();
+    if (!snapshot) return false;
     activeStreamIdRef.current = null;
     setAllSessionsRef.current((prev) =>
-      applyAgentComplete(prev, pending.sessionId, pending.runId, pending.streamId, pending.content),
+      applyAgentComplete(
+        prev,
+        snapshot.sessionId,
+        snapshot.runId,
+        snapshot.streamId,
+        snapshot.content,
+      ),
     );
     setIsStreamingRef.current(false);
     return true;

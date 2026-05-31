@@ -68,6 +68,16 @@ export class StreamRevealController {
     };
   }
 
+  /** cancel / failed / error 等で reset 前に persist すべき本文があれば返す */
+  drainForAbort(): PendingStreamComplete | null {
+    const pending = this.drainPendingComplete();
+    if (pending) return pending;
+    const ctx = this.context;
+    if (!ctx || codePointCount(this.receivedContent) === 0) return null;
+    this.stop();
+    return { ...ctx, content: this.receivedContent };
+  }
+
   queueComplete(pending: PendingStreamComplete): void {
     this.pendingComplete = pending;
   }
