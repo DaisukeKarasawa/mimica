@@ -5,6 +5,7 @@ import type { BrowserWindow as BrowserWindowType } from "electron";
 import { electron } from "./electron.js";
 import { userDataJoin } from "./userDataPaths.js";
 import { openAllowedExternalUrl } from "./openExternal.js";
+import { matchForwardedChatTabShortcut } from "../common/chatTabShortcuts.js";
 
 const MIN_WIDTH = 960;
 const MIN_HEIGHT = 640;
@@ -117,24 +118,12 @@ export function createMainWindow(): BrowserWindowType {
   });
 
   // Electron closes the window on Cmd/Ctrl+W by default. preventDefault stops that, but also
-  // blocks keydown in the renderer — forward to the UI so ⌘W closes the active chat tab.
+  // blocks keydown in the renderer — forward shortcuts marked forwardFromMain via IPC.
   win.webContents.on("before-input-event", (event, input) => {
-    if (input.type !== "keyDown") return;
-    const mod = process.platform === "darwin" ? input.meta : input.control;
-    if (mod && !input.alt && !input.shift && input.key?.toLowerCase() === "w") {
-      event.preventDefault();
-      win.webContents.send("chat-tab-shortcut", "close");
-      return;
-    }
-    if (mod && !input.alt && !input.shift && input.key?.toLowerCase() === "y") {
-      event.preventDefault();
-      win.webContents.send("chat-tab-shortcut", "history");
-      return;
-    }
-    if (mod && !input.alt && !input.shift && input.key?.toLowerCase() === "b") {
-      event.preventDefault();
-      win.webContents.send("chat-tab-shortcut", "tabsBar");
-    }
+    const action = matchForwardedChatTabShortcut(input, process.platform);
+    if (!action) return;
+    event.preventDefault();
+    win.webContents.send("chat-tab-shortcut", action);
   });
 
   return win;

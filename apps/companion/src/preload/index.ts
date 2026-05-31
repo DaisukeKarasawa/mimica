@@ -6,6 +6,7 @@ import type {
   ChatSession,
   EditorContext,
 } from "@mimica/shared";
+import type { ChatTabShortcutAction } from "../common/chatTabShortcuts.js";
 
 export interface AgentSubmitPayload {
   sessionId: string;
@@ -27,7 +28,7 @@ export interface MimicaApi {
   openExternal: (url: string) => Promise<boolean>;
   onEditorContext: (cb: (context: EditorContext) => void) => () => void;
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
-  onChatTabShortcut: (cb: (action: "new" | "close" | "next" | "prev" | "history" | "tabsBar") => void) => () => void;
+  onChatTabShortcut: (cb: (action: ChatTabShortcutAction) => void) => () => void;
 }
 
 const api: MimicaApi = {
@@ -51,8 +52,7 @@ const api: MimicaApi = {
     return () => ipcRenderer.removeListener("agent-event", handler);
   },
   onChatTabShortcut: (cb) => {
-    const handler = (_: unknown, action: "new" | "close" | "next" | "prev" | "history" | "tabsBar") =>
-      cb(action);
+    const handler = (_: unknown, action: ChatTabShortcutAction) => cb(action);
     ipcRenderer.on("chat-tab-shortcut", handler);
     return () => ipcRenderer.removeListener("chat-tab-shortcut", handler);
   },
