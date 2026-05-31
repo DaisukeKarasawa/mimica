@@ -153,6 +153,14 @@ export class SpineStageController {
       if (this.disposed || this.pendingFitFrames <= 0) return;
       this.pendingFitFrames -= 1;
       this.fitSpineToStage();
+      if (this.pendingFitFrames === 0) {
+        const { w, h } = this.stageSize();
+        if (w <= 0 || h <= 0) {
+          console.warn(
+            "[SpineStageController] Host layout did not stabilize; stage remains empty.",
+          );
+        }
+      }
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
