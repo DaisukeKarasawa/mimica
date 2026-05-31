@@ -350,6 +350,33 @@ export class SpineStageController {
     return filterAnimationsOnSkeleton(spine.skeleton.data, fallback);
   }
 
+  private setTrack(
+    animName: string,
+    loop: boolean,
+    onComplete?: () => void,
+  ): boolean {
+    const spine = this.spine;
+    if (!spine) return false;
+
+    const existingTrack = spine.state.getCurrent(this.trackIndex);
+    if (existingTrack?.animation?.name === animName && existingTrack.loop === loop) {
+      return false;
+    }
+
+    if (existingTrack) existingTrack.listener = {};
+
+    spine.state.setAnimation(this.trackIndex, animName, loop);
+    stripViewportLetterbox(spine.skeleton);
+
+    if (onComplete) {
+      const track = spine.state.getCurrent(this.trackIndex);
+      if (track) {
+        track.listener = { complete: onComplete };
+      }
+    }
+    return true;
+  }
+
   private playRandomLoop(pool: "idle" | "talk", avatarState: AvatarState, preferDifferent = false): void {
     const spine = this.spine;
     if (!spine) return;
@@ -372,25 +399,15 @@ export class SpineStageController {
       return;
     }
 
-    if (existingTrack) existingTrack.listener = {};
-
     this.lastLoopAnimationName = animName;
-    spine.state.setAnimation(this.trackIndex, animName, true);
-    stripViewportLetterbox(spine.skeleton);
-
-    const track = spine.state.getCurrent(this.trackIndex);
-    if (!track) return;
-
     const expectedPool = pool;
-    track.listener = {
-      complete: () => {
-        if (this.disposed) return;
-        if (this.activeLoopPool !== expectedPool) return;
-        if (expectedPool === "idle" && !usesIdleAnimationPool(this.currentState)) return;
-        if (expectedPool === "talk" && this.currentState !== "talking") return;
-        this.playRandomLoop(expectedPool, this.currentState, candidates.length > 1);
-      },
-    };
+    this.setTrack(animName, true, () => {
+      if (this.disposed) return;
+      if (this.activeLoopPool !== expectedPool) return;
+      if (expectedPool === "idle" && !usesIdleAnimationPool(this.currentState)) return;
+      if (expectedPool === "talk" && this.currentState !== "talking") return;
+      this.playRandomLoop(expectedPool, this.currentState, candidates.length > 1);
+    });
   }
 
   private playOneShot(state: AvatarState): void {
@@ -412,28 +429,16 @@ export class SpineStageController {
     if (onSkel.length === 0) return;
     animName = onSkel[0]!;
 
-    const existingTrack = spine.state.getCurrent(this.trackIndex);
-    if (existingTrack?.animation?.name === animName && existingTrack.loop === loop) {
+    if (!loop && returnTo) {
+      const expectedState = state;
+      this.setTrack(animName, loop, () => {
+        if (this.currentState === expectedState) {
+          this.setAvatarState(returnTo);
+        }
+      });
       return;
     }
 
-    if (existingTrack) existingTrack.listener = {};
-
-    spine.state.setAnimation(this.trackIndex, animName, loop);
-    stripViewportLetterbox(spine.skeleton);
-
-    if (!loop && returnTo) {
-      const expectedState = state;
-      const track = spine.state.getCurrent(this.trackIndex);
-      if (track) {
-        track.listener = {
-          complete: () => {
-            if (this.currentState === expectedState) {
-              this.setAvatarState(returnTo);
-            }
-          },
-        };
-      }
-    }
+    this.setTrack(animName, loop);
   }
 }
