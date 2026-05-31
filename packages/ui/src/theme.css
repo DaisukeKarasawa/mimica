@@ -21,6 +21,15 @@
   --panel: rgba(29, 28, 25, 0.82);
   --panel-strong: rgba(18, 18, 15, 0.94);
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.56);
+  /* Muted chrome marks (orb, avatar placeholder, status pulse) */
+  --chrome-mark-bg: radial-gradient(
+      circle at 32% 28%,
+      rgba(139, 164, 176, 0.38),
+      transparent 58%
+    ),
+    linear-gradient(145deg, var(--surface-3) 0%, var(--surface-2) 100%);
+  --chrome-mark-border: rgba(139, 164, 176, 0.32);
+  --chrome-mark-glow: rgba(139, 164, 176, 0.14);
 }
 
 * {
