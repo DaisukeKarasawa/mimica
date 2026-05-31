@@ -22,7 +22,7 @@ export class CharacterDirector {
   }
 
   setState(next: AvatarState, force = false): void {
-    if (!force && next === this.state) return;
+    if (next === this.state) return;
     const isTerminalToIdle =
       next === "idle" &&
       (this.state === "error" || this.state === "success" || this.state === "cancelled");

@@ -11,3 +11,8 @@ export function resolveAvatarAnimations(state: AvatarState, motionMap: MotionMap
   if (entry.fallback?.length) return entry.fallback;
   return idleAnimations?.length ? idleAnimations : [];
 }
+
+/** thinking / waiting でも idle プールでループする */
+export function usesIdleAnimationPool(state: AvatarState): boolean {
+  return state === "idle" || state === "thinking" || state === "waiting";
+}

@@ -35,6 +35,9 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
           setSpineReady(true);
           setLoadError(null);
           controller.setAvatarState(avatarState);
+          requestAnimationFrame(() => {
+            if (!cancelled) controller.refreshLayout();
+          });
         }
       })
       .catch((err: unknown) => {
@@ -50,7 +53,13 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
       controllerRef.current = null;
       setSpineReady(false);
     };
-  }, [assets?.ready, assets?.baseUrl, assets?.metadata, assets?.motionMap]);
+  }, [
+    assets?.ready,
+    assets?.baseUrl,
+    assets?.metadata?.skelFile,
+    assets?.metadata?.atlasFile,
+    assets?.motionMap,
+  ]);
 
   useEffect(() => {
     if (spineReady && controllerRef.current) {
