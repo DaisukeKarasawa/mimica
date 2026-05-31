@@ -460,7 +460,7 @@ Mimica: Open Settings
 - 現在workspaceがMimicaへ渡る
 - 現在ファイルがMimicaへ渡る
 - 選択範囲がMimicaへ渡る
-- Mimica側でコンテキストチップとして表示される
+- コンテキストは Agent 送信に付与（**パネル上のチップ表示は §7.3.1 では出さない**）
 
 ---
 
@@ -766,7 +766,7 @@ mimica/
 
 ### 7.2.1 参照モデル（`docs/ui-mock.html`）
 
-初期モックに記載したフルシェル。接続状態・コンテキストチップ・Stage バッジ等を含む。**将来または別スライス**で段階的に寄せる。
+初期モックに記載したフルシェル。接続状態・コンテキストチップ・Stage バッジ等を含む。**現行 MVP の受け入れ基準は §7.2.2 / §7.3.1**。本節は参照モデルのみ。
 
 ```txt
 Header
@@ -814,15 +814,15 @@ MainSplitLayout（ドラッグで幅変更、--chat-panel-width を永続化）
 
 ### 7.3.1 現行（Chrome 風シェル）
 
-| 項目 | 方針 |
-| --- | --- |
-| アイコン | Agent 側のみ（`icon.png`）。ユーザー側は非表示 |
-| 表示名 | チャットヘッダに `調月リオ`（`AGENT_DISPLAY_NAME`）。バブル内の名前行・小さな状態テキストは出さない |
-| Markdown / コードブロック | 読みやすく表示する |
-| ストリーム待ち | `ThinkingIndicator`（内容のない assistant 行は一覧に出さない） |
-| **ツール実行 UI** | `agent_tool` → `ChatMessage.toolCalls` に蓄積し永続化可能。**チャットパネルではカード表示しない**（ミニマルシェル）。カード化の参照は `docs/ui-mock.html`、実装は後続スライス |
-| **コンテキスト参照 UI** | チップ表示しない。送信時の `editorContext` / `MessageContext` は維持 |
-| **UI 言語** | **二層**: プロダクト・案内・aria は **日本語**（例: 空タブ案内、調月リオ）。Chrome 風 chrome は **英語** — `DEFAULT_SESSION_TITLE`（`New Chat`）、履歴 `Search sessions…` / `Today`・`Yesterday`・`Earlier`、コンポーザー placeholder（`Ask Rio…` 等、`AGENT_SHORT_NAME_EN`） |
+| 項目                      | 方針                                                                                                                                                                                                                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| アイコン                  | Agent 側のみ（`icon.png`）。ユーザー側は非表示                                                                                                                                                                                                                                |
+| 表示名                    | チャットヘッダに `調月リオ`（`AGENT_DISPLAY_NAME`）。バブル内の名前行・小さな状態テキストは出さない                                                                                                                                                                           |
+| Markdown / コードブロック | 読みやすく表示する                                                                                                                                                                                                                                                            |
+| ストリーム待ち            | `ThinkingIndicator`（内容のない assistant 行は一覧に出さない）                                                                                                                                                                                                                |
+| **ツール実行 UI**         | `agent_tool` → `ChatMessage.toolCalls` に蓄積し永続化可能。**チャットパネルではカード表示しない**（ミニマルシェル）。カード化の参照は `docs/ui-mock.html`、実装は後続スライス                                                                                                 |
+| **コンテキスト参照 UI**   | チップ表示しない。送信時の `editorContext` / `MessageContext` は維持                                                                                                                                                                                                          |
+| **UI 言語**               | **二層**: プロダクト・案内・aria は **日本語**（例: 空タブ案内、調月リオ）。Chrome 風 chrome は **英語** — `DEFAULT_SESSION_TITLE`（`New Chat`）、履歴 `Search sessions…` / `Today`・`Yesterday`・`Earlier`、コンポーザー placeholder（`Ask Rio…` 等、`AGENT_SHORT_NAME_EN`） |
 
 セッション（draft）:
 
@@ -1179,7 +1179,7 @@ OSごとの保存パスはElectronの `app.getPath("userData")` を使う。
 - Agentアイコン
 - ユーザーアイコンなし
 - 入力欄
-- 実行中バー
+- ストリーム待ち（Thinking インジケータ + コンポーザー cancel。**実行中バーは §7.3.2**）
 
 ## Task 7: セッション保存
 
