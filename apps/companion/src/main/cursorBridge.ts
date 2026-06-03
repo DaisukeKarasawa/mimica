@@ -2,11 +2,12 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { WebSocketServer, WebSocket } from "ws";
 import type { ClientMessage, EditorContext, ServerMessage } from "@mimica/shared";
+import { MIMICA_BRIDGE_TOKEN_FILENAME } from "@mimica/shared";
 import { registerWorkspaceRoot } from "./workspaceAllowlist.js";
 import { userDataJoin } from "./userDataPaths.js";
 
 function bridgeTokenPath(): string {
-  return userDataJoin("bridge-token");
+  return userDataJoin(MIMICA_BRIDGE_TOKEN_FILENAME);
 }
 
 function resolveBridgeToken(): string {
