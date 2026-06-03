@@ -12,7 +12,7 @@
     "dev": "turbo run dev",
     "dev:companion": "pnpm --filter @mimica/shared build && pnpm --filter @mimica/character-runtime build && pnpm --filter @mimica/agent-orchestrator build && pnpm --filter @mimica/companion dev",
     "dev:ui-lab": "pnpm --filter @mimica/companion dev:ui-lab",
-    "dev:extension": "pnpm --filter @mimica/cursor-extension dev",
+    "dev:extension": "pnpm --filter mimica-cursor-extension dev",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "format": "prettier --write .",

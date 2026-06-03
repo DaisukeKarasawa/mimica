@@ -53,7 +53,7 @@ jobs:
         run: pnpm build
 
       - name: Package VSIX
-        run: pnpm --filter @mimica/cursor-extension run package:vsix
+        run: pnpm --filter mimica-cursor-extension run package:vsix
 
       - name: Package Companion DMG
         run: pnpm --filter @mimica/companion exec electron-builder --mac dmg
