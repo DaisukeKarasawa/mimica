@@ -9,6 +9,8 @@
     "dev:ui-lab": "pnpm --filter @mimica/shared build && pnpm --filter @mimica/character-runtime build && vite --config vite.ui-lab.config.ts",
     "build": "node scripts/run-electron-vite.mjs build",
     "preview": "node scripts/run-electron-vite.mjs preview",
+    "copy-pack": "node scripts/copy-pack.mjs",
+    "package:mac": "pnpm copy-pack && pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src"
   },
@@ -31,15 +33,40 @@
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^39.8.5",
+    "electron-builder": "^25.1.8",
     "electron-vite": "^5.0.0",
     "typescript": "^5.7.2",
     "vite": "^6.4.2"
   },
   "build": {
+    "appId": "dev.mimica.companion",
+    "productName": "Mimica",
+    "asar": true,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.developer-tools"
+    },
     "extraResources": [
       {
         "from": "../../templates/persona",
         "to": "templates/persona",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "build/packs/rio",
+        "to": "packs/rio",
         "filter": [
           "**/*"
         ]

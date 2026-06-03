@@ -10,6 +10,7 @@ out/
 !.env.example
 *.tsbuildinfo
 apps/companion/release/
+apps/companion/build/packs/
 apps/cursor-extension/*.vsix
 .vscode-test/
 

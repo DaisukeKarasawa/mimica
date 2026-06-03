@@ -39,6 +39,14 @@ rsync -a --exclude='*.bak' ~/MimicaAssets/characters/rio/ ~/dev/mimica-assets/pa
 cd ~/dev/mimica-assets && git add packs && git commit -m "chore: add rio character pack"
 ```
 
+## ローカル DMG（Companion + rio 同梱）
+
+```bash
+# mimica-assets が ../mimica-assets にある前提
+pnpm package:companion:mac
+# 成果物: apps/companion/release/*.dmg
+```
+
 ## 関連 Issue
 
 - [#5 bootstrap: mimica-assets](https://github.com/DaisukeKarasawa/mimica/issues/5)
