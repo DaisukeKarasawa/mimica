@@ -47,6 +47,8 @@ pnpm package:companion:mac
 # 成果物: apps/companion/release/*.dmg
 ```
 
+未署名（ad-hoc）ビルドのため、初回起動時に macOS Gatekeeper でブロックされることがあります。システム設定の「このまま開く」や、Finder で右クリック →「開く」で回避してください。
+
 ## 関連 Issue
 
 - [#5 bootstrap: mimica-assets](https://github.com/DaisukeKarasawa/mimica/issues/5)

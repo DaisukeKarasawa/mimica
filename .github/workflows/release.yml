@@ -49,6 +49,9 @@ jobs:
           set -euo pipefail
           MIMICA_ASSETS_REPO="$GITHUB_WORKSPACE/mimica-assets" node apps/companion/scripts/copy-pack.mjs
 
+      - name: Validate before release
+        run: pnpm security
+
       - name: Build workspace
         run: pnpm build
 
@@ -67,7 +70,7 @@ jobs:
           ls -la release-upload/
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@38f0d7a123b5b7f9a8d6112f9470b595ebbb926
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           files: release-upload/*
           generate_release_notes: true
