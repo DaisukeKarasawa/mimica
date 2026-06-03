@@ -5,6 +5,14 @@ import type { MimicaSettings } from "./chat.js";
 
 export const DEFAULT_ACTIVE_CHARACTER_ID = "rio";
 
+const CHARACTER_ID_RE = /^[A-Za-z0-9_-]+$/;
+
+export function assertCharacterId(characterId: string): void {
+  if (!CHARACTER_ID_RE.test(characterId)) {
+    throw new Error(`Invalid characterId: ${characterId}`);
+  }
+}
+
 export interface CharacterPackResolveOptions {
   /** When true, resolve under `{resourcesPath}/packs/{id}/`. */
   packaged?: boolean;
@@ -25,6 +33,8 @@ export function resolveCharacterPackRoot(
   characterId: string,
   options: CharacterPackResolveOptions = {},
 ): string {
+  assertCharacterId(characterId);
+
   for (const candidate of options.candidateRoots ?? []) {
     if (existsSync(candidate)) {
       return candidate;
