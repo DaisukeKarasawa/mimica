@@ -67,7 +67,10 @@ export function buildSettingsForPackRoot(
 export function resolveCharacterPackPaths(
   characterId: string,
   options: CharacterPackResolveOptions = {},
-): Pick<MimicaSettings, "characterAssetRoot" | "motionMapPath" | "personaPackPath" | "chatIconPath"> {
+): Pick<
+  MimicaSettings,
+  "characterAssetRoot" | "motionMapPath" | "personaPackPath" | "chatIconPath"
+> {
   const characterAssetRoot = resolveCharacterPackRoot(characterId, options);
   return {
     characterAssetRoot,
@@ -77,9 +80,7 @@ export function resolveCharacterPackPaths(
   };
 }
 
-export function buildDefaultSettings(
-  options: CharacterPackResolveOptions = {},
-): MimicaSettings {
+export function buildDefaultSettings(options: CharacterPackResolveOptions = {}): MimicaSettings {
   const characterId = DEFAULT_ACTIVE_CHARACTER_ID;
   const characterAssetRoot = resolveCharacterPackRoot(characterId, options);
   return buildSettingsForPackRoot(characterAssetRoot, characterId);

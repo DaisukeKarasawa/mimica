@@ -23,8 +23,8 @@ Companion dev は `packs/rio`（symlink）を優先し、無い場合は `~/Mimi
 
 `mimica` repo → **Settings → Secrets → Actions**:
 
-| Secret | 値 |
-| --- | --- |
+| Secret                | 値                                          |
+| --------------------- | ------------------------------------------- |
 | `MIMICA_ASSETS_TOKEN` | `mimica-assets` 読み取り用 fine-grained PAT |
 
 Release workflow（#8 実装後）がこの repo を checkout し `packs/` を Companion に同梱します。
