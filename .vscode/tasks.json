@@ -4,7 +4,7 @@
     {
       "label": "build-extension",
       "type": "shell",
-      "command": "pnpm --filter @mimica/cursor-extension build",
+      "command": "pnpm --filter mimica-cursor-extension build",
       "group": "build"
     }
   ]
