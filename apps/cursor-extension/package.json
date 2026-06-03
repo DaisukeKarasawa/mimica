@@ -40,7 +40,7 @@
     ]
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/bundle-extension.mjs",
     "vscode:prepublish": "pnpm --filter @mimica/shared build && pnpm run build",
     "package:vsix": "vsce package --no-dependencies --allow-missing-repository",
     "dev": "tsc -p tsconfig.json --watch",
@@ -56,6 +56,7 @@
     "@types/vscode": "^1.85.0",
     "@types/ws": "^8.5.13",
     "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.25.0",
     "typescript": "^5.7.2"
   }
 }
