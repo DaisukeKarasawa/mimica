@@ -28,6 +28,10 @@ __pycache__/
 # Local asset tree if copied or symlinked into the workspace
 MimicaAssets/
 
+# Character packs (canonical: mimica-assets repo; see packs/README.md)
+packs/*
+!packs/README.md
+
 # Persona dialogue (user-provided; may contain third-party game text)
 templates/persona/lines.json
 templates/persona/lines.source.txt

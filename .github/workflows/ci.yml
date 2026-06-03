@@ -57,6 +57,12 @@ jobs:
             failures+=("$tracked_local_assets")
           fi
 
+          tracked_packs="$(git ls-files 'packs/' ':!packs/README.md' || true)"
+          if [ -n "$tracked_packs" ]; then
+            failures+=("Character pack binaries must stay in mimica-assets (only packs/README.md may be tracked):")
+            failures+=("$tracked_packs")
+          fi
+
           tracked_env="$(
             git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -Ev '(^|/)\.env\.example$' || true
           )"
