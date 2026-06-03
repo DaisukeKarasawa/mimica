@@ -9,10 +9,16 @@ import { assertContained, resolveExpandedPath } from "./paths.js";
 export const CHARACTER_ASSET_SCHEME = "mimica-asset";
 export const CHARACTER_ASSET_BASE = `${CHARACTER_ASSET_SCHEME}://local/`;
 
-let assetRoot = resolveExpandedPath(getActiveMimicaSettings().characterAssetRoot);
+let assetRoot: string | null = null;
 let electronApis: Pick<ElectronMain, "protocol" | "net"> | null = null;
 
 const CHAT_ICON_NAMES = ["icon.png", "icon.jpg", "icon.jpeg", "icon.webp"] as const;
+
+function syncAssetRootFromSettings(): string {
+  const root = resolveExpandedPath(getActiveMimicaSettings().characterAssetRoot);
+  assetRoot = root;
+  return root;
+}
 
 export function bindElectronApis(apis: Pick<ElectronMain, "protocol" | "net">): void {
   electronApis = apis;
@@ -63,8 +69,8 @@ export function setupAssetProtocolHandler(): void {
   const { protocol, net } = apis();
   let realRootNorm: string;
   try {
-    assetRoot = resolveExpandedPath(getActiveMimicaSettings().characterAssetRoot);
-    realRootNorm = `${realpathSync(assetRoot)}/`;
+    const root = syncAssetRootFromSettings();
+    realRootNorm = `${realpathSync(root)}/`;
   } catch {
     console.error(
       "[mimica] Character asset root is unavailable; mimica-asset:// requests will 404",
@@ -74,7 +80,11 @@ export function setupAssetProtocolHandler(): void {
   protocol.handle(CHARACTER_ASSET_SCHEME, (request: Request) => {
     const url = new URL(request.url);
     const rel = decodeURIComponent(url.pathname).replace(/^\/+/, "");
-    const filePath = normalize(join(assetRoot, rel));
+    const root = assetRoot;
+    if (!root) {
+      return new Response("Not Found", { status: 404 });
+    }
+    const filePath = normalize(join(root, rel));
     let realPath: string;
     try {
       realPath = realpathSync(filePath);
@@ -90,8 +100,7 @@ export function setupAssetProtocolHandler(): void {
 
 export function getCharacterAssetStatus(): CharacterAssetStatus {
   const settings = getActiveMimicaSettings();
-  const root = resolveExpandedPath(settings.characterAssetRoot);
-  assetRoot = root;
+  const root = syncAssetRootFromSettings();
 
   let metadata: CharacterMetadata | null = null;
   let motionMap: MotionMap | null = null;

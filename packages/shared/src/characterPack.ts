@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { MimicaSettings } from "./chat.js";
@@ -16,12 +17,20 @@ export interface CharacterPackResolveOptions {
    * Resolves to `{assetsRoot}/characters/{id}/`.
    */
   assetsRoot?: string;
+  /** Checked in order before packaged / default fallbacks (first existing path wins). */
+  candidateRoots?: string[];
 }
 
 export function resolveCharacterPackRoot(
   characterId: string,
   options: CharacterPackResolveOptions = {},
 ): string {
+  for (const candidate of options.candidateRoots ?? []) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
   const home = options.homeDir ?? homedir();
 
   if (options.packaged) {
@@ -36,6 +45,23 @@ export function resolveCharacterPackRoot(
   }
 
   return join(home, "MimicaAssets", "characters", characterId);
+}
+
+export function buildSettingsForPackRoot(
+  characterAssetRoot: string,
+  characterId: string = DEFAULT_ACTIVE_CHARACTER_ID,
+): MimicaSettings {
+  return {
+    theme: "kanagawa-dragon",
+    activeCharacterId: characterId,
+    characterAssetRoot,
+    motionMapPath: join(characterAssetRoot, "motion-map.json"),
+    personaPackPath: join(characterAssetRoot, "persona", "SKILL.md"),
+    chatIconPath: join(characterAssetRoot, "icon.png"),
+    maxChatSessions: 5,
+    saveChatHistory: true,
+    defaultAgentMode: "agent",
+  };
 }
 
 export function resolveCharacterPackPaths(
@@ -55,12 +81,6 @@ export function buildDefaultSettings(
   options: CharacterPackResolveOptions = {},
 ): MimicaSettings {
   const characterId = DEFAULT_ACTIVE_CHARACTER_ID;
-  return {
-    theme: "kanagawa-dragon",
-    activeCharacterId: characterId,
-    ...resolveCharacterPackPaths(characterId, options),
-    maxChatSessions: 5,
-    saveChatHistory: true,
-    defaultAgentMode: "agent",
-  };
+  const characterAssetRoot = resolveCharacterPackRoot(characterId, options);
+  return buildSettingsForPackRoot(characterAssetRoot, characterId);
 }

@@ -1,10 +1,9 @@
-import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MimicaSettings } from "@mimica/shared";
 import {
-  buildDefaultSettings,
+  buildSettingsForPackRoot,
   DEFAULT_ACTIVE_CHARACTER_ID,
   resolveCharacterPackRoot,
   type CharacterPackResolveOptions,
@@ -18,21 +17,31 @@ function devMonorepoPacksDir(): string {
   return join(companionPackageRoot, "../../packs");
 }
 
+let cachedPackResolveOptions: CharacterPackResolveOptions | undefined;
+
 export function getCharacterPackResolveOptions(): CharacterPackResolveOptions {
+  if (cachedPackResolveOptions) {
+    return cachedPackResolveOptions;
+  }
+
   try {
     const { app } = electron();
-    return {
+    cachedPackResolveOptions = {
       packaged: app.isPackaged,
       resourcesPath: process.resourcesPath,
       homeDir: homedir(),
     };
+    return cachedPackResolveOptions;
   } catch {
     return { packaged: false, homeDir: homedir() };
   }
 }
 
 /**
- * Resolves the active character pack directory (dev: env → monorepo packs → MimicaAssets).
+ * Resolves the active character pack directory.
+ *
+ * Priority: MIMICA_CHARACTER_PACK_ROOT → candidate paths (MIMICA_ASSETS_ROOT layouts,
+ * monorepo packs/rio) → packaged resources → ~/MimicaAssets/characters/{id}.
  */
 export function resolveActiveCharacterPackRoot(
   characterId: string = DEFAULT_ACTIVE_CHARACTER_ID,
@@ -42,38 +51,28 @@ export function resolveActiveCharacterPackRoot(
     return resolveExpandedPath(explicit);
   }
 
+  const baseOptions = getCharacterPackResolveOptions();
+  const candidateRoots: string[] = [];
+
   const assetsRootEnv = process.env.MIMICA_ASSETS_ROOT?.trim();
   if (assetsRootEnv) {
     const assetsRoot = resolveExpandedPath(assetsRootEnv);
-    const packsLayout = join(assetsRoot, "packs", characterId);
-    const legacyLayout = join(assetsRoot, "characters", characterId);
-    if (existsSync(packsLayout)) return packsLayout;
-    if (existsSync(legacyLayout)) return legacyLayout;
-    return legacyLayout;
+    candidateRoots.push(join(assetsRoot, "packs", characterId));
+    candidateRoots.push(join(assetsRoot, "characters", characterId));
   }
 
-  const baseOptions = getCharacterPackResolveOptions();
   if (!baseOptions.packaged) {
-    const monorepoPack = join(devMonorepoPacksDir(), characterId);
-    if (existsSync(monorepoPack)) {
-      return monorepoPack;
-    }
+    candidateRoots.push(join(devMonorepoPacksDir(), characterId));
   }
 
-  return resolveCharacterPackRoot(characterId, baseOptions);
+  return resolveCharacterPackRoot(characterId, {
+    ...baseOptions,
+    candidateRoots,
+  });
 }
 
 export function getActiveMimicaSettings(
   characterId: string = DEFAULT_ACTIVE_CHARACTER_ID,
 ): MimicaSettings {
-  const characterAssetRoot = resolveActiveCharacterPackRoot(characterId);
-  const base = buildDefaultSettings(getCharacterPackResolveOptions());
-  return {
-    ...base,
-    activeCharacterId: characterId,
-    characterAssetRoot,
-    motionMapPath: join(characterAssetRoot, "motion-map.json"),
-    personaPackPath: join(characterAssetRoot, "persona", "SKILL.md"),
-    chatIconPath: join(characterAssetRoot, "icon.png"),
-  };
+  return buildSettingsForPackRoot(resolveActiveCharacterPackRoot(characterId), characterId);
 }

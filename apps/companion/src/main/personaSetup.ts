@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { electron } from "./electron.js";
-import { getActiveMimicaSettings, resolveActiveCharacterPackRoot } from "./characterPack.js";
+import { getActiveMimicaSettings } from "./characterPack.js";
 import { resolveExpandedPath } from "./paths.js";
 
 const LOG_PREFIX = "[personaSetup]";
@@ -60,7 +60,7 @@ function readPersonaPack(skillPath: string): string | null {
 }
 
 export function ensurePersonaPackOnDisk(): void {
-  const assetRoot = resolveActiveCharacterPackRoot();
+  const assetRoot = resolveExpandedPath(getActiveMimicaSettings().characterAssetRoot);
   const targetDir = join(assetRoot, "persona");
   mkdirSync(targetDir, { recursive: true });
 

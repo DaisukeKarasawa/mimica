@@ -10,7 +10,8 @@
     "build": "node scripts/run-electron-vite.mjs build",
     "preview": "node scripts/run-electron-vite.mjs preview",
     "copy-pack": "node scripts/copy-pack.mjs",
-    "package:mac": "pnpm copy-pack && pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
+    "pack:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
+    "package:mac": "pnpm copy-pack && pnpm build && pnpm run pack:mac",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src"
   },

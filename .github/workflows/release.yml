@@ -56,9 +56,7 @@ jobs:
         run: pnpm --filter mimica-cursor-extension run package:vsix
 
       - name: Package Companion DMG
-        run: pnpm --filter @mimica/companion exec electron-builder --mac dmg
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: pnpm --filter @mimica/companion run pack:mac
 
       - name: Collect release artifacts
         run: |
