@@ -16,6 +16,16 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Mimica",
+      "properties": {
+        "mimica.companionAppPath": {
+          "type": "string",
+          "default": "/Applications/Mimica.app",
+          "description": "Path to the installed Mimica Companion app (.app on macOS). Used when the extension is not running from the mimica monorepo."
+        }
+      }
+    },
     "commands": [
       {
         "command": "mimica.openCompanion",
