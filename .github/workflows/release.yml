@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build VSIX and macOS DMG
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout mimica
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Checkout mimica-assets
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: DaisukeKarasawa/mimica-assets
+          path: mimica-assets
+          token: ${{ secrets.MIMICA_ASSETS_TOKEN }}
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Stage character pack for Companion
+        run: |
+          set -euo pipefail
+          MIMICA_ASSETS_REPO="$GITHUB_WORKSPACE/mimica-assets" node apps/companion/scripts/copy-pack.mjs
+
+      - name: Build workspace
+        run: pnpm build
+
+      - name: Package VSIX
+        run: pnpm --filter @mimica/cursor-extension run package:vsix
+
+      - name: Package Companion DMG
+        run: pnpm --filter @mimica/companion exec electron-builder --mac dmg
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Collect release artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p release-upload
+          cp apps/cursor-extension/*.vsix release-upload/
+          cp apps/companion/release/*.dmg release-upload/
+          ls -la release-upload/
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@38f0d7a123b5b7f9a8d6112f9470b595ebbb926
+        with:
+          files: release-upload/*
+          generate_release_notes: true

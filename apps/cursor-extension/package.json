@@ -41,6 +41,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "vscode:prepublish": "pnpm --filter @mimica/shared build && pnpm run build",
+    "package:vsix": "vsce package --no-dependencies",
     "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src"
@@ -53,6 +55,7 @@
     "@types/node": "^20.17.0",
     "@types/vscode": "^1.85.0",
     "@types/ws": "^8.5.13",
+    "@vscode/vsce": "^3.2.1",
     "typescript": "^5.7.2"
   }
 }
