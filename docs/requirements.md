@@ -1269,7 +1269,8 @@ Persona:
   技術回答は通常品質を維持
 
 Distribution:
-  配布しない
-  公開しない
-  素材を同梱しない
+  Marketplace / 公開配布しない
+  公開 mimica リポジトリ・公開 Release には Spine / キャラ素材を載せない
+  プライベートタグ Release の Companion DMG のみ mimica-assets パック同梱可（個人利用・権利範囲内）
+  VSIX はコードのみ（キャラ素材を同梱しない）
 ```

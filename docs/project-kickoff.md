@@ -16,7 +16,7 @@
 | 初期 MVP         | Phase 4 まで（Agent チャット + ストリーミング + キャンセル + コンテキスト + Avatar 連動 + セッション保存）     |
 | 対象 OS          | **macOS のみ**（他 OS 向けの考慮・実装は不要）                                                                 |
 | UI 言語          | **二層** — プロダクト文言は日本語、Chrome 風 chrome（タブ・履歴・コンポーザー placeholder 等）は英語（§7.3.1） |
-| 配布             | なし（個人利用、素材非同梱）                                                                                   |
+| 配布             | 個人利用のみ。Marketplace 公開なし（`requirements.md` §13.3: 公開 Release に素材なし / プライベート DMG のみ同梱可 / VSIX はコードのみ） |
 
 ---
 

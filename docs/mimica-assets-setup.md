@@ -27,7 +27,7 @@ Companion dev は `packs/rio`（symlink）を優先し、無い場合は `~/Mimi
 | --------------------- | ------------------------------------------- |
 | `MIMICA_ASSETS_TOKEN` | `mimica-assets` 読み取り用 fine-grained PAT |
 
-Release workflow（#8 実装後）がこの repo を checkout し `packs/` を Companion に同梱します。
+Release workflow がこの repo を checkout し `packs/` を **プライベートタグ Release の Companion DMG** にのみ同梱します（配布方針は `docs/requirements.md` §13.3 / §16）。
 
 ## 初回のみ：手元からコピー
 
