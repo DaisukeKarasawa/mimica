@@ -50,7 +50,7 @@ WebSocket 認証用トークンは次のいずれかで揃えます。
 
 | 方法 | 説明 |
 | --- | --- |
-| **自動（推奨）** | 一度 Companion を起動すると `~/Library/Application Support/Mimica/bridge-token` が作成されます。拡張はこのファイルを読み取ります |
+| **自動（推奨）** | 一度 Companion を起動すると userData 内の `bridge-token`（macOS: `~/Library/Application Support/Mimica/bridge-token`）が作成されます。拡張はこのファイルを読み取ります |
 | **明示指定** | 開発機と同様、`MIMICA_BRIDGE_TOKEN` を環境変数で設定（Companion と拡張で同じ値） |
 
 ## 5. 使い方

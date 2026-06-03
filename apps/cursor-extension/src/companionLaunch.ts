@@ -1,15 +1,15 @@
 import { existsSync } from "node:fs";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
+import { MIMICA_COMPANION_APP_DEFAULT_PATH } from "@mimica/shared";
 import * as vscode from "vscode";
 
-const DEFAULT_COMPANION_APP_PATH = "/Applications/Mimica.app";
 const COMPANION_EXECUTABLE = "Mimica";
 
 export function getCompanionAppPath(): string {
   return (
     vscode.workspace.getConfiguration("mimica").get<string>("companionAppPath")?.trim() ||
-    DEFAULT_COMPANION_APP_PATH
+    MIMICA_COMPANION_APP_DEFAULT_PATH
   );
 }
 
@@ -31,27 +31,19 @@ function spawnDetached(command: string, args: string[], options: { cwd?: string 
 }
 
 function launchPackagedCompanion(appPath: string): ChildProcess | null {
+  if (process.platform !== "darwin") {
+    throw new Error("Packaged Mimica Companion launch is supported on macOS only.");
+  }
+
   const macBinary = join(appPath, "Contents", "MacOS", COMPANION_EXECUTABLE);
-  if (process.platform === "darwin") {
-    if (existsSync(macBinary)) {
-      return spawnDetached(macBinary, []);
-    }
-    if (existsSync(appPath)) {
-      spawnDetached("open", ["-a", appPath]);
-      return null;
-    }
+  if (existsSync(macBinary)) {
+    return spawnDetached(macBinary, []);
+  }
+  if (existsSync(appPath)) {
+    spawnDetached("open", ["-a", appPath]);
     return null;
   }
-
-  if (process.platform === "win32" && existsSync(appPath)) {
-    return spawnDetached(appPath, []);
-  }
-
-  if (process.platform === "linux" && existsSync(appPath)) {
-    return spawnDetached(appPath, []);
-  }
-
-  return null;
+  throw new Error(`Mimica Companion not found at ${appPath}`);
 }
 
 function launchDevCompanion(extensionPath: string): ChildProcess {
@@ -63,30 +55,12 @@ export function launchCompanion(context: vscode.ExtensionContext): ChildProcess 
   if (isMimicaDevMonorepo(context.extensionPath)) {
     return launchDevCompanion(context.extensionPath);
   }
-
-  const appPath = getCompanionAppPath();
-  const macBinary = join(appPath, "Contents", "MacOS", COMPANION_EXECUTABLE);
-  if (process.platform === "darwin") {
-    if (existsSync(macBinary)) {
-      return spawnDetached(macBinary, []);
-    }
-    if (existsSync(appPath)) {
-      spawnDetached("open", ["-a", appPath]);
-      return null;
-    }
-    throw new Error(`Mimica Companion not found at ${appPath}`);
-  }
-
-  const packaged = launchPackagedCompanion(appPath);
-  if (packaged === null) {
-    throw new Error(`Mimica Companion not found at ${appPath}`);
-  }
-  return packaged;
+  return launchPackagedCompanion(getCompanionAppPath());
 }
 
 export function companionLaunchHint(context: vscode.ExtensionContext): string {
   if (isMimicaDevMonorepo(context.extensionPath)) {
-    return "別ターミナルで pnpm dev:companion を実行してください。";
+    return "mimica リポジトリルートで pnpm dev:companion を実行してください。";
   }
   return `Mimica.app を ${getCompanionAppPath()} にインストールするか、設定 mimica.companionAppPath を確認してください。`;
 }

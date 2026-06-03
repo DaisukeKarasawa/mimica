@@ -3,7 +3,7 @@ import type { ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import WebSocket from "ws";
 import type { ClientMessage, ServerMessage } from "@mimica/shared";
-import { DEFAULT_WS_PORT } from "@mimica/shared";
+import { DEFAULT_WS_PORT, mimicaBridgeTokenPath } from "@mimica/shared";
 import { getBridgeToken } from "./bridgeToken";
 import { companionLaunchHint, launchCompanion } from "./companionLaunch";
 import { getEditorContext } from "./contextProvider";
@@ -12,8 +12,9 @@ import { loadRepoDotEnv } from "./loadRepoDotEnv";
 loadRepoDotEnv(join(__dirname, "..", "..", ".."));
 
 let companionProcess: ChildProcess | null = null;
-let companionLaunchAttempted = false;
+let companionLaunchSucceeded = false;
 let wsClient: WebSocket | null = null;
+let connectedBridgeToken: string | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let isShuttingDown = false;
 let pendingConnect: Promise<void> | null = null;
@@ -56,7 +57,8 @@ export function deactivate(): void {
   pendingConnect = null;
   wsClient?.close();
   wsClient = null;
-  companionLaunchAttempted = false;
+  connectedBridgeToken = null;
+  companionLaunchSucceeded = false;
   if (companionProcess) {
     killCompanionProcess(companionProcess);
     companionProcess = null;
@@ -77,8 +79,7 @@ function killCompanionProcess(proc: ChildProcess): void {
 }
 
 async function openCompanion(context: vscode.ExtensionContext): Promise<void> {
-  if (!companionLaunchAttempted) {
-    companionLaunchAttempted = true;
+  if (!companionLaunchSucceeded) {
     try {
       companionProcess = launchCompanion(context);
       if (companionProcess) {
@@ -86,6 +87,7 @@ async function openCompanion(context: vscode.ExtensionContext): Promise<void> {
           companionProcess = null;
         });
       }
+      companionLaunchSucceeded = true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       void vscode.window.showErrorMessage(`Mimica Companion を起動できません: ${message}`);
@@ -133,23 +135,30 @@ function handleServerMessage(raw: unknown): void {
   if (!raw || typeof raw !== "object") return;
   const msg = raw as ServerMessage;
   if (msg.type === "connection_ack") {
-    /* token is never sent over WebSocket; use MIMICA_BRIDGE_TOKEN from env */
+    /* connection_ack carries no token; client auth uses companion_ready / context_update */
   }
 }
 
 async function connectBridge(): Promise<void> {
   if (isShuttingDown) return;
   const bridgeToken = getBridgeToken();
-  if (wsClient?.readyState === WebSocket.OPEN && bridgeToken) return;
+  if (
+    wsClient?.readyState === WebSocket.OPEN &&
+    bridgeToken &&
+    bridgeToken === connectedBridgeToken
+  ) {
+    return;
+  }
   if (pendingConnect) return pendingConnect;
   if (!bridgeToken) {
     throw new Error(
-      "MIMICA_BRIDGE_TOKEN is required. Set it in the environment, repo .env (dev), or launch Companion once so ~/Library/Application Support/Mimica/bridge-token is created.",
+      `MIMICA_BRIDGE_TOKEN is required. Set it in the environment, repo .env (dev), or launch Companion once so ${mimicaBridgeTokenPath()} is created.`,
     );
   }
 
   pendingConnect = (async () => {
     wsClient?.close();
+    connectedBridgeToken = null;
     wsClient = new WebSocket(`ws://127.0.0.1:${DEFAULT_WS_PORT}`);
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error("Bridge auth timeout")), 5000);
@@ -185,11 +194,13 @@ async function connectBridge(): Promise<void> {
       }
     });
     wsClient.on("close", () => {
+      connectedBridgeToken = null;
       if (!isShuttingDown) scheduleReconnect();
     });
     if (bridgeToken) {
       const ready: ClientMessage = { type: "companion_ready", token: bridgeToken };
       wsClient.send(JSON.stringify(ready));
+      connectedBridgeToken = bridgeToken;
     }
   })();
 
