@@ -85,7 +85,7 @@ export function hasSessionHistory(session: Pick<ChatSession, "messages">): boole
 
 export interface MimicaSettings {
   theme: "kanagawa-dragon";
-  activeCharacterId: "rio";
+  activeCharacterId: string;
   characterAssetRoot: string;
   motionMapPath: string;
   personaPackPath: string;
@@ -152,6 +152,7 @@ export function resolveCharacterShortNameEn(metadata?: CharacterNameMetadata | n
 /** Fallback when the Cursor extension has not yet sent workspace context. */
 export const DEFAULT_WORKSPACE_FALLBACK = "~/dev/mimica";
 
+/** Renderer-safe defaults; Companion main resolves packs at runtime. */
 export const DEFAULT_SETTINGS: MimicaSettings = {
   theme: "kanagawa-dragon",
   activeCharacterId: "rio",

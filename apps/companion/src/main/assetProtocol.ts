@@ -1,16 +1,15 @@
 import { readFileSync, existsSync, realpathSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, dirname, extname, join, normalize, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { CharacterAssetStatus, CharacterMetadata, MotionMap } from "@mimica/shared";
-import { DEFAULT_SETTINGS } from "@mimica/shared";
 import type { ElectronMain } from "./electron.js";
-import { assertContained, resolveContainedPath, resolveExpandedPath } from "./paths.js";
+import { getActiveMimicaSettings } from "./characterPack.js";
+import { assertContained, resolveExpandedPath } from "./paths.js";
 
 export const CHARACTER_ASSET_SCHEME = "mimica-asset";
 export const CHARACTER_ASSET_BASE = `${CHARACTER_ASSET_SCHEME}://local/`;
 
-let assetRoot = resolveContainedPath(DEFAULT_SETTINGS.characterAssetRoot, homedir());
+let assetRoot = resolveExpandedPath(getActiveMimicaSettings().characterAssetRoot);
 let electronApis: Pick<ElectronMain, "protocol" | "net"> | null = null;
 
 const CHAT_ICON_NAMES = ["icon.png", "icon.jpg", "icon.jpeg", "icon.webp"] as const;
@@ -64,7 +63,7 @@ export function setupAssetProtocolHandler(): void {
   const { protocol, net } = apis();
   let realRootNorm: string;
   try {
-    assetRoot = resolveContainedPath(DEFAULT_SETTINGS.characterAssetRoot, homedir());
+    assetRoot = resolveExpandedPath(getActiveMimicaSettings().characterAssetRoot);
     realRootNorm = `${realpathSync(assetRoot)}/`;
   } catch {
     console.error(
@@ -90,13 +89,14 @@ export function setupAssetProtocolHandler(): void {
 }
 
 export function getCharacterAssetStatus(): CharacterAssetStatus {
-  const root = resolveContainedPath(DEFAULT_SETTINGS.characterAssetRoot, homedir());
+  const settings = getActiveMimicaSettings();
+  const root = resolveExpandedPath(settings.characterAssetRoot);
   assetRoot = root;
 
   let metadata: CharacterMetadata | null = null;
   let motionMap: MotionMap | null = null;
   const metaPath = join(root, "metadata.json");
-  const motionPath = resolveContainedPath(DEFAULT_SETTINGS.motionMapPath, root);
+  const motionPath = resolveExpandedPath(settings.motionMapPath);
 
   if (existsSync(metaPath)) {
     try {
@@ -133,7 +133,7 @@ export function getCharacterAssetStatus(): CharacterAssetStatus {
     typeof metadata.atlasFile === "string" &&
     metadata.atlasFile.trim() !== "";
 
-  const iconFile = resolveChatIconFile(root, DEFAULT_SETTINGS.chatIconPath);
+  const iconFile = resolveChatIconFile(root, settings.chatIconPath);
   let chatIconUrl: string | null = null;
   if (iconFile) {
     const rel = relative(root, iconFile).replace(/\\/g, "/");

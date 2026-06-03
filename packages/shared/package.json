@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./character-pack": {
+      "types": "./dist/characterPack.d.ts",
+      "import": "./dist/characterPack.js",
+      "default": "./dist/characterPack.js"
     }
   },
   "scripts": {

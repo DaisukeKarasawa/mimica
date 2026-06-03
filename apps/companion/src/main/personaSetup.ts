@@ -1,10 +1,9 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_SETTINGS } from "@mimica/shared";
 import { electron } from "./electron.js";
-import { homedir } from "node:os";
-import { resolveContainedPath } from "./paths.js";
+import { getActiveMimicaSettings, resolveActiveCharacterPackRoot } from "./characterPack.js";
+import { resolveExpandedPath } from "./paths.js";
 
 const LOG_PREFIX = "[personaSetup]";
 
@@ -60,16 +59,9 @@ function readPersonaPack(skillPath: string): string | null {
   return parts.join("\n\n");
 }
 
-function resolveCharacterAssetRoot(): string {
-  return resolveContainedPath(DEFAULT_SETTINGS.characterAssetRoot, homedir());
-}
-
 export function ensurePersonaPackOnDisk(): void {
-  const assetRoot = resolveCharacterAssetRoot();
-  const targetDir = resolveContainedPath(
-    join(DEFAULT_SETTINGS.characterAssetRoot, "persona"),
-    assetRoot,
-  );
+  const assetRoot = resolveActiveCharacterPackRoot();
+  const targetDir = join(assetRoot, "persona");
   mkdirSync(targetDir, { recursive: true });
 
   const seeds: Array<{ template: string; dest: string }> = [
@@ -97,8 +89,7 @@ export function ensurePersonaPackOnDisk(): void {
 
 export function resolvePersonaSystemPrompt(): string | undefined {
   ensurePersonaPackOnDisk();
-  const prompt = readPersonaPack(
-    resolveContainedPath(DEFAULT_SETTINGS.personaPackPath, resolveCharacterAssetRoot()),
-  );
+  const settings = getActiveMimicaSettings();
+  const prompt = readPersonaPack(resolveExpandedPath(settings.personaPackPath));
   return prompt ?? undefined;
 }

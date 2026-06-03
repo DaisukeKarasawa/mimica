@@ -16,6 +16,9 @@ cd ~/dev/mimica
 ./scripts/link-character-pack.sh
 ```
 
+Companion dev は `packs/rio`（symlink）を優先し、無い場合は `~/MimicaAssets/characters/rio` にフォールバックします。  
+上書き: `MIMICA_ASSETS_ROOT`（repo ルートまたは `~/MimicaAssets`）、`MIMICA_CHARACTER_PACK_ROOT`（パック直指定）。
+
 ## 3. GitHub Actions（Release 用）
 
 `mimica` repo → **Settings → Secrets → Actions**:
