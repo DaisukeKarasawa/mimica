@@ -1,4 +1,7 @@
+import { installAbortRejectionHandler } from "@mimica/agent-orchestrator";
 import { DEFAULT_WS_PORT } from "@mimica/shared";
+
+installAbortRejectionHandler();
 import { electron } from "./electron.js";
 import {
   bindElectronApis,

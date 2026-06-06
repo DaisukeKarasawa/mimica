@@ -1,5 +1,6 @@
 import type { Run } from "@cursor/sdk";
 import type { AgentMode, ChatMessage, MessageContext } from "@mimica/shared";
+import { cancelRun, isAbortError } from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import { createCursorAgent, type CursorSdkConversationMode } from "./createCursorAgent.js";
 import { ensureReadOnlyHooks } from "./ensureReadOnlyHooks.js";
@@ -134,7 +135,22 @@ export class AgentRunner {
         return;
       }
 
-      const result = await run.wait();
+      if (this.cancelled || params.signal?.aborted) {
+        params.callbacks.onState("cancelled");
+        return;
+      }
+
+      let result;
+      try {
+        result = await run.wait();
+      } catch (err) {
+        if (isAbortError(err) || this.cancelled) {
+          params.callbacks.onState("cancelled");
+          return;
+        }
+        throw err;
+      }
+
       if (result.status === "cancelled") {
         params.callbacks.onState("cancelled");
         return;
@@ -155,6 +171,10 @@ export class AgentRunner {
       params.callbacks.onState("completed");
       params.callbacks.onComplete(finalText);
     } catch (err) {
+      if (isAbortError(err) || this.cancelled) {
+        params.callbacks.onState("cancelled");
+        return;
+      }
       params.callbacks.onState("failed");
       params.callbacks.onError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -165,7 +185,7 @@ export class AgentRunner {
 
   async cancel(): Promise<void> {
     this.cancelled = true;
-    await this.activeRun?.cancel();
+    await cancelRun(this.activeRun);
   }
 
   private buildFullPrompt(params: RunChatParams): string {
