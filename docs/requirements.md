@@ -166,7 +166,7 @@ Agentの状態に応じてキャラクターが動く
 - 音声入力
 - 音声合成
 - 実音声再生
-- 素材の配布
+- 公開 Git / 公開 Release による Spine 素材・persona バイナリの配布
 - Marketplace公開
 - 商用利用
 - チーム利用
@@ -1129,10 +1129,11 @@ OSごとの保存パスはElectronの `app.getPath("userData")` を使う。
 
 ## 13.3 個人利用前提
 
-- 素材はローカルに置く
-- 素材をGit管理しない（公開 `mimica` リポジトリ・公開 Release には Spine バイナリを載せない）
-- プライベートビルドの Companion（タグ付き GitHub Release の DMG）には、`mimica-assets` 由来のキャラパックを同梱してよい（個人利用・権利範囲内）
-- 拡張 VSIX にはキャラクター素材を同梱しない（コードのみ）
+- 素材はローカルに置く（開発時は `~/MimicaAssets/characters/{id}/`）
+- 素材を **公開** `mimica` リポジトリ・**公開** Release には載せない（Spine バイナリ・wiki 由来 persona を Git/CI で配布しない）
+- **プライベートビルド**の Companion（タグ付き GitHub Release の DMG）には、`mimica-assets` 由来のキャラパック（`packs/{id}/`）を同梱してよい（個人利用・権利範囲内）
+- 拡張 VSIX にはキャラクター素材を同梱しない（コードのみ）。起動はインストール済み `Mimica.app` を優先（設定 `mimica.companionAppPath`）
+- キャラ切り替えの識別子は **`activeCharacterId`**（初期 `"rio"`）。packaged 時は `{resourcesPath}/packs/{activeCharacterId}/` を参照
 - Marketplace公開しない
 - 個人利用のため会話履歴は保存してよい
 

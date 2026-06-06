@@ -15,6 +15,11 @@
       "types": "./dist/characterPack.d.ts",
       "import": "./dist/characterPack.js",
       "default": "./dist/characterPack.js"
+    },
+    "./paths": {
+      "types": "./dist/mimicaPaths.d.ts",
+      "import": "./dist/mimicaPaths.js",
+      "default": "./dist/mimicaPaths.js"
     }
   },
   "scripts": {

@@ -133,7 +133,7 @@ When changing how Mimica loads or maps Spine assets:
 - For commit-message history cleanup on unpushed work, preserve commit granularity and commit trees unless the user explicitly asks to squash or change content.
 - Prefer project-local, shared sources of truth over hidden global references when codifying repository behavior; avoid keeping duplicate commit-message rule sources.
 - When a path should clearly not be committed (e.g. `__pycache__/`, `*.py[cod]`), add the matching `.gitignore` entry directly instead of asking whether to add it.
-- Do not install or commit MVP read-only hooks (`mimica-read-only-guard.mjs`, `denied-hook-tools.mjs`) in the mimica dev workspace; dev `.cursor/hooks` is `security-guard.mjs` only.
+- Do not install or commit MVP read-only hooks (`mimica-read-only-guard.mjs`, `denied-hook-tools.mjs`) in the mimica dev workspace; dev `.cursor/hooks` allows `security-guard.mjs` and `format-on-edit.mjs` only (see `.cursor/hooks.json`).
 - For Ask-mode read-only hook testing, use a separate workspace directory—not the mimica monorepo dev root.
 
 ## Learned Workspace Facts
@@ -154,9 +154,12 @@ When changing how Mimica loads or maps Spine assets:
   defaults to `~/MimicaAssets/characters/rio/persona/SKILL.md`.
 - Validation defaults: `pnpm typecheck`, `pnpm build`, and `pnpm security` when
   touching runtime or dependency surfaces.
-- Dev-repo Cursor hooks: `.cursor/hooks.json` + `.cursor/hooks/security-guard.mjs` only
-  (supply-chain / execution security). Companion Ask must not persist read-only hook files
-  or merge read-only entries into this repo.
+- Dev-repo Cursor hooks: `.cursor/hooks.json` with `security-guard.mjs` (supply-chain /
+  execution security) and `format-on-edit.mjs` (Prettier on `afterFileEdit`, aligned with
+  CI `format:check`). Companion Ask must not persist read-only hook files or merge
+  read-only entries into this repo.
+- Optional git pre-commit: run `pnpm setup:githooks` once per clone to format staged files
+  before commit (`.githooks/pre-commit`).
 - Companion Agent modes: **Ask** (read-only hooks + write-tool block), **Agent** (full
   SDK tools), **Plan** (`mode: "plan"`). `ensureReadOnlyHooks()` runs for Ask in external
   workspaces only; it skips the mimica monorepo dev root (package.json name `mimica`,

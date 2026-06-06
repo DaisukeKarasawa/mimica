@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+# Format staged files with Prettier (same rules as CI `pnpm format:check`) and re-stage.
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT INT TERM
+
+git diff --cached --name-only -z --diff-filter=ACMR > "$tmp"
+[ ! -s "$tmp" ] && exit 0
+
+xargs -0 pnpm exec prettier --write < "$tmp"
+
+while IFS= read -r -d '' file; do
+  [ -f "$file" ] || continue
+  git add -- "$file"
+done < "$tmp"

@@ -51,3 +51,9 @@ export {
 } from "./protocol.js";
 
 export { toMessageContext } from "./context.js";
+
+export {
+  MIMICA_USER_DATA_DIR_NAME,
+  MIMICA_BRIDGE_TOKEN_FILENAME,
+  MIMICA_COMPANION_APP_DEFAULT_PATH,
+} from "./mimicaPathConstants.js";
