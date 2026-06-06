@@ -164,3 +164,14 @@ When changing how Mimica loads or maps Spine assets:
   SDK tools), **Plan** (`mode: "plan"`). `ensureReadOnlyHooks()` runs for Ask in external
   workspaces only; it skips the mimica monorepo dev root (package.json name `mimica`,
   `packages/agent-orchestrator`, `apps/companion`).
+- **Consumer release loop:** `.cursor/skills/loop-on-release/SKILL.md` and
+  `.cursor/commands/loop-on-release.md` (`/loop-on-release`). Derive the next
+  `vMAJOR.MINOR.PATCH` tag from commits since the latest tag (Conventional Commits;
+  no user-supplied tag). Loop: bump versions → tag push → watch
+  `.github/workflows/release.yml` → on failure fix via `/commit` and default-branch
+  push → re-derive tag → retry until VSIX + DMG publish or stop condition.
+- **Release version alignment:** before each annotated tag, run
+  `pnpm bump:release <NEXT_TAG>` (`scripts/bump-release-version.mjs`) so root,
+  `apps/cursor-extension`, `apps/companion`, and `packages/*` `version` fields match
+  the tag. Verify with `pnpm bump:release:check <NEXT_TAG>`. Consumer install:
+  `docs/consumer-setup.md`.
