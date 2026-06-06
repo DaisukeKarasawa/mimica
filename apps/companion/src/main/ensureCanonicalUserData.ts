@@ -36,7 +36,7 @@ function migrateSessionsDir(legacyDir: string, canonicalDir: string): void {
       if (!file.endsWith(".json")) continue;
       const source = join(legacyDir, file);
       const dest = join(canonicalDir, file);
-      if (existsSync(dest)) continue;
+      if (existsSync(dest) && fileHasContent(dest)) continue;
       copyFileSync(source, dest);
     }
   } catch (err) {
