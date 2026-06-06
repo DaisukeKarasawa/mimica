@@ -26,6 +26,7 @@ export default function App() {
   const [tabsBarVisible, setTabsBarVisible] = useState(true);
 
   const resetStreamRef = useRef<() => void>(() => {});
+  const workspaceSyncInFlight = useRef(new Set<string>());
 
   const director = useMemo(() => new CharacterDirector({ onStateChange: setAvatarState }), []);
 
@@ -67,17 +68,32 @@ export default function App() {
 
   useEffect(() => {
     if (!linkedWorkspacePath) return;
-    const active = tabs.activeSession;
-    if (!active || active.workspacePath === linkedWorkspacePath) return;
+    const sessionId = tabs.activeSession?.id;
+    if (!sessionId || tabs.activeSession?.workspacePath === linkedWorkspacePath) return;
+    if (workspaceSyncInFlight.current.has(sessionId)) return;
 
+    workspaceSyncInFlight.current.add(sessionId);
     void (async () => {
-      const saved = await window.mimica.saveSession({
-        ...active,
-        workspacePath: linkedWorkspacePath,
-      });
-      tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+      try {
+        const list = await window.mimica.listSessions();
+        const current = list.find((s) => s.id === sessionId);
+        if (!current || current.workspacePath === linkedWorkspacePath) return;
+
+        const saved = await window.mimica.saveSession({
+          ...current,
+          workspacePath: linkedWorkspacePath,
+        });
+        tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+      } finally {
+        workspaceSyncInFlight.current.delete(sessionId);
+      }
     })();
-  }, [linkedWorkspacePath, tabs.activeSession, tabs.setAllSessions]);
+  }, [
+    linkedWorkspacePath,
+    tabs.activeSession?.id,
+    tabs.activeSession?.workspacePath,
+    tabs.setAllSessions,
+  ]);
 
   const applyChatTabShortcut = useCallback(
     (action: ChatTabShortcutAction) => {
