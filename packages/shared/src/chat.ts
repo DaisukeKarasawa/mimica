@@ -149,7 +149,7 @@ export function resolveCharacterShortNameEn(metadata?: CharacterNameMetadata | n
   return resolveShortName(metadata, "en");
 }
 
-/** Fallback when the Cursor extension has not yet sent workspace context. */
+/** UI Lab / dev stubs only — consumer flows must use live `editorContext.workspacePath`. */
 export const DEFAULT_WORKSPACE_FALLBACK = "~/dev/mimica";
 
 /** Renderer-safe defaults; Companion main resolves packs at runtime. */

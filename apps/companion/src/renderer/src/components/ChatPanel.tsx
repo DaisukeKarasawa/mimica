@@ -148,7 +148,8 @@ export function ChatPanel({
             <div className="messages" ref={messagesRef}>
               {!activeSession && (
                 <p className="chat-empty">
-                  タブがありません。⌘T（Ctrl+T）で New Chat
+                  タブがありません。Cursor で「Mimica: Open
+                  Companion」を実行してから、⌘T（Ctrl+T）で New Chat
                   を開くか、⌘Y（Ctrl+Y）で履歴を開いてください。
                 </p>
               )}

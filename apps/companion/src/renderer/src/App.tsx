@@ -7,11 +7,7 @@ import type {
   CharacterAssetStatus,
   EditorContext,
 } from "@mimica/shared";
-import {
-  DEFAULT_SETTINGS,
-  DEFAULT_WORKSPACE_FALLBACK,
-  resolveCharacterShortNameEn,
-} from "@mimica/shared";
+import { DEFAULT_SETTINGS, resolveCharacterShortNameEn } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
 import { CharacterStage } from "./components/CharacterStage";
@@ -57,10 +53,7 @@ export default function App() {
 
   resetStreamRef.current = resetStream;
 
-  const resolveWorkspacePath = useCallback(
-    () => editorContext?.workspacePath ?? DEFAULT_WORKSPACE_FALLBACK,
-    [editorContext?.workspacePath],
-  );
+  const linkedWorkspacePath = editorContext?.workspacePath ?? null;
 
   useEffect(() => {
     void window.mimica.getCharacterAssets().then(setCharacterAssets);
@@ -72,6 +65,20 @@ export default function App() {
     };
   }, [handleAgentEvent]);
 
+  useEffect(() => {
+    if (!linkedWorkspacePath) return;
+    const active = tabs.activeSession;
+    if (!active || active.workspacePath === linkedWorkspacePath) return;
+
+    void (async () => {
+      const saved = await window.mimica.saveSession({
+        ...active,
+        workspacePath: linkedWorkspacePath,
+      });
+      tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+    })();
+  }, [linkedWorkspacePath, tabs.activeSession, tabs.setAllSessions]);
+
   const applyChatTabShortcut = useCallback(
     (action: ChatTabShortcutAction) => {
       if (typeof action === "object" && action.type === "selectTab") {
@@ -81,7 +88,9 @@ export default function App() {
 
       switch (action) {
         case "new":
-          void tabs.handleNewSession(resolveWorkspacePath());
+          if (linkedWorkspacePath) {
+            void tabs.handleNewSession(linkedWorkspacePath);
+          }
           break;
         case "close": {
           const target =
@@ -106,7 +115,7 @@ export default function App() {
       }
     },
     [
-      resolveWorkspacePath,
+      linkedWorkspacePath,
       tabs.activeSessionId,
       tabs.openTabIds,
       tabs.handleNewSession,
@@ -136,9 +145,12 @@ export default function App() {
   }, [applyChatTabShortcut]);
 
   const handleSend = async (content: string) => {
+    const workspacePath = linkedWorkspacePath ?? tabs.activeSession?.workspacePath;
+    if (!workspacePath) return;
+
     let session = tabs.activeSession;
     if (!session) {
-      session = await tabs.handleNewSession(resolveWorkspacePath());
+      session = await tabs.handleNewSession(workspacePath);
     }
 
     const userMsg: ChatMessage = {
@@ -155,6 +167,7 @@ export default function App() {
     const updated = {
       ...session,
       title,
+      workspacePath,
       messages: [...session.messages, userMsg],
     };
     const saved = await window.mimica.saveSession(updated);
@@ -166,7 +179,7 @@ export default function App() {
       await window.mimica.submitAgent({
         sessionId: saved.id,
         content,
-        workspacePath: saved.workspacePath,
+        workspacePath,
         mode: agentMode,
         editorContext,
       });
