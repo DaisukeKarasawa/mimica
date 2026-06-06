@@ -7,8 +7,12 @@ import * as vscode from "vscode";
 const COMPANION_EXECUTABLE = "Mimica";
 
 export function getCompanionAppPath(): string {
+  const inspected = vscode.workspace
+    .getConfiguration("mimica")
+    .inspect<string>("companionAppPath");
   return (
-    vscode.workspace.getConfiguration("mimica").get<string>("companionAppPath")?.trim() ||
+    inspected?.globalValue?.trim() ||
+    inspected?.defaultValue?.trim() ||
     MIMICA_COMPANION_APP_DEFAULT_PATH
   );
 }
@@ -20,11 +24,15 @@ export function isMimicaDevMonorepo(extensionPath: string): boolean {
 }
 
 function spawnDetached(command: string, args: string[], options: { cwd?: string } = {}): ChildProcess {
+  // Cursor's extension host may set ELECTRON_RUN_AS_NODE=1; strip it so Electron apps start normally.
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+
   const child = spawn(command, args, {
     cwd: options.cwd,
     stdio: "ignore",
     detached: true,
-    env: process.env,
+    env,
   });
   child.unref();
   return child;

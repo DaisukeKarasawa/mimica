@@ -65,6 +65,10 @@ export function deactivate(): void {
   }
 }
 
+function resetCompanionLaunchLatch(): void {
+  companionLaunchSucceeded = false;
+}
+
 function killCompanionProcess(proc: ChildProcess): void {
   const { pid } = proc;
   if (pid != null && process.platform !== "win32") {
@@ -85,6 +89,7 @@ async function openCompanion(context: vscode.ExtensionContext): Promise<void> {
       if (companionProcess) {
         companionProcess.on("exit", () => {
           companionProcess = null;
+          resetCompanionLaunchLatch();
         });
       }
       companionLaunchSucceeded = true;
@@ -104,6 +109,7 @@ async function openCompanion(context: vscode.ExtensionContext): Promise<void> {
   try {
     await connectBridge();
   } catch (err) {
+    resetCompanionLaunchLatch();
     const message = err instanceof Error ? err.message : String(err);
     void vscode.window.showErrorMessage(`Mimica ブリッジに接続できません: ${message}`);
     return;
@@ -195,6 +201,7 @@ async function connectBridge(): Promise<void> {
     });
     wsClient.on("close", () => {
       connectedBridgeToken = null;
+      resetCompanionLaunchLatch();
       if (!isShuttingDown) scheduleReconnect();
     });
     if (bridgeToken) {

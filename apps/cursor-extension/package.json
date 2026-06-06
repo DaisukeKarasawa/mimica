@@ -21,6 +21,7 @@
       "properties": {
         "mimica.companionAppPath": {
           "type": "string",
+          "scope": "machine",
           "default": "/Applications/Mimica.app",
           "markdownDescription": "Path to the installed Mimica Companion app (.app on macOS). Default matches `@mimica/shared` `MIMICA_COMPANION_APP_DEFAULT_PATH`.",
           "description": "Path to the installed Mimica Companion app (.app on macOS). Used when the extension is not running from the mimica monorepo."

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { mimicaBridgeTokenPath } from "@mimica/shared";
 
 /** Resolve bridge token: env first, then Companion userData file (consumer path). */
@@ -9,8 +9,12 @@ export function getBridgeToken(): string | null {
   if (process.platform !== "darwin") return null;
 
   const tokenPath = mimicaBridgeTokenPath();
-  if (!existsSync(tokenPath)) return null;
-
-  const persisted = readFileSync(tokenPath, "utf8").trim();
-  return persisted || null;
+  try {
+    const persisted = readFileSync(tokenPath, "utf8").trim();
+    return persisted || null;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "EACCES" || code === "EPERM") return null;
+    throw err;
+  }
 }
