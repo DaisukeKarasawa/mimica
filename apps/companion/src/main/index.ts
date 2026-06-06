@@ -92,7 +92,9 @@ if (!gotLock) {
 
   app.on("window-all-closed", () => {
     bridgeServer?.stop();
-    if (process.platform !== "darwin") app.quit();
+    // Consumer MVP: quit when the window closes on all platforms. Keeping a macOS
+    // dock process without a bridge caused ECONNREFUSED on the next Open Companion.
+    app.quit();
   });
 
   app.on("before-quit", () => {
