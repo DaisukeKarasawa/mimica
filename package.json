@@ -20,7 +20,9 @@
     "setup:githooks": "chmod +x .githooks/pre-commit && git config core.hooksPath .githooks",
     "audit": "pnpm audit --audit-level=moderate",
     "security": "pnpm audit --audit-level=moderate && turbo run typecheck",
-    "package:companion:mac": "pnpm --filter @mimica/shared build && pnpm --filter @mimica/character-runtime build && pnpm --filter @mimica/agent-orchestrator build && pnpm --filter @mimica/companion package:mac"
+    "package:companion:mac": "pnpm --filter @mimica/shared build && pnpm --filter @mimica/character-runtime build && pnpm --filter @mimica/agent-orchestrator build && pnpm --filter @mimica/companion package:mac",
+    "bump:release": "node scripts/bump-release-version.mjs",
+    "bump:release:check": "node scripts/bump-release-version.mjs --check"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
