@@ -10,6 +10,8 @@ import {
   collectTalkPool,
   filterAnimationsOnSkeleton,
   pickRandomAnimation,
+  isTalkAttachmentAnimation,
+  talkAttachmentPair,
 } from "./motionPools.js";
 import { resolveAvatarAnimations, usesIdleAnimationPool } from "./resolveAnimations.js";
 import { computeStageCropRect, maximalOpaqueRect, resolveStageCrop } from "./stageCrop.js";
@@ -43,6 +45,9 @@ export class SpineStageController {
   private resizeObserver: ResizeObserver | null = null;
   private resizeFrameId = 0;
   private readonly trackIndex = 0;
+  /** Mouth/face attachments for Talk_*; same index as pet release track (idle-only). */
+  private readonly attachmentTrackIndex = 1;
+  private static readonly ATTACHMENT_MIX_DURATION = 0.15;
   private disposed = false;
   private assetsLoaded = false;
   private pendingFitFrames = 0;
@@ -337,15 +342,17 @@ export class SpineStageController {
     const motionMap = this.motionMap;
     if (!spine || !motionMap) return;
 
-    if (usesIdleAnimationPool(state)) {
-      this.activeLoopPool = "idle";
-      this.playRandomLoop("idle", state);
-      return;
-    }
-
     if (state === "talking") {
       this.activeLoopPool = "talk";
       this.playRandomLoop("talk", state);
+      return;
+    }
+
+    this.clearTalkAttachmentTrack();
+
+    if (usesIdleAnimationPool(state)) {
+      this.activeLoopPool = "idle";
+      this.playRandomLoop("idle", state);
       return;
     }
 
@@ -362,6 +369,50 @@ export class SpineStageController {
     if (onSkel.length > 0) return onSkel;
     const fallback = resolveAvatarAnimations(pool === "idle" ? "idle" : "talking", motionMap);
     return filterAnimationsOnSkeleton(spine.skeleton.data, fallback);
+  }
+
+  private resolveTalkAttachment(motionAnimName: string): string | undefined {
+    const spine = this.spine;
+    if (!spine) return undefined;
+    const pair = talkAttachmentPair(motionAnimName);
+    if (!pair) return undefined;
+    return filterAnimationsOnSkeleton(spine.skeleton.data, [pair])[0];
+  }
+
+  private syncTalkAttachmentTrack(motionAnimName: string, loop: boolean): void {
+    const spine = this.spine;
+    if (!spine) return;
+
+    const attachmentName = this.resolveTalkAttachment(motionAnimName);
+    if (!attachmentName) return;
+
+    const existing = spine.state.getCurrent(this.attachmentTrackIndex);
+    if (existing?.animation?.name === attachmentName && existing.loop === loop) {
+      return;
+    }
+
+    if (existing) existing.listener = {};
+
+    const entry = spine.state.setAnimation(this.attachmentTrackIndex, attachmentName, loop);
+    entry.mixDuration = SpineStageController.ATTACHMENT_MIX_DURATION;
+    stripViewportLetterbox(spine.skeleton);
+  }
+
+  /** Drop Talk_*_A overlay only; pet uses the same track during idle. */
+  private clearTalkAttachmentTrack(): void {
+    const spine = this.spine;
+    if (!spine) return;
+
+    const current = spine.state.getCurrent(this.attachmentTrackIndex);
+    const animName = current?.animation?.name;
+    if (!animName || !isTalkAttachmentAnimation(animName)) return;
+
+    current.listener = {};
+    spine.state.setEmptyAnimation(
+      this.attachmentTrackIndex,
+      SpineStageController.ATTACHMENT_MIX_DURATION,
+    );
+    stripViewportLetterbox(spine.skeleton);
   }
 
   private setTrack(animName: string, loop: boolean, onComplete?: () => void): boolean {
@@ -410,7 +461,19 @@ export class SpineStageController {
       this.activeLoopPool === pool &&
       this.currentState === avatarState
     ) {
-      return;
+      if (pool === "talk") {
+        const attachmentName = this.resolveTalkAttachment(animName);
+        const existingAttachment = spine.state.getCurrent(this.attachmentTrackIndex);
+        if (
+          attachmentName &&
+          existingAttachment?.animation?.name === attachmentName &&
+          existingAttachment.loop === true
+        ) {
+          return;
+        }
+      } else {
+        return;
+      }
     }
 
     this.lastLoopAnimationName = animName;
@@ -422,6 +485,9 @@ export class SpineStageController {
       if (expectedPool === "talk" && this.currentState !== "talking") return;
       this.playRandomLoop(expectedPool, this.currentState, candidates.length > 1);
     });
+    if (pool === "talk") {
+      this.syncTalkAttachmentTrack(animName, true);
+    }
   }
 
   private playOneShot(state: AvatarState): void {
