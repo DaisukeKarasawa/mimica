@@ -8,11 +8,15 @@ export function getBridgeToken(): string | null {
 
   if (process.platform !== "darwin") return null;
 
-  for (const tokenPath of mimicaBridgeTokenCandidatePaths()) {
+  const candidates = mimicaBridgeTokenCandidatePaths();
+  for (let i = 0; i < candidates.length; i++) {
+    const tokenPath = candidates[i];
     if (!existsSync(tokenPath)) continue;
     try {
       const persisted = readFileSync(tokenPath, "utf8").trim();
       if (persisted) return persisted;
+      // Canonical file exists but is empty — treat as unset; do not read legacy token.
+      if (i === 0) return null;
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === "ENOENT" || code === "EACCES" || code === "EPERM") continue;
