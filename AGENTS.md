@@ -133,7 +133,7 @@ When changing how Mimica loads or maps Spine assets:
 - For commit-message history cleanup on unpushed work, preserve commit granularity and commit trees unless the user explicitly asks to squash or change content.
 - Prefer project-local, shared sources of truth over hidden global references when codifying repository behavior; avoid keeping duplicate commit-message rule sources.
 - When a path should clearly not be committed (e.g. `__pycache__/`, `*.py[cod]`), add the matching `.gitignore` entry directly instead of asking whether to add it.
-- Do not install or commit MVP read-only hooks (`mimica-read-only-guard.mjs`, `denied-hook-tools.mjs`) in the mimica dev workspace; dev `.cursor/hooks` is `security-guard.mjs` only.
+- Do not install or commit MVP read-only hooks (`mimica-read-only-guard.mjs`, `denied-hook-tools.mjs`) in the mimica dev workspace; dev `.cursor/hooks` allows `security-guard.mjs` and `format-on-edit.mjs` only (see `.cursor/hooks.json`).
 - For Ask-mode read-only hook testing, use a separate workspace directory—not the mimica monorepo dev root.
 
 ## Learned Workspace Facts
