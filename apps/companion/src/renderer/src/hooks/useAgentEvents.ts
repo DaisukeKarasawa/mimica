@@ -156,15 +156,19 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
         }
         case "agent_tool": {
           syncRevealContext(event);
+          reveal.clearReceived();
           const ctx = reveal.getContext();
           if (!ctx) break;
+          setAllSessionsRef.current((prev) =>
+            applyAgentDelta(prev, ctx.sessionId, ctx.runId, ctx.streamId, ""),
+          );
           setAllSessionsRef.current((prev) =>
             applyAgentTool(
               prev,
               ctx.sessionId,
               ctx.runId,
               ctx.streamId,
-              reveal.getDisplayedContent(),
+              "",
               event.name,
               event.detail,
             ),
