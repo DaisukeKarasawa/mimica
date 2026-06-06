@@ -13,6 +13,7 @@ import { AgentService } from "./agentService.js";
 import type { BrowserWindow as BrowserWindowType } from "electron";
 import { openAllowedExternalUrl } from "./openExternal.js";
 import { seedWorkspaceAllowlist } from "./workspaceAllowlist.js";
+import { ensureCanonicalUserData } from "./ensureCanonicalUserData.js";
 
 const electronApis = electron();
 
@@ -20,6 +21,7 @@ bindElectronApis(electronApis);
 registerAssetProtocol();
 
 const { app, BrowserWindow, ipcMain } = electronApis;
+ensureCanonicalUserData(app);
 let mainWindow: BrowserWindowType | null = null;
 let bridgeServer: CursorBridgeServer | null = null;
 const sessionStore = new SessionStore();

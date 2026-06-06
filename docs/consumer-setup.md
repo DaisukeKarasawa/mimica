@@ -53,6 +53,16 @@ WebSocket 認証用トークンは次のいずれかで揃えます。
 | **自動（推奨）** | 一度 Companion を起動すると userData 内の `bridge-token`（macOS: `~/Library/Application Support/Mimica/bridge-token`）が作成されます。拡張はこのファイルを読み取ります |
 | **明示指定**     | 開発機と同様、`MIMICA_BRIDGE_TOKEN` を環境変数で設定（Companion と拡張で同じ値）                                                                                       |
 
+**v0.1.x の bridge-token パスずれ（暫定）:** 古い DMG は token を `~/Library/Application Support/@mimica/companion/bridge-token` に作成することがあります。拡張は `~/Library/Application Support/Mimica/bridge-token` を読みます。次のいずれかで揃えてください。
+
+```bash
+mkdir -p ~/Library/Application\ Support/Mimica
+cp ~/Library/Application\ Support/@mimica/companion/bridge-token \
+   ~/Library/Application\ Support/Mimica/bridge-token
+```
+
+（修正版 VSIX / DMG では拡張のフォールバック読み取りと Companion 側の `Mimica` userData 正規化に対応済み）
+
 ## 5. 使い方
 
 1. Cursor で **任意のプロジェクト** を開く（mimica リポジトリである必要はありません）
@@ -63,12 +73,12 @@ WebSocket 認証用トークンは次のいずれかで揃えます。
 
 ## トラブルシュート
 
-| 症状                   | 確認                                                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------------------------------- |
-| Companion が起動しない | `/Applications/Mimica.app` の有無、`mimica.companionAppPath`                                            |
-| ブリッジ接続エラー     | Companion を一度起動して `bridge-token` ができているか、ポート `43721` が他プロセスに占有されていないか |
-| キャラが表示されない   | Release 付属 DMG か（開発用ビルドは `~/MimicaAssets` フォールバックあり）                               |
-| Agent が動かない       | `CURSOR_API_KEY` が Cursor プロセスから見えているか                                                     |
+| 症状                   | 確認                                                                                                                                                                                                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Companion が起動しない | `/Applications/Mimica.app` の有無、`mimica.companionAppPath`                                                                                                                                                                                                |
+| ブリッジ接続エラー     | Companion を一度起動して `bridge-token` ができているか（`~/Library/Application Support/Mimica/bridge-token`）、ポート `43721` が他プロセスに占有されていないか。v0.1.0–0.1.1 DMG で token が `@mimica/companion` にある場合は VSIX 更新か手動コピー（下記） |
+| キャラが表示されない   | Release 付属 DMG か（開発用ビルドは `~/MimicaAssets` フォールバックあり）                                                                                                                                                                                   |
+| Agent が動かない       | `CURSOR_API_KEY` が Cursor プロセスから見えているか                                                                                                                                                                                                         |
 
 ## 開発者向け（参考）
 
