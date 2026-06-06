@@ -86,7 +86,7 @@ function killCompanionProcess(proc: ChildProcess): void {
 async function openCompanion(context: vscode.ExtensionContext): Promise<void> {
   if (!companionLaunchSucceeded) {
     try {
-      companionProcess = launchCompanion(context);
+      companionProcess = await launchCompanion(context);
       if (companionProcess) {
         companionProcess.on("exit", () => {
           companionProcess = null;
