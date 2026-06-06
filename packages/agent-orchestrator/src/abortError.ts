@@ -23,7 +23,11 @@ let abortRejectionHandlerInstalled = false;
 export function installAbortRejectionHandler(): void {
   if (abortRejectionHandlerInstalled) return;
   abortRejectionHandlerInstalled = true;
-  process.on("unhandledRejection", (reason) => {
+  process.on("unhandledRejection", (reason, promise) => {
     if (isAbortError(reason)) return;
+    console.error("Unhandled rejection:", promise, reason);
+    setImmediate(() => {
+      throw reason instanceof Error ? reason : new Error(String(reason));
+    });
   });
 }

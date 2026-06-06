@@ -5,7 +5,7 @@ const META_VERB =
 
 /** 段落末尾の作業宣言（「関連コードを読みます。」など） */
 const META_CLOSING = new RegExp(
-  `(?:関連コードを|コードを|実装を|原因を|箇所を)?${META_VERB.source}[。?？!！]?\\s*$`,
+  `^\\s*(?:関連コードを|コードを|実装を|原因を|箇所を)?${META_VERB.source}[。?？!！]?\\s*$`,
 );
 
 const META_TOPIC =
@@ -13,7 +13,7 @@ const META_TOPIC =
 
 function splitJapaneseSentences(paragraph: string): string[] {
   return paragraph
-    .split(/(?<=。)/)
+    .split(/(?<=[。?？!！])|\n+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
