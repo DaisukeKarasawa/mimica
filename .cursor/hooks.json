@@ -12,6 +12,11 @@
         "command": "node .cursor/hooks/security-guard.mjs",
         "failClosed": true
       }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "node .cursor/hooks/format-on-edit.mjs"
+      }
     ]
   }
 }

@@ -154,9 +154,12 @@ When changing how Mimica loads or maps Spine assets:
   defaults to `~/MimicaAssets/characters/rio/persona/SKILL.md`.
 - Validation defaults: `pnpm typecheck`, `pnpm build`, and `pnpm security` when
   touching runtime or dependency surfaces.
-- Dev-repo Cursor hooks: `.cursor/hooks.json` + `.cursor/hooks/security-guard.mjs` only
-  (supply-chain / execution security). Companion Ask must not persist read-only hook files
-  or merge read-only entries into this repo.
+- Dev-repo Cursor hooks: `.cursor/hooks.json` with `security-guard.mjs` (supply-chain /
+  execution security) and `format-on-edit.mjs` (Prettier on `afterFileEdit`, aligned with
+  CI `format:check`). Companion Ask must not persist read-only hook files or merge
+  read-only entries into this repo.
+- Optional git pre-commit: run `pnpm setup:githooks` once per clone to format staged files
+  before commit (`.githooks/pre-commit`).
 - Companion Agent modes: **Ask** (read-only hooks + write-tool block), **Agent** (full
   SDK tools), **Plan** (`mode: "plan"`). `ensureReadOnlyHooks()` runs for Ask in external
   workspaces only; it skips the mimica monorepo dev root (package.json name `mimica`,
