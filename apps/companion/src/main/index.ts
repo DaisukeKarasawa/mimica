@@ -13,6 +13,7 @@ import { AgentService } from "./agentService.js";
 import type { BrowserWindow as BrowserWindowType } from "electron";
 import { openAllowedExternalUrl } from "./openExternal.js";
 import { seedWorkspaceAllowlist } from "./workspaceAllowlist.js";
+import { ensureCanonicalUserData } from "./ensureCanonicalUserData.js";
 
 const electronApis = electron();
 
@@ -20,6 +21,7 @@ bindElectronApis(electronApis);
 registerAssetProtocol();
 
 const { app, BrowserWindow, ipcMain } = electronApis;
+ensureCanonicalUserData(app);
 let mainWindow: BrowserWindowType | null = null;
 let bridgeServer: CursorBridgeServer | null = null;
 const sessionStore = new SessionStore();
@@ -90,7 +92,9 @@ if (!gotLock) {
 
   app.on("window-all-closed", () => {
     bridgeServer?.stop();
-    if (process.platform !== "darwin") app.quit();
+    // Consumer MVP: quit when the window closes on all platforms. Keeping a macOS
+    // dock process without a bridge caused ECONNREFUSED on the next Open Companion.
+    app.quit();
   });
 
   app.on("before-quit", () => {
