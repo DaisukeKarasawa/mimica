@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { mimicaBridgeTokenPath } from "@mimica/shared";
+import { mimicaBridgeTokenPath } from "@mimica/shared/paths";
 
 /** Resolve bridge token: env first, then Companion userData file (consumer path). */
 export function getBridgeToken(): string | null {

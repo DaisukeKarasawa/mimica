@@ -6,6 +6,9 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "noEmit": false,
+    "paths": {
+      "@mimica/shared/paths": ["../../packages/shared/dist/mimicaPaths"]
+    },
     "lib": ["ES2022"],
     "types": ["node", "vscode"]
   },

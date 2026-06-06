@@ -56,6 +56,4 @@ export {
   MIMICA_USER_DATA_DIR_NAME,
   MIMICA_BRIDGE_TOKEN_FILENAME,
   MIMICA_COMPANION_APP_DEFAULT_PATH,
-  mimicaUserDataDir,
-  mimicaBridgeTokenPath,
-} from "./mimicaPaths.js";
+} from "./mimicaPathConstants.js";
