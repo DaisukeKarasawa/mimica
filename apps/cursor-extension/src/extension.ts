@@ -9,6 +9,7 @@ import { getBridgeToken } from "./bridgeToken";
 import { companionLaunchHint, launchCompanion } from "./companionLaunch";
 import { getEditorContext } from "./contextProvider";
 import { loadRepoDotEnv } from "./loadRepoDotEnv";
+import { searchWorkspaceSymbols } from "./symbolProvider";
 
 loadRepoDotEnv(join(__dirname, "..", "..", ".."));
 
@@ -143,7 +144,29 @@ function handleServerMessage(raw: unknown): void {
   const msg = raw as ServerMessage;
   if (msg.type === "connection_ack") {
     /* connection_ack carries no token; client auth uses companion_ready / context_update */
+    return;
   }
+  if (msg.type === "symbol_search_request") {
+    void handleSymbolSearchRequest(msg.requestId, msg.query, msg.limit);
+  }
+}
+
+async function handleSymbolSearchRequest(
+  requestId: string,
+  query: string,
+  limit: number,
+): Promise<void> {
+  const bridgeToken = getBridgeToken();
+  if (!bridgeToken || wsClient?.readyState !== WebSocket.OPEN) return;
+
+  const symbols = await searchWorkspaceSymbols(query, limit);
+  const response: ClientMessage = {
+    type: "symbol_search_result",
+    requestId,
+    token: bridgeToken,
+    symbols,
+  };
+  wsClient.send(JSON.stringify(response));
 }
 
 async function connectBridge(): Promise<void> {
