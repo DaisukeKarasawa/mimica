@@ -1,7 +1,8 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { MimicaSettings } from "./chat.js";
+import type { CharacterMetadata } from "./avatar.js";
 
 export const DEFAULT_ACTIVE_CHARACTER_ID = "rio";
 
@@ -29,6 +30,25 @@ export interface CharacterPackResolveOptions {
   candidateRoots?: string[];
 }
 
+/** True when the directory has metadata, skeleton, atlas, and motion-map for runtime. */
+export function isValidCharacterPackRoot(packRoot: string): boolean {
+  const metaPath = join(packRoot, "metadata.json");
+  const motionPath = join(packRoot, "motion-map.json");
+  if (!existsSync(metaPath) || !existsSync(motionPath)) return false;
+
+  try {
+    const metadata = JSON.parse(readFileSync(metaPath, "utf8")) as CharacterMetadata;
+    if (typeof metadata.skelFile !== "string" || metadata.skelFile.trim() === "") return false;
+    if (typeof metadata.atlasFile !== "string" || metadata.atlasFile.trim() === "") return false;
+    return (
+      existsSync(join(packRoot, metadata.skelFile)) &&
+      existsSync(join(packRoot, metadata.atlasFile))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function resolveCharacterPackRoot(
   characterId: string,
   options: CharacterPackResolveOptions = {},
@@ -36,7 +56,7 @@ export function resolveCharacterPackRoot(
   assertCharacterId(characterId);
 
   for (const candidate of options.candidateRoots ?? []) {
-    if (existsSync(candidate)) {
+    if (isValidCharacterPackRoot(candidate)) {
       return candidate;
     }
   }
@@ -51,10 +71,14 @@ export function resolveCharacterPackRoot(
   }
 
   if (options.assetsRoot) {
-    return join(options.assetsRoot, "characters", characterId);
+    const fromAssetsRoot = join(options.assetsRoot, "characters", characterId);
+    if (isValidCharacterPackRoot(fromAssetsRoot)) return fromAssetsRoot;
   }
 
-  return join(home, "MimicaAssets", "characters", characterId);
+  const defaultRoot = join(home, "MimicaAssets", "characters", characterId);
+  if (isValidCharacterPackRoot(defaultRoot)) return defaultRoot;
+
+  return defaultRoot;
 }
 
 export function buildSettingsForPackRoot(
