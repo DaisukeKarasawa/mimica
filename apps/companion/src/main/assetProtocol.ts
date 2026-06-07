@@ -92,6 +92,9 @@ export function setupAssetProtocolHandler(): boolean {
   const { protocol, net } = apis();
   protocol.handle(CHARACTER_ASSET_SCHEME, (request: Request) => {
     syncAssetRootFromSettings();
+    if (!syncAssetRootRealNorm()) {
+      return new Response("Not Found", { status: 404 });
+    }
     const realRootNorm = assetRootRealNorm;
     const url = new URL(request.url);
     const rel = decodeURIComponent(url.pathname).replace(/^\/+/, "");
