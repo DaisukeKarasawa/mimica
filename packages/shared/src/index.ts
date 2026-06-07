@@ -72,6 +72,16 @@ export {
   slashSubagentsForMode,
 } from "./slashSubagents.js";
 
+export {
+  SLASH_INPUT_PATTERN,
+  SLASH_MENU_OPEN_PATTERN,
+  SLASH_NAME_PATTERN,
+  type ParsedSlashInput,
+  parseSlashInput,
+  isSlashMenuOpen,
+  slashMenuFilterQuery,
+} from "./slashInput.js";
+
 export { type ChatAttachment, MIMICA_ATTACHMENT_SCHEME, chatAttachmentUrl } from "./chat.js";
 
 export {

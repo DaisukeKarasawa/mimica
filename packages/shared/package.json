@@ -25,7 +25,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "node --experimental-strip-types --test src/slashInput.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
