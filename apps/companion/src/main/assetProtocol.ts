@@ -1,6 +1,5 @@
 import { readFileSync, existsSync, realpathSync } from "node:fs";
 import { basename, dirname, extname, join, normalize, relative } from "node:path";
-import { pathToFileURL } from "node:url";
 import type { CharacterAssetStatus, CharacterMetadata, MotionMap } from "@mimica/shared";
 import type { ElectronMain } from "./electron.js";
 import { getActiveMimicaSettings } from "./characterPack.js";
@@ -12,7 +11,17 @@ export const CHARACTER_ASSET_BASE = `${CHARACTER_ASSET_SCHEME}://local/`;
 let assetRoot: string | null = null;
 let assetRootRealNorm: string | null = null;
 let protocolHandlerRegistered = false;
-let electronApis: Pick<ElectronMain, "protocol" | "net"> | null = null;
+let electronApis: Pick<ElectronMain, "protocol"> | null = null;
+
+const MIME_BY_EXT: Record<string, string> = {
+  ".skel": "application/octet-stream",
+  ".atlas": "text/plain",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".json": "application/json",
+};
 
 const CHAT_ICON_NAMES = ["icon.png", "icon.jpg", "icon.jpeg", "icon.webp"] as const;
 
@@ -22,11 +31,11 @@ function syncAssetRootFromSettings(): string {
   return root;
 }
 
-export function bindElectronApis(apis: Pick<ElectronMain, "protocol" | "net">): void {
+export function bindElectronApis(apis: Pick<ElectronMain, "protocol">): void {
   electronApis = apis;
 }
 
-function apis(): Pick<ElectronMain, "protocol" | "net"> {
+function apis(): Pick<ElectronMain, "protocol"> {
   if (!electronApis) throw new Error("Electron APIs not bound");
   return electronApis;
 }
@@ -89,7 +98,7 @@ export function setupAssetProtocolHandler(): boolean {
 
   if (protocolHandlerRegistered) return true;
 
-  const { protocol, net } = apis();
+  const { protocol } = apis();
   protocol.handle(CHARACTER_ASSET_SCHEME, (request: Request) => {
     syncAssetRootFromSettings();
     if (!syncAssetRootRealNorm()) {
@@ -107,12 +116,23 @@ export function setupAssetProtocolHandler(): boolean {
     try {
       realPath = realpathSync(filePath);
     } catch {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`[mimica-asset] missing file: ${filePath}`);
+      }
       return new Response("Not Found", { status: 404 });
     }
     if (!realPath.startsWith(realRootNorm)) {
       return new Response("Forbidden", { status: 403 });
     }
-    return net.fetch(pathToFileURL(realPath).href);
+    try {
+      const data = readFileSync(realPath);
+      const mimeType = MIME_BY_EXT[extname(rel).toLowerCase()] ?? "application/octet-stream";
+      return new Response(data, { headers: { "Content-Type": mimeType } });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[mimica-asset] read failed for ${realPath}: ${message}`);
+      return new Response("Not Found", { status: 404 });
+    }
   });
   protocolHandlerRegistered = true;
   return true;
