@@ -33,4 +33,34 @@ describe("buildAgentFullPrompt", () => {
     assert.match(prompt, /Agent mode/);
     assert.match(prompt, /Three-layer persona rules/);
   });
+
+  it("includes ask mode constraints on follow-up turns", () => {
+    const prompt = buildAgentFullPrompt(
+      {
+        prompt: "続けて",
+        mode: "ask",
+        personaSystemPrompt: personaPrompt,
+      },
+      true,
+    );
+
+    assert.match(prompt, /Ask mode/);
+    assert.match(prompt, /CRITICAL output rule/);
+    assert.match(prompt, /Persona reminder \(調月リオ\)/);
+  });
+
+  it("includes plan mode constraints on follow-up turns", () => {
+    const prompt = buildAgentFullPrompt(
+      {
+        prompt: "続けて",
+        mode: "plan",
+        personaSystemPrompt: personaPrompt,
+      },
+      true,
+    );
+
+    assert.match(prompt, /Plan mode/);
+    assert.match(prompt, /CRITICAL output rule/);
+    assert.match(prompt, /Persona reminder \(調月リオ\)/);
+  });
 });

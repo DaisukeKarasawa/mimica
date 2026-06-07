@@ -62,6 +62,7 @@ export function buildAgentFullPrompt(params: BuildAgentPromptParams, isFollowUp:
 
   if (promptStrategyForFollowUp(isFollowUp) === "followUp") {
     return [
+      preambleForMode(params.mode),
       FOLLOW_UP_PERSONA_REMINDER,
       params.personaSystemPrompt,
       contextBlock,
