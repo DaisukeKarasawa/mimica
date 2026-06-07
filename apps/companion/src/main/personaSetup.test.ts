@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,7 +25,9 @@ function seedAllTemplates(skillContent = "three-layer persona"): void {
 }
 
 function readV1Template(name: string): string {
-  return execSync(`git show master:templates/persona/${name}`, { encoding: "utf8" });
+  return execFileSync("git", ["show", `master:templates/persona/${name}`], {
+    encoding: "utf8",
+  });
 }
 
 beforeEach(() => {
