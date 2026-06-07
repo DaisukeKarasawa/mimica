@@ -5,8 +5,8 @@
  * - **coldStart** (`isFollowUp === false`): new SDK agent; send preamble, persona, trimmed
  *   history (see `trimChatHistoryForPrompt`), context, and user message.
  * - **followUp** (`isFollowUp === true`): reused SDK agent with prior turns in memory; send
- *   a compact persona reminder, editor context (if any), and the user message. Full persona/history
- *   are not replayed.
+ *   a compact persona reminder, the persona pack rules, editor context (if any), and the user
+ *   message. Conversation history is not replayed.
  * - **recycledAgent**: pool entry invalidated (workspace/mode/apiKey change); treated as
  *   coldStart on the replacement agent (`turnsSent` reset to 0).
  *
