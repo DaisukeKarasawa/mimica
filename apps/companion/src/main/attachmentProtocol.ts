@@ -24,22 +24,6 @@ function apis(): Pick<ElectronMain, "protocol"> {
   return electronApis;
 }
 
-export function registerAttachmentProtocol(): void {
-  const { protocol } = apis();
-  protocol.registerSchemesAsPrivileged([
-    {
-      scheme: ATTACHMENT_SCHEME,
-      privileges: {
-        standard: true,
-        secure: true,
-        supportFetchAPI: true,
-        corsEnabled: true,
-        stream: true,
-      },
-    },
-  ]);
-}
-
 export function setupAttachmentProtocolHandler(): void {
   if (handlerRegistered) return;
   const { protocol } = apis();

@@ -60,20 +60,12 @@ export function resolveChatIconFile(assetRootDir: string, configuredPath: string
   return null;
 }
 
-export function registerAssetProtocol(): void {
-  const { protocol } = apis();
-  protocol.registerSchemesAsPrivileged([
-    {
-      scheme: CHARACTER_ASSET_SCHEME,
-      privileges: {
-        standard: true,
-        secure: true,
-        supportFetchAPI: true,
-        corsEnabled: true,
-        stream: true,
-      },
-    },
-  ]);
+function assetResponseHeaders(mimeType: string): HeadersInit {
+  return {
+    "Content-Type": mimeType,
+    "Access-Control-Allow-Origin": "*",
+    "Cache-Control": "no-cache",
+  };
 }
 
 function syncAssetRootRealNorm(): boolean {
@@ -127,7 +119,7 @@ export function setupAssetProtocolHandler(): boolean {
     try {
       const data = readFileSync(realPath);
       const mimeType = MIME_BY_EXT[extname(rel).toLowerCase()] ?? "application/octet-stream";
-      return new Response(data, { headers: { "Content-Type": mimeType } });
+      return new Response(data, { headers: assetResponseHeaders(mimeType) });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[mimica-asset] read failed for ${realPath}: ${message}`);

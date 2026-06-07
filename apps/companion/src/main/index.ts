@@ -5,7 +5,6 @@ installAbortRejectionHandler();
 import { electron } from "./electron.js";
 import {
   bindElectronApis,
-  registerAssetProtocol,
   setupAssetProtocolHandler,
   getCharacterAssetStatus,
 } from "./assetProtocol.js";
@@ -21,9 +20,9 @@ import { listSlashMenuSections } from "./cursorSlashInput.js";
 import { resolveWorkspacePath } from "./paths.js";
 import {
   bindAttachmentProtocolApis,
-  registerAttachmentProtocol,
   setupAttachmentProtocolHandler,
 } from "./attachmentProtocol.js";
+import { registerPrivilegedProtocols } from "./privilegedProtocols.js";
 import {
   ImageAttachmentError,
   MAX_IMAGE_ATTACHMENTS,
@@ -36,8 +35,7 @@ const electronApis = electron();
 
 bindElectronApis(electronApis);
 bindAttachmentProtocolApis(electronApis);
-registerAssetProtocol();
-registerAttachmentProtocol();
+registerPrivilegedProtocols(electronApis.protocol);
 
 const { app, BrowserWindow, ipcMain, dialog } = electronApis;
 ensureCanonicalUserData(app);
