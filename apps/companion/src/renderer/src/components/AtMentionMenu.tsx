@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AtMenuItem, AtMenuSection } from "@mimica/shared";
 import {
-  AT_GIT_COMMIT_LABEL,
-  atGitBranchLabel,
   atMenuFilterQuery,
+  atMenuItemDisplayLabel,
   isAtMenuOpen,
   isSlashMenuOpen,
   replaceAtMenuSelection,
@@ -36,23 +35,6 @@ function flattenAtMenuSections(sections: AtMenuSection[]): {
     }
   }
   return { rows, items };
-}
-
-function atMenuItemLabel(item: AtMenuItem): string {
-  switch (item.kind) {
-    case "past-chat":
-      return `@Past Chat: ${item.name}`;
-    case "git-commit":
-      return `@${AT_GIT_COMMIT_LABEL}`;
-    case "git-branch":
-      return `@${atGitBranchLabel(item.name)}`;
-    case "code":
-      return `@Code:${item.path}:${item.name}`;
-    case "folder":
-      return `@${item.path}/`;
-    default:
-      return `@${item.path}`;
-  }
 }
 
 function atMenuItemDescription(item: AtMenuItem): string {
@@ -192,7 +174,9 @@ export function AtMentionMenu({
                 }}
                 onMouseEnter={() => onHighlightChange(flatIndex)}
               >
-                <span className={`slash-menu-name kind-${item.kind}`}>{atMenuItemLabel(item)}</span>
+                <span className={`slash-menu-name kind-${item.kind}`}>
+                  {atMenuItemDisplayLabel(item)}
+                </span>
                 <span className="slash-menu-desc">{atMenuItemDescription(item)}</span>
               </button>
             );

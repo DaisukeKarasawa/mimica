@@ -4,6 +4,7 @@ import { agentModeComposerPlaceholder, cycleAgentMode } from "@mimica/shared";
 import { ComposerAttachments } from "./ComposerAttachments";
 import { SlashCommandMenu, useSlashMenuSections, useSlashMenuState } from "./SlashCommandMenu";
 import { AtMentionMenu, replaceAtMenuSelection, useAtMenuState } from "./AtMentionMenu";
+import { handleComposerMenuKeyDown } from "./useComposerMenuKeyboard";
 import { fileToBase64 } from "../utils/fileToBase64";
 
 /** Matches `.composer-input` max-height in chat.css */
@@ -233,60 +234,30 @@ export function ChatComposer({
             }
           }}
           onKeyDown={(e) => {
-            if (slashMenu.open && slashMenu.filteredItems.length > 0) {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                slashMenu.setHighlightedIndex(
-                  (index) => (index + 1) % slashMenu.filteredItems.length,
-                );
-                return;
-              }
-              if (e.key === "ArrowUp") {
-                e.preventDefault();
-                slashMenu.setHighlightedIndex(
-                  (index) =>
-                    (index - 1 + slashMenu.filteredItems.length) % slashMenu.filteredItems.length,
-                );
-                return;
-              }
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                const selected = slashMenu.filteredItems[slashMenu.highlightedIndex];
-                if (selected) void selectSlashItem(selected.name, selected.kind);
-                return;
-              }
-              if (e.key === "Escape") {
-                e.preventDefault();
-                onChange("");
-                return;
-              }
+            if (
+              handleComposerMenuKeyDown(e, {
+                open: slashMenu.open,
+                filteredItems: slashMenu.filteredItems,
+                highlightedIndex: slashMenu.highlightedIndex,
+                setHighlightedIndex: slashMenu.setHighlightedIndex,
+                onSelect: (item) => void selectSlashItem(item.name, item.kind),
+                onEscape: () => onChange(""),
+              })
+            ) {
+              return;
             }
 
-            if (atMenu.open && atMenu.filteredItems.length > 0) {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                atMenu.setHighlightedIndex((index) => (index + 1) % atMenu.filteredItems.length);
-                return;
-              }
-              if (e.key === "ArrowUp") {
-                e.preventDefault();
-                atMenu.setHighlightedIndex(
-                  (index) =>
-                    (index - 1 + atMenu.filteredItems.length) % atMenu.filteredItems.length,
-                );
-                return;
-              }
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                const selected = atMenu.filteredItems[atMenu.highlightedIndex];
-                if (selected) selectAtItem(selected);
-                return;
-              }
-              if (e.key === "Escape") {
-                e.preventDefault();
-                onChange(value.replace(/@([^\s@]*)$/, ""));
-                return;
-              }
+            if (
+              handleComposerMenuKeyDown(e, {
+                open: atMenu.open,
+                filteredItems: atMenu.filteredItems,
+                highlightedIndex: atMenu.highlightedIndex,
+                setHighlightedIndex: atMenu.setHighlightedIndex,
+                onSelect: selectAtItem,
+                onEscape: () => onChange(value.replace(/@([^\s@]*)$/, "")),
+              })
+            ) {
+              return;
             }
 
             if (e.key === "Tab" && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
