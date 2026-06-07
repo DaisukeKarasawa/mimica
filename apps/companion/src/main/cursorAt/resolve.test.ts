@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { resolveAtInput } from "./index.js";
-import { searchAtPaths } from "./enumerate.js";
+import { clearAtPathIndexCache, searchAtPaths } from "./enumerate.js";
 
 const workspacePath = mkdtempSync(join(tmpdir(), "mimica-at-test-"));
 
@@ -14,6 +14,7 @@ after(() => {
 
 describe("searchAtPaths", () => {
   it("excludes gitignored node_modules paths", () => {
+    clearAtPathIndexCache(workspacePath);
     mkdirSync(join(workspacePath, "packages", "shared", "src"), { recursive: true });
     writeFileSync(join(workspacePath, "packages", "shared", "src", "chat.ts"), "export {}");
     mkdirSync(join(workspacePath, "node_modules", "left-pad"), { recursive: true });
@@ -28,6 +29,7 @@ describe("searchAtPaths", () => {
   });
 
   it("lists direct children when browsing a folder", () => {
+    clearAtPathIndexCache(workspacePath);
     mkdirSync(join(workspacePath, "packages", "shared"), { recursive: true });
     writeFileSync(join(workspacePath, "packages", "shared", "index.ts"), "export {}");
 
@@ -37,11 +39,13 @@ describe("searchAtPaths", () => {
   });
 
   it("matches partial basename queries", () => {
+    clearAtPathIndexCache(workspacePath);
     const results = searchAtPaths(workspacePath, "chat");
     assert.ok(results.some((item) => item.path === "packages/shared/src/chat.ts"));
   });
 
   it("matches partial scoped directory queries", () => {
+    clearAtPathIndexCache(workspacePath);
     const results = searchAtPaths(workspacePath, "packages/sh");
     assert.ok(results.some((item) => item.path === "packages/shared"));
     assert.ok(results.some((item) => item.path === "packages/shared/src/chat.ts"));
@@ -49,15 +53,18 @@ describe("searchAtPaths", () => {
 });
 
 describe("resolveAtInput", () => {
-  it("expands file mentions into prompt blocks", () => {
-    const result = resolveAtInput(workspacePath, "please review @packages/shared/src/chat.ts");
+  it("expands file mentions into prompt blocks", async () => {
+    const result = await resolveAtInput(
+      workspacePath,
+      "please review @packages/shared/src/chat.ts",
+    );
     assert.match(result.expanded, /Referenced file/);
     assert.match(result.expanded, /export \{\}/);
     assert.deepEqual(result.paths, ["packages/shared/src/chat.ts"]);
   });
 
-  it("warns when path is missing", () => {
-    const result = resolveAtInput(workspacePath, "see @missing/file.ts");
+  it("warns when path is missing", async () => {
+    const result = await resolveAtInput(workspacePath, "see @missing/file.ts");
     assert.match(result.warning ?? "", /missing\/file\.ts/);
     assert.match(result.expanded, /@missing\/file\.ts/);
   });

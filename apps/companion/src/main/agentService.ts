@@ -100,7 +100,7 @@ export class AgentService {
         skipAtPaths.push(rel);
       }
     }
-    const atResolved = resolveAtInput(cwd, resolved.expanded, {
+    const atResolved = await resolveAtInput(cwd, resolved.expanded, {
       skipPaths: skipAtPaths,
       getSession: (id) => this.sessionStore.get(id),
     });

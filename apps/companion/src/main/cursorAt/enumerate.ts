@@ -12,6 +12,8 @@ import { assertContained } from "../paths.js";
 import { WorkspaceIgnoreFilter } from "./ignoreFilter.js";
 
 const MAX_WALK_DEPTH = 24;
+export const PATH_INDEX_TTL_MS = 5_000;
+const MAX_CACHED_WORKSPACES = 5;
 
 interface PathIndexEntry {
   path: string;
@@ -20,20 +22,12 @@ interface PathIndexEntry {
 }
 
 interface PathIndexCache {
-  mtimeMs: number;
+  builtAt: number;
   entries: PathIndexEntry[];
 }
 
 const indexCaches = new Map<string, PathIndexCache>();
 const ignoreFilters = new Map<string, WorkspaceIgnoreFilter>();
-
-function workspaceMtimeMs(workspacePath: string): number {
-  try {
-    return lstatSync(workspacePath).mtimeMs;
-  } catch {
-    return 0;
-  }
-}
 
 function getIgnoreFilter(workspacePath: string): WorkspaceIgnoreFilter {
   const existing = ignoreFilters.get(workspacePath);
@@ -88,14 +82,34 @@ function buildPathIndex(workspacePath: string): PathIndexEntry[] {
   return entries;
 }
 
+function evictPathIndexCaches(now = Date.now()): void {
+  for (const [key, cache] of indexCaches) {
+    if (now - cache.builtAt >= PATH_INDEX_TTL_MS) {
+      indexCaches.delete(key);
+      ignoreFilters.delete(key);
+    }
+  }
+
+  while (indexCaches.size > MAX_CACHED_WORKSPACES) {
+    const oldestKey = indexCaches.keys().next().value;
+    if (!oldestKey) break;
+    indexCaches.delete(oldestKey);
+    ignoreFilters.delete(oldestKey);
+  }
+}
+
 function getPathIndex(workspacePath: string): PathIndexEntry[] {
-  const mtimeMs = workspaceMtimeMs(workspacePath);
+  const now = Date.now();
+  evictPathIndexCaches(now);
+
   const cached = indexCaches.get(workspacePath);
-  if (cached && cached.mtimeMs === mtimeMs) {
+  if (cached && now - cached.builtAt < PATH_INDEX_TTL_MS) {
     return cached.entries;
   }
+
   const entries = buildPathIndex(workspacePath);
-  indexCaches.set(workspacePath, { mtimeMs, entries });
+  indexCaches.set(workspacePath, { builtAt: now, entries });
+  evictPathIndexCaches(now);
   return entries;
 }
 

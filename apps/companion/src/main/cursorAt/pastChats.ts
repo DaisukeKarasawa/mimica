@@ -1,5 +1,5 @@
 import type { AtMenuItem, ChatSession } from "@mimica/shared";
-import { AT_MENU_SECTION_LABELS, AT_MENU_MAX_RESULTS } from "@mimica/shared";
+import { AT_MENU_MAX_RESULTS } from "@mimica/shared";
 import { normalize } from "node:path";
 
 export const MAX_PAST_CHAT_TURNS = 20;
@@ -70,8 +70,4 @@ export function formatPastChatForPrompt(session: ChatSession): {
   }
 
   return { text: body, warning };
-}
-
-export function pastChatSectionLabel(): string {
-  return AT_MENU_SECTION_LABELS["past-chats"];
 }

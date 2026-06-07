@@ -1,6 +1,6 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import type { AtMenuItem } from "@mimica/shared";
-import { AT_GIT_COMMIT_LABEL, AT_MENU_SECTION_LABELS, atGitBranchLabel } from "@mimica/shared";
+import { AT_GIT_COMMIT_LABEL, atGitBranchLabel } from "@mimica/shared";
 
 export const GIT_TIMEOUT_MS = 30_000;
 export const MAX_GIT_DIFF_BYTES = 256 * 1024;
@@ -29,6 +29,45 @@ function runGit(
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
   };
+}
+
+function runGitAsync(
+  workspacePath: string,
+  args: string[],
+): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    const child = spawn("git", ["--no-pager", ...args], {
+      cwd: workspacePath,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill();
+      resolve({ ok: false, stdout: "", stderr: "git command timed out" });
+    }, GIT_TIMEOUT_MS);
+
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr?.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on("error", (error: Error) => {
+      clearTimeout(timer);
+      resolve({
+        ok: false,
+        stdout: "",
+        stderr: error.message,
+      });
+    });
+    child.on("close", (code: number | null) => {
+      clearTimeout(timer);
+      resolve({ ok: code === 0, stdout, stderr });
+    });
+  });
 }
 
 export function isGitRepository(workspacePath: string): boolean {
@@ -106,12 +145,12 @@ function truncateDiff(diff: string): { body: string; truncated: boolean } {
   return { body, truncated: true };
 }
 
-export function getWorkingTreeDiff(workspacePath: string): GitDiffResult {
+export async function getWorkingTreeDiff(workspacePath: string): Promise<GitDiffResult> {
   if (!isGitRepository(workspacePath)) {
     return { diff: "", truncated: false, empty: true, warning: "Git リポジトリではありません" };
   }
 
-  const result = runGit(workspacePath, ["diff", "HEAD"]);
+  const result = await runGitAsync(workspacePath, ["diff", "HEAD"]);
   if (!result.ok) {
     return {
       diff: "",
@@ -137,7 +176,10 @@ export function getWorkingTreeDiff(workspacePath: string): GitDiffResult {
   };
 }
 
-export function getBranchDiff(workspacePath: string, baseBranch?: string): GitDiffResult {
+export async function getBranchDiff(
+  workspacePath: string,
+  baseBranch?: string,
+): Promise<GitDiffResult> {
   if (!isGitRepository(workspacePath)) {
     return { diff: "", truncated: false, empty: true, warning: "Git リポジトリではありません" };
   }
@@ -152,7 +194,7 @@ export function getBranchDiff(workspacePath: string, baseBranch?: string): GitDi
       warning: `無効なブランチ名です: ${base}`,
     };
   }
-  const verify = runGit(workspacePath, ["rev-parse", "--verify", base]);
+  const verify = await runGitAsync(workspacePath, ["rev-parse", "--verify", base]);
   if (!verify.ok) {
     return {
       diff: "",
@@ -163,7 +205,7 @@ export function getBranchDiff(workspacePath: string, baseBranch?: string): GitDi
     };
   }
 
-  const result = runGit(workspacePath, ["diff", `${base}...HEAD`]);
+  const result = await runGitAsync(workspacePath, ["diff", `${base}...HEAD`]);
   if (!result.ok) {
     return {
       diff: "",
@@ -228,8 +270,4 @@ export function listGitMenuItems(workspacePath: string, query: string): AtMenuIt
   }
 
   return items;
-}
-
-export function gitSectionLabel(): string {
-  return AT_MENU_SECTION_LABELS.git;
 }

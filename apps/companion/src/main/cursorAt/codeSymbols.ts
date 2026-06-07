@@ -1,17 +1,13 @@
 import { readFileSync } from "node:fs";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 import type { AtMenuItem, CodeSymbolResult } from "@mimica/shared";
-import { AT_MENU_MAX_RESULTS, AT_MENU_SECTION_LABELS, matchesAtPathQuery } from "@mimica/shared";
+import { AT_MENU_MAX_RESULTS, matchesAtPathQuery } from "@mimica/shared";
 import { assertContained } from "../paths.js";
+import { languageHintFromPath } from "./util.js";
 
 export const MAX_CODE_SNIPPET_LINES = 80;
 export const CODE_CONTEXT_BEFORE = 5;
 export const CODE_CONTEXT_AFTER = 40;
-
-function languageHintFromPath(relativePath: string): string {
-  const ext = extname(relativePath).slice(1);
-  return ext || "text";
-}
 
 function findSymbolLine(content: string, symbolName: string, hintLine?: number): number {
   if (hintLine && hintLine > 0) return hintLine;
@@ -103,8 +99,4 @@ export function codeSymbolsToMenuItems(symbols: CodeSymbolResult[], query: strin
     if (items.length >= AT_MENU_MAX_RESULTS) break;
   }
   return items;
-}
-
-export function codeSectionLabel(): string {
-  return AT_MENU_SECTION_LABELS.code;
 }

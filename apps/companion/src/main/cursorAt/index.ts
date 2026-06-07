@@ -1,5 +1,6 @@
-import { lstatSync, readdirSync, readFileSync } from "node:fs";
-import { extname, join } from "node:path";
+import { lstatSync, readdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { ChatSession, ResolveAtInputResult } from "@mimica/shared";
 import {
   AT_GIT_COMMIT_LABEL,
@@ -15,6 +16,7 @@ import { resolveRelativePath } from "./enumerate.js";
 import { formatGitDiffBlock, getBranchDiff, getWorkingTreeDiff } from "./gitContext.js";
 import { WorkspaceIgnoreFilter } from "./ignoreFilter.js";
 import { formatPastChatForPrompt } from "./pastChats.js";
+import { languageHintFromPath } from "./util.js";
 
 export const MAX_AT_FILE_LINES = 800;
 export const MAX_AT_FILE_BYTES = 256 * 1024;
@@ -23,11 +25,6 @@ export const MAX_AT_FOLDER_ENTRIES = 500;
 export interface ResolveAtInputOptions {
   skipPaths?: string[];
   getSession?: (id: string) => ChatSession | undefined;
-}
-
-function languageHintFromPath(relativePath: string): string {
-  const ext = extname(relativePath).slice(1);
-  return ext || "text";
 }
 
 function truncateFileContent(content: string): { body: string; truncated: boolean } {
@@ -93,13 +90,13 @@ function listFolderEntries(workspacePath: string, absDir: string, relativeDir: s
   return entries;
 }
 
-function expandFileMention(
+async function expandFileMention(
   relativePath: string,
   absPath: string,
-): { text: string; warning?: string } {
+): Promise<{ text: string; warning?: string }> {
   let content: string;
   try {
-    content = readFileSync(absPath, "utf8");
+    content = await readFile(absPath, "utf8");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
@@ -147,11 +144,11 @@ function normalizePathForCompare(path: string): string {
   return path.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
 }
 
-export function resolveAtInput(
+export async function resolveAtInput(
   workspacePath: string,
   input: string,
   options?: ResolveAtInputOptions,
-): ResolveAtInputResult {
+): Promise<ResolveAtInputResult> {
   const warnings: string[] = [];
   const resolvedPaths: string[] = [];
   let expanded = input;
@@ -167,8 +164,9 @@ export function resolveAtInput(
     if (result.warning) warnings.push(result.warning);
   }
 
-  for (const token of extractGitCommitTokens(expanded)) {
-    const diffResult = getWorkingTreeDiff(workspacePath);
+  const gitCommitTokens = extractGitCommitTokens(expanded);
+  if (gitCommitTokens.length > 0) {
+    const diffResult = await getWorkingTreeDiff(workspacePath);
     if (diffResult.warning && !diffResult.empty) warnings.push(diffResult.warning);
     if (
       diffResult.warning &&
@@ -178,22 +176,32 @@ export function resolveAtInput(
       warnings.push(diffResult.warning);
     }
     const block = formatGitDiffBlock(AT_GIT_COMMIT_LABEL, diffResult.diff, diffResult.empty);
-    expanded = expanded.replace(token, block.trim());
+    for (const token of gitCommitTokens) {
+      expanded = expanded.replace(token, block.trim());
+    }
   }
 
-  for (const token of extractGitBranchTokens(expanded)) {
-    const diffResult = getBranchDiff(workspacePath, token.baseBranch);
-    if (diffResult.warning && !diffResult.empty) warnings.push(diffResult.warning);
-    if (
-      diffResult.warning &&
-      diffResult.empty &&
-      diffResult.warning !== "Git リポジトリではありません"
-    ) {
-      warnings.push(diffResult.warning);
+  const branchTokens = extractGitBranchTokens(expanded);
+  if (branchTokens.length > 0) {
+    const branchDiffs = await Promise.all(
+      branchTokens.map(async (token) => ({
+        token,
+        diffResult: await getBranchDiff(workspacePath, token.baseBranch),
+      })),
+    );
+    for (const { token, diffResult } of branchDiffs) {
+      if (diffResult.warning && !diffResult.empty) warnings.push(diffResult.warning);
+      if (
+        diffResult.warning &&
+        diffResult.empty &&
+        diffResult.warning !== "Git リポジトリではありません"
+      ) {
+        warnings.push(diffResult.warning);
+      }
+      const title = atGitBranchLabel(diffResult.baseBranch ?? token.baseBranch);
+      const block = formatGitDiffBlock(title, diffResult.diff, diffResult.empty);
+      expanded = expanded.replace(token.raw, block.trim());
     }
-    const title = atGitBranchLabel(diffResult.baseBranch ?? token.baseBranch);
-    const block = formatGitDiffBlock(title, diffResult.diff, diffResult.empty);
-    expanded = expanded.replace(token.raw, block.trim());
   }
 
   for (const token of extractCodeTokens(expanded)) {
@@ -208,29 +216,48 @@ export function resolveAtInput(
   );
   const pathTokens = extractAtPathTokens(expanded);
 
-  for (const token of pathTokens) {
-    const normalized = normalizePathForCompare(token.path);
-    if (skip.has(normalized)) continue;
+  const pathExpansions = await Promise.all(
+    pathTokens.map(async (token) => {
+      const normalized = normalizePathForCompare(token.path);
+      if (skip.has(normalized)) return null;
 
-    const resolved = resolveRelativePath(workspacePath, normalized);
-    if (!resolved) {
-      warnings.push(`@${token.path} は workspace 内に見つからないか参照できません`);
-      continue;
-    }
+      const resolved = resolveRelativePath(workspacePath, normalized);
+      if (!resolved) {
+        return {
+          raw: token.raw,
+          warning: `@${token.path} は workspace 内に見つからないか参照できません`,
+          text: null,
+          resolvedPath: null,
+        };
+      }
 
-    const relativePath = normalized;
-    if (resolved.kind === "file") {
-      const result = expandFileMention(relativePath, resolved.absPath);
-      expanded = expanded.replace(token.raw, result.text);
-      if (result.warning) warnings.push(result.warning);
-      resolvedPaths.push(relativePath);
-      continue;
-    }
+      const relativePath = normalized;
+      if (resolved.kind === "file") {
+        const result = await expandFileMention(relativePath, resolved.absPath);
+        return {
+          raw: token.raw,
+          text: result.text,
+          warning: result.warning,
+          resolvedPath: relativePath,
+        };
+      }
 
-    const result = expandFolderMention(workspacePath, relativePath, resolved.absPath);
-    expanded = expanded.replace(token.raw, result.text);
-    if (result.warning) warnings.push(result.warning);
-    resolvedPaths.push(`${relativePath}/`);
+      const result = expandFolderMention(workspacePath, relativePath, resolved.absPath);
+      return {
+        raw: token.raw,
+        text: result.text,
+        warning: result.warning,
+        resolvedPath: `${relativePath}/`,
+      };
+    }),
+  );
+
+  for (const expansion of pathExpansions) {
+    if (!expansion) continue;
+    if (expansion.warning) warnings.push(expansion.warning);
+    if (!expansion.text) continue;
+    expanded = expanded.replace(expansion.raw, expansion.text);
+    if (expansion.resolvedPath) resolvedPaths.push(expansion.resolvedPath);
   }
 
   return {
