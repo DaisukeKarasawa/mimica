@@ -5,14 +5,12 @@ import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import { AgentSessionPool } from "./agentSessionPool.js";
 import { type CursorSdkConversationMode } from "./createCursorAgent.js";
 import { ensureReadOnlyHooks } from "./ensureReadOnlyHooks.js";
-import { buildContextPrompt } from "./eventMapper.js";
+import { buildAgentFullPrompt } from "./buildAgentPrompt.js";
 import { processAgentStream, resolveFinalAssistantText } from "./processAgentStream.js";
 import { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { READ_ONLY_HOOK_INSTALL_WARNING } from "./readOnlyPolicy.js";
 import { AgentRunTimingTrace } from "./agentRunTiming.js";
 import { resolveCursorApiKey } from "./resolveApiKey.js";
-import { promptStrategyForFollowUp } from "./promptStrategy.js";
-import { trimChatHistoryForPrompt } from "./trimChatHistory.js";
 
 export type { AgentRunCallbacks } from "./agentCallbacks.js";
 
@@ -33,49 +31,8 @@ export interface RunChatParams {
   timing?: AgentRunTimingTrace;
 }
 
-const OUTPUT_RULES = `CRITICAL output rule for the user-visible message:
-- Output ONLY the final answer in 調月リオ persona (short intro + substantive reply + optional short closing).
-- NEVER write planning, process narration, or tool preamble to the user. Forbidden examples: 「調べます」「確認します」「ペルソナ設定を確認」「ワークスペースを読み取ります」「最新の情報を取得します」.
-- Do planning silently via tools. The user must not see your internal steps.
-- Format the substantive reply as GitHub-Flavored Markdown: use blank lines between sections; tables must have one row per line (never collapse table rows onto a single line).
-
-Reply in Japanese when the user writes in Japanese. Follow the persona instructions below.`;
-
-const ASK_PREAMBLE = `You are the Mimica coding companion (調月リオ UI) in Ask mode: do not create, edit, delete, or run commands that modify the workspace. You may read and analyze files.
-
-${OUTPUT_RULES}`;
-
-const AGENT_PREAMBLE = `You are the Mimica coding companion (調月リオ UI) in Agent mode: you may read, edit, and run shell commands in the workspace when needed to answer the user.
-
-${OUTPUT_RULES}`;
-
-const PLAN_PREAMBLE = `You are the Mimica coding companion (調月リオ UI) in Plan mode: explore the codebase, propose a clear plan, and only implement when the user confirms or asks you to build.
-
-${OUTPUT_RULES}`;
-
-function preambleForMode(mode: AgentMode): string {
-  switch (mode) {
-    case "ask":
-      return ASK_PREAMBLE;
-    case "plan":
-      return PLAN_PREAMBLE;
-    default:
-      return AGENT_PREAMBLE;
-  }
-}
-
 function sdkModeFor(mode: AgentMode): CursorSdkConversationMode {
   return mode === "plan" ? "plan" : "agent";
-}
-
-function buildHistoryPrompt(messages: ChatMessage[]): string {
-  const turns = trimChatHistoryForPrompt(messages);
-  if (turns.length === 0) return "";
-  const lines = turns.map((m) => {
-    const label = m.role === "user" ? "User" : "Assistant";
-    return `${label}: ${m.content.trim()}`;
-  });
-  return `## Conversation history\n${lines.join("\n\n")}`;
 }
 
 export class AgentRunner {
@@ -269,21 +226,6 @@ export class AgentRunner {
   }
 
   private buildFullPrompt(params: RunChatParams, isFollowUp: boolean): string {
-    const contextBlock = params.context ? buildContextPrompt(params.context) : "";
-
-    if (promptStrategyForFollowUp(isFollowUp) === "followUp") {
-      return [contextBlock, `## User message\n${params.prompt}`].filter(Boolean).join("\n\n");
-    }
-
-    const historyBlock = params.history ? buildHistoryPrompt(params.history) : "";
-    return [
-      preambleForMode(params.mode),
-      params.personaSystemPrompt,
-      historyBlock,
-      contextBlock,
-      `## User message\n${params.prompt}`,
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    return buildAgentFullPrompt(params, isFollowUp);
   }
 }

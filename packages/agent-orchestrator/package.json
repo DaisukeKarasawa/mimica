@@ -15,7 +15,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "tsx --test 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.16",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.2"
   }
 }
