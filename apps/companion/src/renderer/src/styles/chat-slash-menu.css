@@ -128,3 +128,24 @@
 .slash-menu-name.kind-image {
   color: rgba(164, 188, 214, 0.95);
 }
+
+.slash-menu-name.kind-file {
+  color: rgba(174, 196, 174, 0.92);
+}
+
+.slash-menu-name.kind-folder {
+  color: rgba(196, 176, 148, 0.95);
+}
+
+.slash-menu-name.kind-past-chat {
+  color: rgba(196, 188, 214, 0.95);
+}
+
+.slash-menu-name.kind-git-commit,
+.slash-menu-name.kind-git-branch {
+  color: rgba(214, 188, 164, 0.95);
+}
+
+.slash-menu-name.kind-code {
+  color: rgba(174, 196, 214, 0.92);
+}

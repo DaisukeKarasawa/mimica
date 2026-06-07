@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type SetStateAction } from "react";
-import type { AgentMode, ChatAttachment } from "@mimica/shared";
+import type { AgentMode, ChatAttachment, AtMenuItem } from "@mimica/shared";
 import { agentModeComposerPlaceholder, cycleAgentMode } from "@mimica/shared";
 import { ComposerAttachments } from "./ComposerAttachments";
 import { SlashCommandMenu, useSlashMenuSections, useSlashMenuState } from "./SlashCommandMenu";
+import { AtMentionMenu, replaceAtMenuSelection, useAtMenuState } from "./AtMentionMenu";
+import { handleComposerMenuKeyDown } from "./useComposerMenuKeyboard";
 import { fileToBase64 } from "../utils/fileToBase64";
 
 /** Matches `.composer-input` max-height in chat.css */
@@ -46,6 +48,7 @@ export function ChatComposer({
   const controlsLocked = disabled || streaming;
   const canSend = !controlsLocked && (value.trim().length > 0 || attachments.length > 0);
   const slashMenu = useSlashMenuState(value, sections, controlsLocked);
+  const atMenu = useAtMenuState(value, workspacePath, sessionId, controlsLocked, slashMenu.open);
 
   const syncInputHeight = useCallback(() => {
     const el = inputRef.current;
@@ -121,6 +124,14 @@ export function ChatComposer({
     [onAttachmentError, onAttachmentsChange, reportAttachmentError, sessionId],
   );
 
+  const selectAtItem = useCallback(
+    (item: AtMenuItem) => {
+      onChange(replaceAtMenuSelection(value, item));
+      queueMicrotask(() => inputRef.current?.focus());
+    },
+    [onChange, value],
+  );
+
   const selectSlashItem = useCallback(
     async (name: string, kind: string) => {
       if (kind === "image") {
@@ -169,6 +180,15 @@ export function ChatComposer({
 
   return (
     <div className={`composer-box mode-${agentMode} ${disabled ? "is-disabled" : ""}`}>
+      <AtMentionMenu
+        open={atMenu.open}
+        workspaceLinked={atMenu.workspaceLinked}
+        sections={atMenu.sections}
+        filteredItems={atMenu.filteredItems}
+        highlightedIndex={atMenu.highlightedIndex}
+        onHighlightChange={atMenu.setHighlightedIndex}
+        onSelect={selectAtItem}
+      />
       <SlashCommandMenu
         open={slashMenu.open}
         filteredSections={slashMenu.filteredSections}
@@ -214,33 +234,30 @@ export function ChatComposer({
             }
           }}
           onKeyDown={(e) => {
-            if (slashMenu.open && slashMenu.filteredItems.length > 0) {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                slashMenu.setHighlightedIndex(
-                  (index) => (index + 1) % slashMenu.filteredItems.length,
-                );
-                return;
-              }
-              if (e.key === "ArrowUp") {
-                e.preventDefault();
-                slashMenu.setHighlightedIndex(
-                  (index) =>
-                    (index - 1 + slashMenu.filteredItems.length) % slashMenu.filteredItems.length,
-                );
-                return;
-              }
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                const selected = slashMenu.filteredItems[slashMenu.highlightedIndex];
-                if (selected) void selectSlashItem(selected.name, selected.kind);
-                return;
-              }
-              if (e.key === "Escape") {
-                e.preventDefault();
-                onChange("");
-                return;
-              }
+            if (
+              handleComposerMenuKeyDown(e, {
+                open: slashMenu.open,
+                filteredItems: slashMenu.filteredItems,
+                highlightedIndex: slashMenu.highlightedIndex,
+                setHighlightedIndex: slashMenu.setHighlightedIndex,
+                onSelect: (item) => void selectSlashItem(item.name, item.kind),
+                onEscape: () => onChange(""),
+              })
+            ) {
+              return;
+            }
+
+            if (
+              handleComposerMenuKeyDown(e, {
+                open: atMenu.open,
+                filteredItems: atMenu.filteredItems,
+                highlightedIndex: atMenu.highlightedIndex,
+                setHighlightedIndex: atMenu.setHighlightedIndex,
+                onSelect: selectAtItem,
+                onEscape: () => onChange(value.replace(/@([^\s@]*)$/, "")),
+              })
+            ) {
+              return;
             }
 
             if (e.key === "Tab" && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {

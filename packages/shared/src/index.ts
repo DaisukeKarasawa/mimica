@@ -43,6 +43,7 @@ export { type CharacterAssetStatus } from "./assets.js";
 
 export {
   type EditorContext,
+  type CodeSymbolResult,
   type ClientMessage,
   type ServerMessage,
   type CompanionMessage,
@@ -81,6 +82,45 @@ export {
   isSlashMenuOpen,
   slashMenuFilterQuery,
 } from "./slashInput.js";
+
+export {
+  type AtMenuEntryKind,
+  type AtMenuSectionCategory,
+  type AtMenuItem,
+  type AtMenuSection,
+  type ResolveAtInputResult,
+  AT_MENU_MAX_RESULTS,
+  AT_MENU_SECTION_LABELS,
+  AT_GIT_COMMIT_LABEL,
+  atGitBranchLabel,
+} from "./atMenu.js";
+
+export {
+  AT_MENU_OPEN_PATTERN,
+  AT_PATH_TOKEN_PATTERN,
+  AT_PAST_CHAT_TOKEN_PATTERN,
+  AT_GIT_COMMIT_TOKEN,
+  AT_CODE_TOKEN_PATTERN,
+  type AtMenuScope,
+  type AtPathToken,
+  type AtPastChatToken,
+  type AtCodeToken,
+  type AtGitBranchToken,
+  isAtMenuOpen,
+  atMenuFilterQuery,
+  atPathQueryFilterText,
+  matchesAtPathQuery,
+  scoreAtPathQueryMatch,
+  parseAtMenuScope,
+  extractAtPathTokens,
+  extractPastChatTokens,
+  extractGitCommitTokens,
+  extractGitBranchTokens,
+  extractCodeTokens,
+  atMenuItemToken,
+  atMenuItemDisplayLabel,
+  replaceAtMenuSelection,
+} from "./atInput.js";
 
 export {
   type ChatAttachment,

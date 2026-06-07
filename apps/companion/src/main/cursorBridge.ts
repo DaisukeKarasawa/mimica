@@ -1,7 +1,7 @@
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomUUID, randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { WebSocketServer, WebSocket } from "ws";
-import type { ClientMessage, EditorContext, ServerMessage } from "@mimica/shared";
+import type { ClientMessage, CodeSymbolResult, EditorContext, ServerMessage } from "@mimica/shared";
 import { MIMICA_BRIDGE_TOKEN_FILENAME } from "@mimica/shared";
 import { registerWorkspaceRoot } from "./workspaceAllowlist.js";
 import { userDataJoin } from "./userDataPaths.js";
@@ -58,14 +58,37 @@ function parseClientMessage(data: unknown, token: string): ClientMessage | null 
     case "context_update":
       if (!isEditorContext(msg.context)) return null;
       return { type: "context_update", context: msg.context, token };
+    case "symbol_search_result": {
+      if (typeof msg.requestId !== "string" || !Array.isArray(msg.symbols)) return null;
+      const symbols = msg.symbols.filter(isCodeSymbolResult);
+      return { type: "symbol_search_result", requestId: msg.requestId, token, symbols };
+    }
     default:
       return null;
   }
 }
 
+function isCodeSymbolResult(value: unknown): value is CodeSymbolResult {
+  if (!value || typeof value !== "object") return false;
+  const symbol = value as Record<string, unknown>;
+  return (
+    typeof symbol.name === "string" &&
+    typeof symbol.kind === "string" &&
+    typeof symbol.filePath === "string" &&
+    typeof symbol.startLine === "number" &&
+    typeof symbol.endLine === "number"
+  );
+}
+
+interface PendingSymbolSearch {
+  resolve: (symbols: CodeSymbolResult[]) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 export class CursorBridgeServer {
   private wss: WebSocketServer | null = null;
   private client: WebSocket | null = null;
+  private readonly pendingSymbolSearches = new Map<string, PendingSymbolSearch>();
   readonly bridgeToken: string;
 
   constructor(
@@ -110,6 +133,11 @@ export class CursorBridgeServer {
   }
 
   stop(): void {
+    for (const pending of this.pendingSymbolSearches.values()) {
+      clearTimeout(pending.timer);
+      pending.resolve([]);
+    }
+    this.pendingSymbolSearches.clear();
     this.client?.close();
     this.wss?.close();
     this.wss = null;
@@ -118,6 +146,29 @@ export class CursorBridgeServer {
 
   hasClient(): boolean {
     return this.client?.readyState === WebSocket.OPEN;
+  }
+
+  searchSymbols(query: string, limit: number, timeoutMs = 5000): Promise<CodeSymbolResult[]> {
+    if (!this.hasClient() || !query.trim()) {
+      return Promise.resolve([]);
+    }
+
+    const requestId = randomUUID();
+    const request: ServerMessage = {
+      type: "symbol_search_request",
+      requestId,
+      query,
+      limit,
+    };
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.pendingSymbolSearches.delete(requestId);
+        resolve([]);
+      }, timeoutMs);
+      this.pendingSymbolSearches.set(requestId, { resolve, timer });
+      this.client?.send(JSON.stringify(request));
+    });
   }
 
   private handleMessage(msg: ClientMessage, ws: WebSocket): void {
@@ -131,6 +182,14 @@ export class CursorBridgeServer {
         this.onContext(msg.context);
         const ack: ServerMessage = { type: "context_ack", context: msg.context };
         ws.send(JSON.stringify(ack));
+        break;
+      }
+      case "symbol_search_result": {
+        const pending = this.pendingSymbolSearches.get(msg.requestId);
+        if (!pending) break;
+        clearTimeout(pending.timer);
+        this.pendingSymbolSearches.delete(msg.requestId);
+        pending.resolve(msg.symbols);
         break;
       }
       case "companion_ready":

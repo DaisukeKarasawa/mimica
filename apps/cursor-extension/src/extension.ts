@@ -9,6 +9,7 @@ import { getBridgeToken } from "./bridgeToken";
 import { companionLaunchHint, launchCompanion } from "./companionLaunch";
 import { getEditorContext } from "./contextProvider";
 import { loadRepoDotEnv } from "./loadRepoDotEnv";
+import { searchWorkspaceSymbols } from "./symbolProvider";
 
 loadRepoDotEnv(join(__dirname, "..", "..", ".."));
 
@@ -138,12 +139,57 @@ function waitForBridge(maxMs = 15000): Promise<void> {
   });
 }
 
+const MAX_SYMBOL_SEARCH_LIMIT = 100;
+
+function isSymbolSearchRequestMessage(
+  msg: unknown,
+): msg is Extract<ServerMessage, { type: "symbol_search_request" }> {
+  if (!msg || typeof msg !== "object") return false;
+  const value = msg as Record<string, unknown>;
+  return (
+    value.type === "symbol_search_request" &&
+    typeof value.requestId === "string" &&
+    typeof value.query === "string" &&
+    typeof value.limit === "number" &&
+    Number.isFinite(value.limit)
+  );
+}
+
 function handleServerMessage(raw: unknown): void {
   if (!raw || typeof raw !== "object") return;
   const msg = raw as ServerMessage;
   if (msg.type === "connection_ack") {
     /* connection_ack carries no token; client auth uses companion_ready / context_update */
+    return;
   }
+  if (isSymbolSearchRequestMessage(msg)) {
+    const safeLimit = Math.min(MAX_SYMBOL_SEARCH_LIMIT, Math.max(1, Math.floor(msg.limit)));
+    void handleSymbolSearchRequest(msg.requestId, msg.query, safeLimit).catch(() => {});
+  }
+}
+
+async function handleSymbolSearchRequest(
+  requestId: string,
+  query: string,
+  limit: number,
+): Promise<void> {
+  const bridgeToken = getBridgeToken();
+  if (!bridgeToken || wsClient?.readyState !== WebSocket.OPEN) return;
+
+  let symbols: Awaited<ReturnType<typeof searchWorkspaceSymbols>> = [];
+  try {
+    symbols = await searchWorkspaceSymbols(query, limit);
+  } catch {
+    symbols = [];
+  }
+
+  const response: ClientMessage = {
+    type: "symbol_search_result",
+    requestId,
+    token: bridgeToken,
+    symbols,
+  };
+  wsClient.send(JSON.stringify(response));
 }
 
 async function connectBridge(): Promise<void> {

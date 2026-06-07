@@ -104,6 +104,7 @@ export function installUiLabStub(): void {
     },
 
     listSlashMenu: async () => [],
+    searchAtMenu: async () => [],
     pickImageAttachments: async () => [],
     pasteImageAttachment: async () => ({
       id: "ui-lab-attachment",
