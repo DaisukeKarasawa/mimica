@@ -137,15 +137,25 @@ export class AgentService {
     this.activeRunId = null;
   }
 
-  closeSession(sessionId: string): void {
-    void this.runner?.closeSession(sessionId);
+  async closeSession(sessionId: string): Promise<void> {
+    if (!this.runner) return;
+    await this.runner.closeSession(sessionId);
   }
 
-  dispose(): void {
-    void this.cancel();
-    this.runner?.closeAllSessions();
+  async dispose(): Promise<void> {
+    const runner = this.runner;
     this.runner = null;
     this.runnerReady = null;
     this.activeRunId = null;
+    if (!runner) return;
+    const results = await Promise.allSettled([
+      runner.cancel(),
+      Promise.resolve(runner.closeAllSessions()),
+    ]);
+    for (const result of results) {
+      if (result.status === "rejected") {
+        console.error("[agentService] dispose cleanup failed:", result.reason);
+      }
+    }
   }
 }

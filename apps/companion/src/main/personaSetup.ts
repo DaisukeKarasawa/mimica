@@ -11,6 +11,7 @@ let cachedTemplatePersonaDir: string | undefined;
 let cachedPersonaPrompt: string | undefined;
 let cachedPersonaSourcePath: string | undefined;
 let cachedPersonaSourceMtimeMs: number | undefined;
+let cachedPersonaStyleMtimeMs: number | undefined;
 
 function devTemplatePersonaDir(): string {
   const companionRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -99,10 +100,13 @@ export function resolvePersonaSystemPrompt(): string | undefined {
   const settings = getActiveMimicaSettings();
   const sourcePath = resolveExpandedPath(settings.personaPackPath);
   const sourceMtimeMs = personaSourceMtimeMs(sourcePath);
+  const stylePath = join(dirname(sourcePath), "style.md");
+  const styleMtimeMs = personaSourceMtimeMs(stylePath);
   if (
     cachedPersonaPrompt &&
     cachedPersonaSourcePath === sourcePath &&
-    cachedPersonaSourceMtimeMs === sourceMtimeMs
+    cachedPersonaSourceMtimeMs === sourceMtimeMs &&
+    cachedPersonaStyleMtimeMs === styleMtimeMs
   ) {
     return cachedPersonaPrompt;
   }
@@ -110,6 +114,7 @@ export function resolvePersonaSystemPrompt(): string | undefined {
   if (!prompt) return undefined;
   cachedPersonaSourcePath = sourcePath;
   cachedPersonaSourceMtimeMs = sourceMtimeMs;
+  cachedPersonaStyleMtimeMs = styleMtimeMs;
   cachedPersonaPrompt = prompt;
   return prompt;
 }
