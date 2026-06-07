@@ -186,17 +186,20 @@ describe("extended slash discovery", () => {
     resetSlashCatalogCachesForTests();
     const isolatedWorkspace = mkdtempSync(join(tmpdir(), "mimica-discovery-symlink-ws-"));
     const outsideDir = mkdtempSync(join(tmpdir(), "mimica-discovery-outside-cmds-"));
-    writeFileSync(join(outsideDir, "leaked.md"), "# Leaked\n\nSecret command body.");
 
-    const commandsLink = join(isolatedWorkspace, ".cursor", "commands");
-    mkdirSync(join(isolatedWorkspace, ".cursor"), { recursive: true });
-    symlinkSync(outsideDir, commandsLink);
+    try {
+      writeFileSync(join(outsideDir, "leaked.md"), "# Leaked\n\nSecret command body.");
 
-    assert.deepEqual(walkCommandFiles(commandsLink), []);
-    assert.equal(resolveSlashCommand(isolatedWorkspace, "leaked"), null);
+      const commandsLink = join(isolatedWorkspace, ".cursor", "commands");
+      mkdirSync(join(isolatedWorkspace, ".cursor"), { recursive: true });
+      symlinkSync(outsideDir, commandsLink);
 
-    rmSync(outsideDir, { recursive: true, force: true });
-    rmSync(isolatedWorkspace, { recursive: true, force: true });
+      assert.deepEqual(walkCommandFiles(commandsLink), []);
+      assert.equal(resolveSlashCommand(isolatedWorkspace, "leaked"), null);
+    } finally {
+      rmSync(outsideDir, { recursive: true, force: true });
+      rmSync(isolatedWorkspace, { recursive: true, force: true });
+    }
   });
 
   it("resolveSlashWorkspaceOrNull returns null for missing or invalid paths", () => {
