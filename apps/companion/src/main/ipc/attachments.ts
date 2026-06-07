@@ -117,7 +117,14 @@ export function registerAttachmentIpc(
         saved.push(saveImageFromPath(sessionId, filePath));
       }
     } catch (error) {
-      releaseDraftSlots(key, toSaveCount - saved.length);
+      for (const attachment of saved) {
+        try {
+          deleteAttachmentFile(sessionId, attachment);
+        } catch {
+          /* best-effort rollback */
+        }
+      }
+      releaseDraftSlots(key, toSaveCount);
       throw error;
     }
     return saved;

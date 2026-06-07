@@ -257,7 +257,7 @@ export default function App() {
             onReorderTab={tabs.reorderOpenTab}
             onSelectHistorySession={tabs.openSessionTab}
             onDeleteSession={(id) => void tabs.handleDeleteSession(id)}
-            onSend={(text) => void handleSend(text)}
+            onSend={(text, attachments) => void handleSend(text, attachments)}
             onCancel={() => void handleCancel()}
           />
         }

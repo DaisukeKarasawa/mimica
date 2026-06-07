@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, type SetStateAction } from "react";
 import type { AgentMode, ChatAttachment } from "@mimica/shared";
 import { agentModeComposerPlaceholder, cycleAgentMode } from "@mimica/shared";
 import { ComposerAttachments } from "./ComposerAttachments";
@@ -18,7 +18,7 @@ interface ChatComposerProps {
   disabled?: boolean;
   streaming?: boolean;
   onChange: (value: string) => void;
-  onAttachmentsChange: (attachments: ChatAttachment[]) => void;
+  onAttachmentsChange: (attachments: SetStateAction<ChatAttachment[]>) => void;
   onAgentModeChange: (mode: AgentMode) => void;
   onSubmit: () => void;
   onCancel: () => void;
@@ -93,20 +93,13 @@ export function ChatComposer({
     try {
       const picked = await window.mimica.pickImageAttachments(sessionId);
       if (picked.length > 0) {
-        onAttachmentsChange([...attachments, ...picked]);
+        onAttachmentsChange((prev) => [...prev, ...picked]);
         onChange("");
       }
     } catch (error) {
       reportAttachmentError(error);
     }
-  }, [
-    attachments,
-    onAttachmentError,
-    onAttachmentsChange,
-    onChange,
-    reportAttachmentError,
-    sessionId,
-  ]);
+  }, [onAttachmentError, onAttachmentsChange, onChange, reportAttachmentError, sessionId]);
 
   const pasteImage = useCallback(
     async (file: File) => {
@@ -120,12 +113,12 @@ export function ChatComposer({
           mimeType: file.type,
           data,
         });
-        onAttachmentsChange([...attachments, saved]);
+        onAttachmentsChange((prev) => [...prev, saved]);
       } catch (error) {
         reportAttachmentError(error);
       }
     },
-    [attachments, onAttachmentError, onAttachmentsChange, reportAttachmentError, sessionId],
+    [onAttachmentError, onAttachmentsChange, reportAttachmentError, sessionId],
   );
 
   const selectSlashItem = useCallback(
@@ -191,7 +184,7 @@ export function ChatComposer({
           disabled={controlsLocked}
           onRemove={(attachmentId) => {
             const removed = attachments.find((item) => item.id === attachmentId);
-            onAttachmentsChange(attachments.filter((item) => item.id !== attachmentId));
+            onAttachmentsChange((prev) => prev.filter((item) => item.id !== attachmentId));
             if (sessionId && removed) {
               void window.mimica.discardImageAttachment(sessionId, removed);
             }
