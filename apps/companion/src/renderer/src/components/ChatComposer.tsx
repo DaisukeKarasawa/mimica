@@ -134,7 +134,7 @@ export function ChatComposer({
 
   const selectSlashItem = useCallback(
     async (name: string, kind: string) => {
-      if (kind === "image") {
+      if (kind === "image" && name === "attach") {
         await pickImages();
         return;
       }

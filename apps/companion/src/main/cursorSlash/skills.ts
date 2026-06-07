@@ -1,11 +1,20 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, relative } from "node:path";
 import type { SlashCommandSource, SlashMenuItem } from "@mimica/shared";
 import { SLASH_NAME_PATTERN } from "@mimica/shared";
-import { getCachedCatalog, skillCatalogStore } from "./catalog.js";
-
-const SKILL_FILE = "SKILL.md";
+import { getCachedCatalog, skillCatalogStore, slashSkillsCatalogMtime } from "./catalog.js";
+import {
+  bundledSkillsRoot,
+  catalogCacheKey,
+  findWorkspaceSkillRoots,
+  normalizeWorkspacePath,
+  pluginSkillsCacheRoot,
+  userAgentsSkillsRoot,
+  userSkillsRoot,
+  walkPluginSkillFiles,
+  walkSkillFiles,
+} from "./discovery.js";
 
 interface SkillEntry {
   name: string;
@@ -13,14 +22,6 @@ interface SkillEntry {
   absolutePath: string;
   source: SlashCommandSource;
   workspaceRelativePath?: string;
-}
-
-function userSkillsRoot(): string {
-  return join(homedir(), ".cursor", "skills");
-}
-
-function projectSkillsRoot(workspacePath: string): string {
-  return join(workspacePath, ".cursor", "skills");
 }
 
 function parseFrontmatter(content: string): Record<string, string> {
@@ -34,29 +35,6 @@ function parseFrontmatter(content: string): Record<string, string> {
     if (field) fields[field[1]] = field[2].trim();
   }
   return fields;
-}
-
-function walkSkillFiles(root: string): string[] {
-  const found: string[] = [];
-  const stack = [root];
-  while (stack.length > 0) {
-    const dir = stack.pop()!;
-    let entries;
-    try {
-      entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      const fullPath = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(fullPath);
-      } else if (entry.isFile() && entry.name === SKILL_FILE) {
-        found.push(fullPath);
-      }
-    }
-  }
-  return found;
 }
 
 function skillNameFromPath(skillFilePath: string, content: string): string {
@@ -87,7 +65,7 @@ function skillDescription(content: string, name: string): string {
 function loadSkillEntry(
   absolutePath: string,
   source: SlashCommandSource,
-  workspacePath: string,
+  workspacePath: string | null,
 ): SkillEntry | null {
   let content: string;
   try {
@@ -98,7 +76,7 @@ function loadSkillEntry(
   const name = skillNameFromPath(absolutePath, content);
   if (!SLASH_NAME_PATTERN.test(name)) return null;
   const workspaceRelativePath =
-    source === "project" ? relative(workspacePath, absolutePath) : undefined;
+    source === "project" && workspacePath ? relative(workspacePath, absolutePath) : undefined;
   return {
     name,
     description: skillDescription(content, name),
@@ -108,31 +86,54 @@ function loadSkillEntry(
   };
 }
 
-function buildSkillCatalog(workspacePath: string): Map<string, SkillEntry> {
+function addSkillsFromRoot(
+  byName: Map<string, SkillEntry>,
+  root: string,
+  source: SlashCommandSource,
+  workspacePath: string | null,
+  overwrite: boolean,
+): void {
+  const walk = source === "plugin" ? walkPluginSkillFiles : walkSkillFiles;
+  for (const filePath of walk(root)) {
+    const entry = loadSkillEntry(filePath, source, workspacePath);
+    if (!entry) continue;
+    if (overwrite || !byName.has(entry.name)) {
+      byName.set(entry.name, entry);
+    }
+  }
+}
+
+function buildSkillCatalog(workspacePath: string | null): Map<string, SkillEntry> {
   const byName = new Map<string, SkillEntry>();
 
-  for (const filePath of walkSkillFiles(projectSkillsRoot(workspacePath))) {
-    const entry = loadSkillEntry(filePath, "project", workspacePath);
-    if (entry) byName.set(entry.name, entry);
-  }
+  // Lowest priority first: plugin → bundled → user → project (project wins).
+  addSkillsFromRoot(byName, pluginSkillsCacheRoot(), "plugin", workspacePath, false);
+  addSkillsFromRoot(byName, bundledSkillsRoot(), "bundled", workspacePath, false);
+  addSkillsFromRoot(byName, userSkillsRoot(), "user", workspacePath, true);
+  addSkillsFromRoot(byName, userAgentsSkillsRoot(), "user", workspacePath, true);
 
-  for (const filePath of walkSkillFiles(userSkillsRoot())) {
-    const entry = loadSkillEntry(filePath, "user", workspacePath);
-    if (entry && !byName.has(entry.name)) {
-      byName.set(entry.name, entry);
+  if (workspacePath) {
+    for (const root of findWorkspaceSkillRoots(workspacePath)) {
+      addSkillsFromRoot(byName, root, "project", workspacePath, true);
     }
   }
 
   return byName;
 }
 
-function getSkillCatalog(workspacePath: string): Map<string, SkillEntry> {
-  return getCachedCatalog(workspacePath, skillCatalogStore(), () =>
-    buildSkillCatalog(workspacePath),
+function getSkillCatalog(workspacePath: string | null): Map<string, SkillEntry> {
+  const normalized = normalizeWorkspacePath(workspacePath);
+  const cacheKey = catalogCacheKey(normalized);
+  return getCachedCatalog(
+    cacheKey,
+    normalized,
+    skillCatalogStore(),
+    () => buildSkillCatalog(normalized),
+    slashSkillsCatalogMtime,
   );
 }
 
-export function listSlashSkills(workspacePath: string): SlashMenuItem[] {
+export function listSlashSkills(workspacePath: string | null): SlashMenuItem[] {
   return [...getSkillCatalog(workspacePath).values()]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((entry) => ({
@@ -144,7 +145,7 @@ export function listSlashSkills(workspacePath: string): SlashMenuItem[] {
 }
 
 export function resolveSlashSkill(
-  workspacePath: string,
+  workspacePath: string | null,
   skillName: string,
   remainder?: string,
 ): { expanded: string; skillName: string } | { warning: string; skillName: string } | null {

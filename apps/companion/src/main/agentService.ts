@@ -9,6 +9,11 @@ import {
   type AgentRunner,
 } from "@mimica/agent-orchestrator";
 import { resolveWorkspacePath } from "./paths.js";
+import {
+  resolveAgentSubmitWorkspace,
+  shouldWarnUnlinkedAtExpansion,
+  UNLINKED_AT_EXPANSION_WARNING,
+} from "./agentSubmitWorkspace.js";
 import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
@@ -81,11 +86,15 @@ export class AgentService {
     const allMessages = session.messages;
     const history = historyForAgentPrompt(allMessages, payload.content);
 
-    const cwd = resolveWorkspacePath(
-      editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "",
+    const rawWorkspace =
+      editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "";
+
+    const { slashWorkspace, cwd, canExpandAt } = resolveAgentSubmitWorkspace(
+      rawWorkspace,
+      resolveWorkspacePath,
     );
 
-    const resolved = resolveSlashInput(cwd, payload.content, payload.mode);
+    const resolved = resolveSlashInput(slashWorkspace, payload.content, payload.mode);
     if (resolved.warning) {
       emitter.warning(resolved.warning);
     }
@@ -93,18 +102,26 @@ export class AgentService {
       debugLogSlashResolution(resolved.kind, resolved.name, resolved.expanded.length);
     }
 
-    const skipAtPaths: string[] = [];
-    if (editorContext?.currentFilePath) {
-      const rel = relative(cwd, editorContext.currentFilePath).replace(/\\/g, "/");
-      if (rel && !rel.startsWith("..")) {
-        skipAtPaths.push(rel);
+    let atResolved: Awaited<ReturnType<typeof resolveAtInput>>;
+    if (canExpandAt) {
+      const skipAtPaths: string[] = [];
+      if (editorContext?.currentFilePath) {
+        const rel = relative(cwd, editorContext.currentFilePath).replace(/\\/g, "/");
+        if (rel && !rel.startsWith("..")) {
+          skipAtPaths.push(rel);
+        }
+      }
+      atResolved = await resolveAtInput(cwd, resolved.expanded, {
+        tokenSource: payload.content,
+        skipPaths: skipAtPaths,
+        getSession: (id) => this.sessionStore.get(id),
+      });
+    } else {
+      atResolved = { expanded: resolved.expanded };
+      if (shouldWarnUnlinkedAtExpansion(canExpandAt, payload.content)) {
+        emitter.warning(UNLINKED_AT_EXPANSION_WARNING);
       }
     }
-    const atResolved = await resolveAtInput(cwd, resolved.expanded, {
-      tokenSource: payload.content,
-      skipPaths: skipAtPaths,
-      getSession: (id) => this.sessionStore.get(id),
-    });
     if (atResolved.warning) {
       emitter.warning(atResolved.warning);
     }
