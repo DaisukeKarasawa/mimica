@@ -8,6 +8,8 @@ import { resolveExpandedPath } from "./paths.js";
 const LOG_PREFIX = "[personaSetup]";
 
 let cachedTemplatePersonaDir: string | undefined;
+let cachedPersonaPrompt: string | undefined;
+let cachedPersonaSourcePath: string | undefined;
 
 function devTemplatePersonaDir(): string {
   const companionRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -49,12 +51,8 @@ function readPersonaPack(skillPath: string): string | null {
   const dir = dirname(resolved);
   const parts = [readFileSync(resolved, "utf8").trim()];
   const stylePath = join(dir, "style.md");
-  const linesPath = join(dir, "lines.json");
   if (existsSync(stylePath)) {
     parts.push(`---\n${readFileSync(stylePath, "utf8").trim()}`);
-  }
-  if (existsSync(linesPath)) {
-    parts.push(`---\n## 参考セリフ (lines.json)\n${readFileSync(linesPath, "utf8").trim()}`);
   }
   return parts.join("\n\n");
 }
@@ -90,6 +88,13 @@ export function ensurePersonaPackOnDisk(): void {
 export function resolvePersonaSystemPrompt(): string | undefined {
   ensurePersonaPackOnDisk();
   const settings = getActiveMimicaSettings();
-  const prompt = readPersonaPack(resolveExpandedPath(settings.personaPackPath));
-  return prompt ?? undefined;
+  const sourcePath = resolveExpandedPath(settings.personaPackPath);
+  if (cachedPersonaPrompt && cachedPersonaSourcePath === sourcePath) {
+    return cachedPersonaPrompt;
+  }
+  const prompt = readPersonaPack(sourcePath);
+  if (!prompt) return undefined;
+  cachedPersonaSourcePath = sourcePath;
+  cachedPersonaPrompt = prompt;
+  return prompt;
 }

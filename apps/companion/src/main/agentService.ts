@@ -2,7 +2,11 @@ import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
 import type { AgentMode, EditorContext } from "@mimica/shared";
 import { toMessageContext } from "@mimica/shared";
-import type { AgentRunner } from "@mimica/agent-orchestrator";
+import {
+  AgentRunTimingTrace,
+  isAgentPerfEnabled,
+  type AgentRunner,
+} from "@mimica/agent-orchestrator";
 import { resolveWorkspacePath } from "./paths.js";
 import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
@@ -70,14 +74,27 @@ export class AgentService {
       editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "",
     );
 
+    const timing = isAgentPerfEnabled()
+      ? new AgentRunTimingTrace(runId, {
+          mode: payload.mode,
+          workspacePath: cwd,
+          promptChars: payload.content.length,
+        })
+      : undefined;
+    if (timing) {
+      emitter.perf(Date.now());
+    }
+
     try {
       await runner.runChat({
+        sessionId: payload.sessionId,
         prompt: payload.content,
         workspacePath: cwd,
         mode: payload.mode,
         context,
         history,
         personaSystemPrompt: resolvePersonaSystemPrompt(),
+        timing,
         callbacks: {
           onState: (state) => emitter.state(state),
           onDelta: (chunk) => emitter.delta(chunk),
@@ -117,6 +134,18 @@ export class AgentService {
     if (this.runner) {
       await this.runner.cancel();
     }
+    this.activeRunId = null;
+  }
+
+  closeSession(sessionId: string): void {
+    void this.runner?.closeSession(sessionId);
+  }
+
+  dispose(): void {
+    void this.cancel();
+    this.runner?.closeAllSessions();
+    this.runner = null;
+    this.runnerReady = null;
     this.activeRunId = null;
   }
 }

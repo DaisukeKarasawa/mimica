@@ -9,6 +9,7 @@ import {
   applyAgentTool,
   streamMessageId,
 } from "../lib/agentSessionUpdate";
+import { logAgentPerfUi, type AgentPerfUiRecord } from "../lib/agentPerfUi";
 import type { PendingStreamComplete, StreamRevealContext } from "../lib/streamRevealController";
 import { StreamRevealController } from "../lib/streamRevealController";
 
@@ -28,6 +29,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
   const { director, setAllSessions, setIsStreaming } = options;
 
   const activeStreamIdRef = useRef<string | null>(null);
+  const perfByRunIdRef = useRef(new Map<string, AgentPerfUiRecord>());
   const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const directorRef = useRef(director);
   const setAllSessionsRef = useRef(setAllSessions);
@@ -55,11 +57,22 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
   if (!revealRef.current) {
     revealRef.current = new StreamRevealController({
       onFrame: (ctx: StreamRevealContext, content: string) => {
+        const perf = perfByRunIdRef.current.get(ctx.runId);
+        if (perf && content.length > 0) {
+          logAgentPerfUi(perf, "first_visible");
+        }
         setAllSessionsRef.current((prev) =>
           applyAgentDelta(prev, ctx.sessionId, ctx.runId, ctx.streamId, content),
         );
       },
       onFinalize: (pending: PendingStreamComplete) => {
+        const perf = perfByRunIdRef.current.get(pending.runId);
+        if (perf) {
+          logAgentPerfUi(perf, "reveal_done", {
+            contentChars: [...pending.content].length,
+          });
+          perfByRunIdRef.current.delete(pending.runId);
+        }
         activeStreamIdRef.current = null;
         setAllSessionsRef.current((prev) =>
           applyAgentComplete(
@@ -148,6 +161,13 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
         }
         case "agent_warning":
           break;
+        case "agent_perf": {
+          perfByRunIdRef.current.set(event.runId, {
+            runId: event.runId,
+            t0EpochMs: event.t0EpochMs,
+          });
+          break;
+        }
         case "agent_delta": {
           syncRevealContext(event);
           reveal.appendReceived(event.content);
