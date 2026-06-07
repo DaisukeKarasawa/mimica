@@ -11,7 +11,14 @@ export const AT_PAST_CHAT_TOKEN_PATTERN = /@Past Chat: ([0-9a-f-]{36})/gi;
 export const AT_GIT_COMMIT_TOKEN = `@${AT_GIT_COMMIT_LABEL}`;
 export const AT_CODE_TOKEN_PATTERN = /@Code:([^:\s]+):([^\s]+)/g;
 
-const FILE_PATH_TOKEN_SKIP_PREFIXES = ["Past", "Commit", "Branch", "Code:"] as const;
+function stripSpecialAtTokens(input: string): string {
+  let stripped = input.replace(AT_PAST_CHAT_TOKEN_PATTERN, " ");
+  stripped = stripped.replace(/@Past Chat:\s*\S*/gi, " ");
+  stripped = stripped.replace(AT_CODE_TOKEN_PATTERN, " ");
+  stripped = stripped.replaceAll(AT_GIT_COMMIT_TOKEN, " ");
+  stripped = stripped.replace(/@Branch \(Diff with [^)]*\)?/g, " ");
+  return stripped;
+}
 
 export interface AtMenuScope {
   /** Directory prefix for folder navigation; empty string means workspace root. */
@@ -154,11 +161,11 @@ export function parseAtMenuScope(query: string): AtMenuScope {
 export function extractAtPathTokens(input: string): AtPathToken[] {
   const tokens: AtPathToken[] = [];
   const seen = new Set<string>();
-  for (const match of input.matchAll(AT_PATH_TOKEN_PATTERN)) {
+  const stripped = stripSpecialAtTokens(input);
+  for (const match of stripped.matchAll(AT_PATH_TOKEN_PATTERN)) {
     const raw = match[0];
     const path = match[1]?.replace(/\\/g, "/").replace(/\/+$/, "") ?? "";
     if (!path || seen.has(path)) continue;
-    if (FILE_PATH_TOKEN_SKIP_PREFIXES.some((prefix) => path.startsWith(prefix))) continue;
     seen.add(path);
     tokens.push({ raw, path });
   }
@@ -223,6 +230,11 @@ export function atMenuItemToken(item: AtMenuItem, baseBranch?: string): string {
     default:
       return `@${item.path} `;
   }
+}
+
+/** Menu row label derived from the canonical submit token. */
+export function atMenuItemDisplayLabel(item: AtMenuItem, baseBranch?: string): string {
+  return atMenuItemToken(item, baseBranch).trimEnd();
 }
 
 export function replaceAtMenuSelection(

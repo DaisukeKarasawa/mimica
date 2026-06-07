@@ -85,6 +85,12 @@ describe("extractAtPathTokens", () => {
     assert.deepEqual(extractAtPathTokens("@Past Chat: abc"), []);
     assert.deepEqual(extractAtPathTokens("@Code:src/a.ts:foo"), []);
   });
+
+  it("does not skip legitimate paths that share special-token prefixes", () => {
+    assert.deepEqual(extractAtPathTokens("see @packages/Past/foo.ts"), [
+      { raw: "@packages/Past/foo.ts", path: "packages/Past/foo.ts" },
+    ]);
+  });
 });
 
 describe("special @ tokens", () => {

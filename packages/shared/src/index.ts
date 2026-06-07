@@ -118,6 +118,7 @@ export {
   extractGitBranchTokens,
   extractCodeTokens,
   atMenuItemToken,
+  atMenuItemDisplayLabel,
   replaceAtMenuSelection,
 } from "./atInput.js";
 
