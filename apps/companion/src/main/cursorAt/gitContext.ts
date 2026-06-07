@@ -74,7 +74,6 @@ function runGitAsync(
 
     let stdout = "";
     let stderr = "";
-    let stdoutBytes = 0;
     let truncated = false;
     const timer = setTimeout(() => {
       child.kill();
@@ -87,12 +86,10 @@ function runGitAsync(
       if (truncated) return;
       if (!maxStdoutBytes) {
         stdout += chunk;
-        stdoutBytes = Buffer.byteLength(stdout, "utf8");
         return;
       }
       const next = appendStdoutUpToBytes(stdout, chunk, maxStdoutBytes);
       stdout = next.text;
-      stdoutBytes = next.bytes;
       if (next.truncated) {
         truncated = true;
         child.kill();
