@@ -1,28 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentMode, SlashMenuItem, SlashMenuSection } from "@mimica/shared";
-
-const SLASH_MENU_PATTERN = /^\/([A-Za-z0-9_-]*)$/;
+import { isSlashMenuOpen, slashMenuFilterQuery } from "@mimica/shared";
 
 type SlashMenuRow =
   | { type: "header"; label: string; key: string }
   | { type: "item"; item: SlashMenuItem; flatIndex: number; key: string };
 
-interface SlashCommandMenuProps {
-  value: string;
-  sections: SlashMenuSection[];
-  disabled?: boolean;
-  highlightedIndex: number;
-  onHighlightChange: (index: number) => void;
-  onSelect: (item: SlashMenuItem) => void;
+export function filterSlashMenuSections(
+  sections: SlashMenuSection[],
+  query: string,
+): SlashMenuSection[] {
+  if (!query) return sections;
+  const lower = query.toLowerCase();
+  return sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => item.name.toLowerCase().startsWith(lower)),
+    }))
+    .filter((section) => section.items.length > 0);
 }
 
-export function isSlashMenuOpen(value: string): boolean {
-  return SLASH_MENU_PATTERN.test(value);
-}
-
-export function slashMenuFilterQuery(value: string): string {
-  const match = value.match(SLASH_MENU_PATTERN);
-  return match?.[1] ?? "";
+export function flattenSlashMenuItems(sections: SlashMenuSection[]): SlashMenuItem[] {
+  return sections.flatMap((section) => section.items);
 }
 
 export function useSlashMenuSections(
@@ -50,18 +49,34 @@ export function useSlashMenuSections(
   return sections;
 }
 
-export function filterSlashMenuSections(
-  sections: SlashMenuSection[],
-  query: string,
-): SlashMenuSection[] {
-  if (!query) return sections;
-  const lower = query.toLowerCase();
-  return sections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => item.name.toLowerCase().startsWith(lower)),
-    }))
-    .filter((section) => section.items.length > 0);
+export function useSlashMenuState(value: string, sections: SlashMenuSection[], disabled?: boolean) {
+  const open = !disabled && isSlashMenuOpen(value);
+  const query = slashMenuFilterQuery(value);
+  const filteredSections = useMemo(
+    () => filterSlashMenuSections(sections, query),
+    [sections, query],
+  );
+  const filteredItems = useMemo(() => flattenSlashMenuItems(filteredSections), [filteredSections]);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  useEffect(() => {
+    if (open) setHighlightedIndex(0);
+  }, [open, query]);
+
+  useEffect(() => {
+    if (!open || filteredItems.length === 0) return;
+    if (highlightedIndex >= filteredItems.length) {
+      setHighlightedIndex(Math.max(0, filteredItems.length - 1));
+    }
+  }, [open, highlightedIndex, filteredItems.length]);
+
+  return {
+    open,
+    filteredSections,
+    filteredItems,
+    highlightedIndex,
+    setHighlightedIndex,
+  };
 }
 
 function buildMenuRows(sections: SlashMenuSection[]): {
@@ -92,29 +107,25 @@ function itemLabel(item: SlashMenuItem): string {
   return `/${item.name}`;
 }
 
+interface SlashCommandMenuProps {
+  open: boolean;
+  filteredSections: SlashMenuSection[];
+  filteredItems: SlashMenuItem[];
+  highlightedIndex: number;
+  onHighlightChange: (index: number) => void;
+  onSelect: (item: SlashMenuItem) => void;
+}
+
 export function SlashCommandMenu({
-  value,
-  sections,
-  disabled,
+  open,
+  filteredSections,
+  filteredItems,
   highlightedIndex,
   onHighlightChange,
   onSelect,
 }: SlashCommandMenuProps) {
-  const open = !disabled && isSlashMenuOpen(value);
-  const query = slashMenuFilterQuery(value);
-  const filteredSections = useMemo(
-    () => filterSlashMenuSections(sections, query),
-    [sections, query],
-  );
   const { rows, items } = useMemo(() => buildMenuRows(filteredSections), [filteredSections]);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (highlightedIndex >= items.length) {
-      onHighlightChange(Math.max(0, items.length - 1));
-    }
-  }, [highlightedIndex, items.length, onHighlightChange, open]);
 
   useEffect(() => {
     if (!open || items.length === 0) return;
@@ -127,7 +138,7 @@ export function SlashCommandMenu({
 
   return (
     <div className="slash-menu" role="listbox" aria-label="Slash menu">
-      {items.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <p className="slash-menu-empty">一致する項目がありません</p>
       ) : (
         <div className="slash-menu-list">
@@ -165,8 +176,4 @@ export function SlashCommandMenu({
       )}
     </div>
   );
-}
-
-export function flattenSlashMenuItems(sections: SlashMenuSection[]): SlashMenuItem[] {
-  return sections.flatMap((section) => section.items);
 }

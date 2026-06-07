@@ -7,6 +7,8 @@ import "./styles/shell.css";
 import "./styles/stage.css";
 import "./styles/stage-placeholder.css";
 import "./styles/chat.css";
+import "./styles/chat-slash-menu.css";
+import "./styles/chat-attachments.css";
 import "./styles/ui-lab.css";
 
 if (import.meta.env.VITE_UI_LAB === "true") {

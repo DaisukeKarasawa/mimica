@@ -1,15 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { AgentMode, ChatAttachment } from "@mimica/shared";
 import { agentModeComposerPlaceholder, cycleAgentMode } from "@mimica/shared";
 import { ComposerAttachments } from "./ComposerAttachments";
-import {
-  filterSlashMenuSections,
-  flattenSlashMenuItems,
-  isSlashMenuOpen,
-  SlashCommandMenu,
-  slashMenuFilterQuery,
-  useSlashMenuSections,
-} from "./SlashCommandMenu";
+import { SlashCommandMenu, useSlashMenuSections, useSlashMenuState } from "./SlashCommandMenu";
+import { fileToBase64 } from "../utils/fileToBase64";
 
 /** Matches `.composer-input` max-height in chat.css */
 const COMPOSER_INPUT_MAX_HEIGHT_PX = 160;
@@ -48,14 +42,10 @@ export function ChatComposer({
   onAttachmentError,
 }: ChatComposerProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const sections = useSlashMenuSections(workspacePath, agentMode);
   const controlsLocked = disabled || streaming;
   const canSend = !controlsLocked && (value.trim().length > 0 || attachments.length > 0);
-  const slashQuery = slashMenuFilterQuery(value);
-  const slashMenuOpen = !controlsLocked && isSlashMenuOpen(value);
-  const filteredSections = filterSlashMenuSections(sections, slashQuery);
-  const filteredItems = flattenSlashMenuItems(filteredSections);
+  const slashMenu = useSlashMenuState(value, sections, controlsLocked);
 
   const syncInputHeight = useCallback(() => {
     const el = inputRef.current;
@@ -86,12 +76,6 @@ export function ChatComposer({
     observer.observe(el);
     return () => observer.disconnect();
   }, [syncInputHeight]);
-
-  useEffect(() => {
-    if (slashMenuOpen) {
-      setHighlightedIndex(0);
-    }
-  }, [slashMenuOpen, slashQuery]);
 
   const reportAttachmentError = useCallback(
     (error: unknown) => {
@@ -131,14 +115,7 @@ export function ChatComposer({
         return;
       }
       try {
-        const buffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        let binary = "";
-        const chunkSize = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-        }
-        const data = btoa(binary);
+        const data = await fileToBase64(file);
         const saved = await window.mimica.pasteImageAttachment(sessionId, {
           mimeType: file.type,
           data,
@@ -200,11 +177,11 @@ export function ChatComposer({
   return (
     <div className={`composer-box mode-${agentMode} ${disabled ? "is-disabled" : ""}`}>
       <SlashCommandMenu
-        value={value}
-        sections={sections}
-        disabled={controlsLocked}
-        highlightedIndex={highlightedIndex}
-        onHighlightChange={setHighlightedIndex}
+        open={slashMenu.open}
+        filteredSections={slashMenu.filteredSections}
+        filteredItems={slashMenu.filteredItems}
+        highlightedIndex={slashMenu.highlightedIndex}
+        onHighlightChange={slashMenu.setHighlightedIndex}
         onSelect={(item) => void selectSlashItem(item.name, item.kind)}
       />
       {sessionId ? (
@@ -240,22 +217,25 @@ export function ChatComposer({
             }
           }}
           onKeyDown={(e) => {
-            if (slashMenuOpen && filteredItems.length > 0) {
+            if (slashMenu.open && slashMenu.filteredItems.length > 0) {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setHighlightedIndex((index) => (index + 1) % filteredItems.length);
+                slashMenu.setHighlightedIndex(
+                  (index) => (index + 1) % slashMenu.filteredItems.length,
+                );
                 return;
               }
               if (e.key === "ArrowUp") {
                 e.preventDefault();
-                setHighlightedIndex(
-                  (index) => (index - 1 + filteredItems.length) % filteredItems.length,
+                slashMenu.setHighlightedIndex(
+                  (index) =>
+                    (index - 1 + slashMenu.filteredItems.length) % slashMenu.filteredItems.length,
                 );
                 return;
               }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                const selected = filteredItems[highlightedIndex];
+                const selected = slashMenu.filteredItems[slashMenu.highlightedIndex];
                 if (selected) void selectSlashItem(selected.name, selected.kind);
                 return;
               }
