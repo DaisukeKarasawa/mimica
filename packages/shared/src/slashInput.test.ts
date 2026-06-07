@@ -28,6 +28,13 @@ describe("parseSlashInput", () => {
     assert.equal(parseSlashInput("/-bad"), null);
     assert.equal(SLASH_INPUT_PATTERN.test("/-bad"), false);
   });
+
+  it("parses nested command paths", () => {
+    assert.deepEqual(parseSlashInput("/git-actions/setup-git on main"), {
+      token: "git-actions/setup-git",
+      remainder: "on main",
+    });
+  });
 });
 
 describe("slash menu open helpers", () => {
@@ -42,5 +49,6 @@ describe("slash menu open helpers", () => {
   it("extracts filter query", () => {
     assert.equal(slashMenuFilterQuery("/com"), "com");
     assert.equal(slashMenuFilterQuery("/"), "");
+    assert.equal(slashMenuFilterQuery("/git-actions"), "git-actions");
   });
 });

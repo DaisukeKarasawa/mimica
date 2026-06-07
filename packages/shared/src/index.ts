@@ -74,6 +74,7 @@ export {
 } from "./slashSubagents.js";
 
 export {
+  SLASH_COMMAND_NAME_PATTERN,
   SLASH_INPUT_PATTERN,
   SLASH_MENU_OPEN_PATTERN,
   SLASH_NAME_PATTERN,

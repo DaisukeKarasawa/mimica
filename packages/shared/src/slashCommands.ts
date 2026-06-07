@@ -1,4 +1,4 @@
-export type SlashCommandSource = "project" | "user";
+export type SlashCommandSource = "project" | "user" | "bundled" | "plugin" | "builtin";
 
 export interface SlashCommandSummary {
   name: string;
