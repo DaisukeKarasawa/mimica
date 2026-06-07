@@ -66,15 +66,29 @@ function storageFileName(attachmentId: string, mimeType: string): string {
 }
 
 export function assertAttachmentRef(attachment: ChatAttachment): void {
+  if (!UUID_RE.test(attachment.id)) {
+    throw new ImageAttachmentError("Invalid attachment reference");
+  }
+  if (!IMAGE_EXT_BY_MIME[attachment.mimeType]) {
+    throw new ImageAttachmentError("Invalid attachment reference");
+  }
   const expected = storageFileName(attachment.id, attachment.mimeType);
   if (attachment.storagePath !== expected) {
     throw new ImageAttachmentError("Invalid attachment reference");
   }
 }
 
+function validatedAttachmentPath(sessionId: string, storagePath: string): string {
+  safeSessionId(sessionId);
+  if (storagePath.includes("..") || storagePath.includes("/") || storagePath.includes("\\")) {
+    throw new ImageAttachmentError("Invalid attachment path");
+  }
+  return join(attachmentsDir(sessionId), storagePath);
+}
+
 export function deleteAttachmentFile(sessionId: string, attachment: ChatAttachment): void {
   assertAttachmentRef(attachment);
-  const fullPath = join(attachmentsDir(sessionId), attachment.storagePath);
+  const fullPath = validatedAttachmentPath(sessionId, attachment.storagePath);
   if (!existsSync(fullPath)) return;
   try {
     unlinkSync(fullPath);
@@ -128,11 +142,7 @@ export function saveImageFromBuffer(
 }
 
 export function resolveAttachmentPath(sessionId: string, storagePath: string): string {
-  safeSessionId(sessionId);
-  if (storagePath.includes("..") || storagePath.includes("/") || storagePath.includes("\\")) {
-    throw new ImageAttachmentError("Invalid attachment path");
-  }
-  const fullPath = join(attachmentsDir(sessionId), storagePath);
+  const fullPath = validatedAttachmentPath(sessionId, storagePath);
   if (!existsSync(fullPath)) {
     throw new ImageAttachmentError("Attachment not found");
   }

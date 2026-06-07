@@ -26,7 +26,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
-    "test": "tsx --test src/slashInput.test.ts"
+    "test": "tsx --test 'src/**/*.test.ts'"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",

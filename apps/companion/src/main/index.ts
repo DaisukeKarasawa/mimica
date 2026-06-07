@@ -24,7 +24,7 @@ import {
 } from "./attachmentProtocol.js";
 import { registerPrivilegedProtocols } from "./privilegedProtocols.js";
 import { registerSlashMenuIpc } from "./ipc/slashMenu.js";
-import { registerAttachmentIpc } from "./ipc/attachments.js";
+import { registerAttachmentIpc, releaseDraftAttachments } from "./ipc/attachments.js";
 
 const electronApis = electron();
 
@@ -77,8 +77,12 @@ if (!gotLock) {
     attachMainWindow(createMainWindow());
 
     ipcMain.handle("character:assets", () => getCharacterAssetStatus());
-    ipcMain.handle("agent:submit", (_e, payload) => {
+    ipcMain.handle("agent:submit", (event, payload) => {
       if (!agentService) throw new Error("Agent service is unavailable");
+      const attachmentCount = Array.isArray(payload?.attachments) ? payload.attachments.length : 0;
+      if (attachmentCount > 0 && typeof payload?.sessionId === "string") {
+        releaseDraftAttachments(event.sender.id, payload.sessionId, attachmentCount);
+      }
       return agentService.submit(payload);
     });
     ipcMain.handle("agent:cancel", () => {

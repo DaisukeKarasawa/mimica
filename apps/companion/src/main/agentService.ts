@@ -13,7 +13,7 @@ import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
-import { readAttachmentBase64 } from "./imageAttachments.js";
+import { MAX_IMAGE_ATTACHMENTS, readAttachmentBase64 } from "./imageAttachments.js";
 
 export interface AgentSubmitPayload {
   sessionId: string;
@@ -72,6 +72,9 @@ export class AgentService {
     const session = this.sessionStore.get(payload.sessionId);
     if (!session) {
       throw new Error("Session not found");
+    }
+    if ((payload.attachments?.length ?? 0) > MAX_IMAGE_ATTACHMENTS) {
+      throw new Error(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
     }
     const allMessages = session.messages;
     const history = historyForAgentPrompt(allMessages, payload.content);

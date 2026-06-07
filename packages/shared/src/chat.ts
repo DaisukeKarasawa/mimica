@@ -62,9 +62,11 @@ export interface ChatAttachment {
 
 export interface ImagePastePayload {
   mimeType: string;
+  /** Base64-encoded image bytes; format validation is deferred to main-side persistence. */
   data: string;
 }
 
+/** Structural guard only; does not validate base64 or image contents. */
 export function isImagePastePayload(payload: unknown): payload is ImagePastePayload {
   return (
     !!payload &&
@@ -76,6 +78,7 @@ export function isImagePastePayload(payload: unknown): payload is ImagePastePayl
   );
 }
 
+/** Structural guard only; path safety must be validated by main-side code (e.g. imageAttachments). */
 export function isChatAttachment(value: unknown): value is ChatAttachment {
   return (
     !!value &&

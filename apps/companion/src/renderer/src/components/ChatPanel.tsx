@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { AgentMode, AvatarState, ChatAttachment, ChatSession } from "@mimica/shared";
 import { AGENT_DISPLAY_NAME } from "@mimica/shared";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
@@ -61,7 +61,7 @@ export function ChatPanel({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const prevSessionIdRef = useRef(activeSessionId);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previousSessionId = prevSessionIdRef.current;
     if (previousSessionId && previousSessionId !== activeSessionId) {
       setAttachments((prev) => {
