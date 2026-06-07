@@ -52,19 +52,13 @@ export function MessageAttachments({ sessionId, attachments }: MessageAttachment
   return (
     <div className="message-attachments">
       {attachments.map((attachment) => (
-        <a
-          key={attachment.id}
-          className="message-attachment"
-          href={chatAttachmentUrl(sessionId, attachment.storagePath)}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <div key={attachment.id} className="message-attachment">
           <img
             src={chatAttachmentUrl(sessionId, attachment.storagePath)}
             alt={attachment.fileName}
             className="message-attachment-thumb"
           />
-        </a>
+        </div>
       ))}
     </div>
   );

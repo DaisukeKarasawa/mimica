@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AgentMode, AvatarState, ChatAttachment, ChatSession } from "@mimica/shared";
 import { AGENT_DISPLAY_NAME } from "@mimica/shared";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
@@ -59,6 +59,24 @@ export function ChatPanel({
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const prevSessionIdRef = useRef(activeSessionId);
+
+  useEffect(() => {
+    const previousSessionId = prevSessionIdRef.current;
+    if (previousSessionId && previousSessionId !== activeSessionId) {
+      setAttachments((prev) => {
+        if (prev.length > 0) {
+          void window.mimica.discardImageAttachments(previousSessionId, prev);
+        }
+        return [];
+      });
+      setAttachmentError(null);
+    } else if (previousSessionId !== activeSessionId) {
+      setAttachments([]);
+      setAttachmentError(null);
+    }
+    prevSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
   const tabsReorderable = openSessions.length > 1;
   const tabIds = openSessions.map((session) => session.id);
   const { draggingId, dropTargetIndex, registerTabRef, tabPointerHandlers, handleTabClick } =

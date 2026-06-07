@@ -60,6 +60,37 @@ export interface ChatAttachment {
   storagePath: string;
 }
 
+export interface ImagePastePayload {
+  mimeType: string;
+  data: string;
+}
+
+export function isImagePastePayload(payload: unknown): payload is ImagePastePayload {
+  return (
+    !!payload &&
+    typeof payload === "object" &&
+    "mimeType" in payload &&
+    "data" in payload &&
+    typeof payload.mimeType === "string" &&
+    typeof payload.data === "string"
+  );
+}
+
+export function isChatAttachment(value: unknown): value is ChatAttachment {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    "id" in value &&
+    "fileName" in value &&
+    "mimeType" in value &&
+    "storagePath" in value &&
+    typeof value.id === "string" &&
+    typeof value.fileName === "string" &&
+    typeof value.mimeType === "string" &&
+    typeof value.storagePath === "string"
+  );
+}
+
 export const MIMICA_ATTACHMENT_SCHEME = "mimica-attachment";
 
 export function chatAttachmentUrl(sessionId: string, storagePath: string): string {

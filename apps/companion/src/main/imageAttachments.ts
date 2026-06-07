@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { basename, extname, join } from "node:path";
@@ -62,6 +63,24 @@ function assertSupportedImage(filePath: string): { mimeType: string; size: numbe
 function storageFileName(attachmentId: string, mimeType: string): string {
   const ext = IMAGE_EXT_BY_MIME[mimeType] ?? ".bin";
   return `${attachmentId}${ext}`;
+}
+
+export function assertAttachmentRef(attachment: ChatAttachment): void {
+  const expected = storageFileName(attachment.id, attachment.mimeType);
+  if (attachment.storagePath !== expected) {
+    throw new ImageAttachmentError("Invalid attachment reference");
+  }
+}
+
+export function deleteAttachmentFile(sessionId: string, attachment: ChatAttachment): void {
+  assertAttachmentRef(attachment);
+  const fullPath = join(attachmentsDir(sessionId), attachment.storagePath);
+  if (!existsSync(fullPath)) return;
+  try {
+    unlinkSync(fullPath);
+  } catch {
+    /* best-effort cleanup */
+  }
 }
 
 export function saveImageFromPath(sessionId: string, sourcePath: string): ChatAttachment {
@@ -124,6 +143,7 @@ export function readAttachmentBase64(
   sessionId: string,
   attachment: ChatAttachment,
 ): { data: string; mimeType: string } {
+  assertAttachmentRef(attachment);
   const fullPath = resolveAttachmentPath(sessionId, attachment.storagePath);
   const mimeType = attachment.mimeType || mimeFromPath(fullPath);
   if (!mimeType || !IMAGE_EXT_BY_MIME[mimeType]) {

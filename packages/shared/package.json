@@ -26,10 +26,11 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
-    "test": "node --experimental-strip-types --test src/slashInput.test.ts"
+    "test": "tsx --test src/slashInput.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.2"
   }
 }

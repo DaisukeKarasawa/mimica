@@ -6,6 +6,7 @@ import type {
   ChatAttachment,
   ChatSession,
   EditorContext,
+  ImagePastePayload,
   SlashMenuSection,
 } from "@mimica/shared";
 import type { ChatTabShortcutAction } from "../common/chatTabShortcuts.js";
@@ -36,8 +37,11 @@ export interface MimicaApi {
   pickImageAttachments: (sessionId: string, currentCount: number) => Promise<ChatAttachment[]>;
   pasteImageAttachment: (
     sessionId: string,
-    payload: { mimeType: string; data: string },
+    currentCount: number,
+    payload: ImagePastePayload,
   ) => Promise<ChatAttachment>;
+  discardImageAttachment: (sessionId: string, attachment: ChatAttachment) => Promise<void>;
+  discardImageAttachments: (sessionId: string, attachments: ChatAttachment[]) => Promise<void>;
 }
 
 const api: MimicaApi = {
@@ -68,8 +72,12 @@ const api: MimicaApi = {
   listSlashMenu: (workspacePath, mode) => ipcRenderer.invoke("slashMenu:list", workspacePath, mode),
   pickImageAttachments: (sessionId, currentCount) =>
     ipcRenderer.invoke("attachments:pick", sessionId, currentCount),
-  pasteImageAttachment: (sessionId, payload) =>
-    ipcRenderer.invoke("attachments:paste", sessionId, payload),
+  pasteImageAttachment: (sessionId, currentCount, payload) =>
+    ipcRenderer.invoke("attachments:paste", sessionId, currentCount, payload),
+  discardImageAttachment: (sessionId, attachment) =>
+    ipcRenderer.invoke("attachments:discard", sessionId, attachment),
+  discardImageAttachments: (sessionId, attachments) =>
+    ipcRenderer.invoke("attachments:discardMany", sessionId, attachments),
 };
 
 contextBridge.exposeInMainWorld("mimica", api);

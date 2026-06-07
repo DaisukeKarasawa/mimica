@@ -109,8 +109,10 @@ export function installUiLabStub(): void {
       id: "ui-lab-attachment",
       fileName: "preview.png",
       mimeType: "image/png",
-      storagePath: "preview.png",
+      storagePath: "ui-lab-attachment.png",
     }),
+    discardImageAttachment: async () => {},
+    discardImageAttachments: async () => {},
   };
 
   window.mimica = api;

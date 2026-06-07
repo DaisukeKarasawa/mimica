@@ -116,7 +116,7 @@ export function ChatComposer({
       }
       try {
         const data = await fileToBase64(file);
-        const saved = await window.mimica.pasteImageAttachment(sessionId, {
+        const saved = await window.mimica.pasteImageAttachment(sessionId, attachments.length, {
           mimeType: file.type,
           data,
         });
@@ -189,9 +189,13 @@ export function ChatComposer({
           sessionId={sessionId}
           attachments={attachments}
           disabled={controlsLocked}
-          onRemove={(attachmentId) =>
-            onAttachmentsChange(attachments.filter((item) => item.id !== attachmentId))
-          }
+          onRemove={(attachmentId) => {
+            const removed = attachments.find((item) => item.id === attachmentId);
+            onAttachmentsChange(attachments.filter((item) => item.id !== attachmentId));
+            if (sessionId && removed) {
+              void window.mimica.discardImageAttachment(sessionId, removed);
+            }
+          }}
         />
       ) : null}
       <div className="composer-row">

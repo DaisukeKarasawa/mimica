@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
-import type { AgentMode, EditorContext } from "@mimica/shared";
-import { toMessageContext } from "@mimica/shared";
+import type { AgentMode, ChatAttachment, EditorContext } from "@mimica/shared";
+import { isChatAttachment, toMessageContext } from "@mimica/shared";
 import {
   AgentRunTimingTrace,
   isAgentPerfEnabled,
@@ -14,7 +14,6 @@ import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
 import { readAttachmentBase64 } from "./imageAttachments.js";
-import type { ChatAttachment } from "@mimica/shared";
 
 export interface AgentSubmitPayload {
   sessionId: string;
@@ -71,7 +70,10 @@ export class AgentService {
       : { workspacePath: payload.workspacePath };
 
     const session = this.sessionStore.get(payload.sessionId);
-    const allMessages = session?.messages ?? [];
+    if (!session) {
+      throw new Error("Session not found");
+    }
+    const allMessages = session.messages;
     const history = historyForAgentPrompt(allMessages, payload.content);
 
     const cwd = resolveWorkspacePath(
@@ -88,6 +90,10 @@ export class AgentService {
 
     const sdkImages: Array<{ data: string; mimeType: string }> = [];
     for (const attachment of payload.attachments ?? []) {
+      if (!isChatAttachment(attachment)) {
+        emitter.warning("Invalid attachment payload was skipped");
+        continue;
+      }
       try {
         sdkImages.push(readAttachmentBase64(payload.sessionId, attachment));
       } catch (error) {

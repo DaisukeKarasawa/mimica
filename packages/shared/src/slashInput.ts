@@ -2,7 +2,7 @@
 export const SLASH_INPUT_PATTERN = /^\/([A-Za-z0-9][A-Za-z0-9_-]*)(?:\s+([\s\S]*))?$/;
 
 /** Composer menu: `/` plus optional partial token (no trailing space yet). */
-export const SLASH_MENU_OPEN_PATTERN = /^\/([A-Za-z0-9_-]*)$/;
+export const SLASH_MENU_OPEN_PATTERN = /^\/([A-Za-z0-9][A-Za-z0-9_-]*)?$/;
 
 export const SLASH_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 

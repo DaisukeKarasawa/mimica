@@ -82,7 +82,14 @@ export {
   slashMenuFilterQuery,
 } from "./slashInput.js";
 
-export { type ChatAttachment, MIMICA_ATTACHMENT_SCHEME, chatAttachmentUrl } from "./chat.js";
+export {
+  type ChatAttachment,
+  type ImagePastePayload,
+  isChatAttachment,
+  isImagePastePayload,
+  MIMICA_ATTACHMENT_SCHEME,
+  chatAttachmentUrl,
+} from "./chat.js";
 
 export {
   MIMICA_USER_DATA_DIR_NAME,

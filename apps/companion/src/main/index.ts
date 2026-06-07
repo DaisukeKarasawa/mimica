@@ -19,6 +19,7 @@ import { ensureCanonicalUserData } from "./ensureCanonicalUserData.js";
 import { resolveWorkspacePath } from "./paths.js";
 import {
   bindAttachmentProtocolApis,
+  bindAttachmentSessionGuard,
   setupAttachmentProtocolHandler,
 } from "./attachmentProtocol.js";
 import { registerPrivilegedProtocols } from "./privilegedProtocols.js";
@@ -66,6 +67,7 @@ if (!gotLock) {
     setupAssetProtocolHandler();
     setupAttachmentProtocolHandler();
     sessionStore.load();
+    bindAttachmentSessionGuard((id) => sessionStore.get(id) != null);
     seedWorkspaceAllowlist(sessionStore.list().map((s) => s.workspacePath));
     bridgeServer = new CursorBridgeServer(DEFAULT_WS_PORT, (context) => {
       mainWindow?.webContents.send("editor-context", context);

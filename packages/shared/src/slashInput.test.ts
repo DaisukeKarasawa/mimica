@@ -35,6 +35,8 @@ describe("slash menu open helpers", () => {
     assert.equal(isSlashMenuOpen("/com"), true);
     assert.equal(isSlashMenuOpen("/commit extra"), false);
     assert.equal(isSlashMenuOpen("text"), false);
+    assert.equal(isSlashMenuOpen("/_bad"), false);
+    assert.equal(isSlashMenuOpen("/-bad"), false);
   });
 
   it("extracts filter query", () => {

@@ -8,9 +8,14 @@ export const ATTACHMENT_SCHEME = "mimica-attachment";
 
 let electronApis: Pick<ElectronMain, "protocol"> | null = null;
 let handlerRegistered = false;
+let sessionExists: ((sessionId: string) => boolean) | null = null;
 
 export function bindAttachmentProtocolApis(apis: Pick<ElectronMain, "protocol">): void {
   electronApis = apis;
+}
+
+export function bindAttachmentSessionGuard(guard: (sessionId: string) => boolean): void {
+  sessionExists = guard;
 }
 
 function apis(): Pick<ElectronMain, "protocol"> {
@@ -29,6 +34,9 @@ export function setupAttachmentProtocolHandler(): void {
         return new Response("Not found", { status: 404 });
       }
       const [sessionId, storagePath] = parts;
+      if (sessionExists && !sessionExists(sessionId)) {
+        return new Response("Not found", { status: 404 });
+      }
       const filePath = resolveAttachmentPath(sessionId, decodeURIComponent(storagePath));
       const mimeType = mimeFromExtension(extname(storagePath), IMAGE_MIME_BY_EXT);
       return fileProtocolResponse(filePath, mimeType);
