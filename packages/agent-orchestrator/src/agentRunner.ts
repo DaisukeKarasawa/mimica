@@ -1,4 +1,4 @@
-import type { Run } from "@cursor/sdk";
+import type { Run, SDKImage } from "@cursor/sdk";
 import type { AgentMode, ChatMessage, MessageContext } from "@mimica/shared";
 import { cancelRun, isAbortError } from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
@@ -19,6 +19,7 @@ export type { AgentRunCallbacks } from "./agentCallbacks.js";
 export interface RunChatParams {
   sessionId: string;
   prompt: string;
+  images?: SDKImage[];
   workspacePath: string;
   mode: AgentMode;
   context?: MessageContext;
@@ -138,7 +139,11 @@ export class AgentRunner {
         readOnlyGuard = new ReadOnlyRunGuard(() => this.activeRun, callbacks);
       }
 
-      const run = await agent.send(fullPrompt, {
+      const message =
+        params.images && params.images.length > 0
+          ? { text: fullPrompt, images: params.images }
+          : fullPrompt;
+      const run = await agent.send(message, {
         mode: sdkMode,
         onDelta: async ({ update }) => {
           await readOnlyGuard?.handleSendDelta(update, () => this.cancelled, params.signal);
