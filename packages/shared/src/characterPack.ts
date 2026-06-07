@@ -49,10 +49,32 @@ export function isValidCharacterPackRoot(packRoot: string): boolean {
   }
 }
 
-export function resolveCharacterPackRoot(
+/** Returns the first valid pack root from candidates, or a default layout path for setup UX. */
+export function resolveCharacterPackRootOrDefault(
   characterId: string,
   options: CharacterPackResolveOptions = {},
 ): string {
+  assertCharacterId(characterId);
+
+  const valid = findValidCharacterPackRoot(characterId, options);
+  if (valid) return valid;
+
+  const home = options.homeDir ?? homedir();
+  if (options.packaged) {
+    if (!options.resourcesPath) {
+      throw new Error("resourcesPath is required when packaged is true");
+    }
+    return join(options.resourcesPath, "packs", characterId);
+  }
+
+  return join(home, "MimicaAssets", "characters", characterId);
+}
+
+/** Returns a validated pack root, or `null` when none of the candidates are runtime-ready. */
+export function findValidCharacterPackRoot(
+  characterId: string,
+  options: CharacterPackResolveOptions = {},
+): string | null {
   assertCharacterId(characterId);
 
   for (const candidate of options.candidateRoots ?? []) {
@@ -67,7 +89,8 @@ export function resolveCharacterPackRoot(
     if (!options.resourcesPath) {
       throw new Error("resourcesPath is required when packaged is true");
     }
-    return join(options.resourcesPath, "packs", characterId);
+    const packagedRoot = join(options.resourcesPath, "packs", characterId);
+    return isValidCharacterPackRoot(packagedRoot) ? packagedRoot : null;
   }
 
   if (options.assetsRoot) {
@@ -76,9 +99,15 @@ export function resolveCharacterPackRoot(
   }
 
   const defaultRoot = join(home, "MimicaAssets", "characters", characterId);
-  if (isValidCharacterPackRoot(defaultRoot)) return defaultRoot;
+  return isValidCharacterPackRoot(defaultRoot) ? defaultRoot : null;
+}
 
-  return defaultRoot;
+/** @deprecated Prefer `resolveCharacterPackRootOrDefault` — name matches fallback behavior. */
+export function resolveCharacterPackRoot(
+  characterId: string,
+  options: CharacterPackResolveOptions = {},
+): string {
+  return resolveCharacterPackRootOrDefault(characterId, options);
 }
 
 export function buildSettingsForPackRoot(
