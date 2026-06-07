@@ -12,6 +12,8 @@ export interface ProcessAgentStreamResult {
   postToolText: string;
 }
 
+type StreamEvent = Awaited<ReturnType<Run["stream"]>> extends AsyncIterable<infer E> ? E : never;
+
 export async function processAgentStream(params: {
   run: Run;
   callbacks: AgentRunCallbacks;
@@ -26,6 +28,63 @@ export async function processAgentStream(params: {
   let postToolText = "";
   let preToolVisible = "";
   let postToolVisible = "";
+
+  const markFirstActivity = () => {
+    timing?.markOnce("T2_first_activity");
+  };
+
+  const setThinking = () => {
+    callbacks.onState("thinking");
+  };
+
+  const handleToolCall = async (
+    event: Extract<StreamEvent, { type: "tool_call" }>,
+  ): Promise<boolean> => {
+    markFirstActivity();
+    if (readOnlyGuard) {
+      const blocked = await readOnlyGuard.handleStreamToolCall(event.name, event.status);
+      if (blocked) return true;
+    }
+
+    if (event.status === "running") {
+      sawToolCall = true;
+      timing?.markOnce("T2_first_tool");
+      setThinking();
+      callbacks.onTool?.(event.name, event.status);
+    }
+    if (event.status === "completed") {
+      timing?.markLatest("T3_last_tool_done");
+    }
+    return false;
+  };
+
+  const handleDeniedStreamEvent = async (toolName: string): Promise<boolean> => {
+    markFirstActivity();
+    if (readOnlyGuard) {
+      await readOnlyGuard.blockDeniedTool(toolName);
+      return true;
+    }
+    setThinking();
+    return false;
+  };
+
+  const handleAssistant = (event: Extract<StreamEvent, { type: "assistant" }>): void => {
+    markFirstActivity();
+    callbacks.onState("streaming");
+    for (const block of event.message.content) {
+      if (block.type !== "text" || !block.text) continue;
+
+      if (!sawToolCall) {
+        preToolText += block.text;
+        const streamed = streamVisibleText(preToolText, preToolVisible, callbacks.onDelta);
+        preToolVisible = streamed.visible;
+      } else {
+        postToolText += block.text;
+        const streamed = streamVisibleText(postToolText, postToolVisible, callbacks.onDelta);
+        postToolVisible = streamed.visible;
+      }
+    }
+  };
 
   const consumeStream = async (): Promise<void> => {
     for await (const event of run.stream()) {
@@ -42,58 +101,25 @@ export async function processAgentStream(params: {
         continue;
       }
 
-      if (event.type === "tool_call") {
-        timing?.markOnce("T2_first_activity");
-        if (readOnlyGuard) {
-          const blocked = await readOnlyGuard.handleStreamToolCall(event.name, event.status);
-          if (blocked) break;
-        }
-
-        if (event.status === "running") {
-          sawToolCall = true;
-          timing?.markOnce("T2_first_tool");
-          callbacks.onState("thinking");
-          callbacks.onTool?.(event.name, event.status);
-        }
-        if (event.status === "completed") {
-          timing?.markLatest("T3_last_tool_done");
-        }
-        continue;
-      }
-
-      if (event.type === "task") {
-        timing?.markOnce("T2_first_activity");
-        if (readOnlyGuard) {
-          await readOnlyGuard.blockDeniedTask();
+      let shouldBreak = false;
+      switch (event.type) {
+        case "tool_call":
+          shouldBreak = await handleToolCall(event);
           break;
-        }
-        callbacks.onState("thinking");
-        continue;
+        case "task":
+          shouldBreak = await handleDeniedStreamEvent("task");
+          break;
+        case "thinking":
+          markFirstActivity();
+          setThinking();
+          break;
+        case "assistant":
+          handleAssistant(event);
+          break;
+        default:
+          break;
       }
-
-      if (event.type === "thinking") {
-        timing?.markOnce("T2_first_activity");
-        callbacks.onState("thinking");
-        continue;
-      }
-
-      if (event.type !== "assistant") continue;
-
-      timing?.markOnce("T2_first_activity");
-      callbacks.onState("streaming");
-      for (const block of event.message.content) {
-        if (block.type !== "text" || !block.text) continue;
-
-        if (!sawToolCall) {
-          preToolText += block.text;
-          const streamed = streamVisibleText(preToolText, preToolVisible, callbacks.onDelta);
-          preToolVisible = streamed.visible;
-        } else {
-          postToolText += block.text;
-          const streamed = streamVisibleText(postToolText, postToolVisible, callbacks.onDelta);
-          postToolVisible = streamed.visible;
-        }
-      }
+      if (shouldBreak) break;
     }
   };
 

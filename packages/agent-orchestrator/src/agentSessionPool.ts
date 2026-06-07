@@ -15,6 +15,13 @@ interface PooledSession {
   turnsSent: number;
 }
 
+/**
+ * Pooled SDK agents keyed by Mimica chat session id.
+ *
+ * Lifecycle: agents stay open between turns for the same session. Call `closeSession` when the
+ * user deletes a chat tab, and `closeAll` on app shutdown (`AgentService.dispose`). The pool does
+ * not evict idle sessions automatically.
+ */
 export class AgentSessionPool {
   private readonly sessions = new Map<string, PooledSession>();
 

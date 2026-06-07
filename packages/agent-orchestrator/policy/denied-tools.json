@@ -1,0 +1,17 @@
+{
+  "streamWritePrefixes": [
+    "write",
+    "edit",
+    "delete",
+    "shell",
+    "run_terminal",
+    "terminal",
+    "apply_patch",
+    "create",
+    "str_replace",
+    "patch",
+    "execute"
+  ],
+  "askDeniedExtraStreamPrefixes": ["task"],
+  "hookToolNames": ["Write", "Delete", "Shell", "Task", "Edit", "ApplyPatch", "Create"]
+}

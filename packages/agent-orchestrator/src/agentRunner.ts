@@ -11,6 +11,7 @@ import { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { READ_ONLY_HOOK_INSTALL_WARNING } from "./readOnlyPolicy.js";
 import { AgentRunTimingTrace } from "./agentRunTiming.js";
 import { resolveCursorApiKey } from "./resolveApiKey.js";
+import { promptStrategyForFollowUp } from "./promptStrategy.js";
 import { trimChatHistoryForPrompt } from "./trimChatHistory.js";
 
 export type { AgentRunCallbacks } from "./agentCallbacks.js";
@@ -251,7 +252,7 @@ export class AgentRunner {
   private buildFullPrompt(params: RunChatParams, isFollowUp: boolean): string {
     const contextBlock = params.context ? buildContextPrompt(params.context) : "";
 
-    if (isFollowUp) {
+    if (promptStrategyForFollowUp(isFollowUp) === "followUp") {
       return [contextBlock, `## User message\n${params.prompt}`].filter(Boolean).join("\n\n");
     }
 

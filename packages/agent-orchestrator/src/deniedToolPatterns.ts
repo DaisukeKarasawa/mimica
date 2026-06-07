@@ -1,25 +1,27 @@
-/**
- * Shared tool-name patterns for Mimica read-only enforcement (Cursor hooks).
- * Patterns are loaded from denied-tools.json (single source of truth).
- */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const policyDir = dirname(fileURLToPath(import.meta.url));
-const config = JSON.parse(readFileSync(join(policyDir, "denied-tools.json"), "utf8"));
+interface DeniedToolsConfig {
+  streamWritePrefixes: string[];
+  askDeniedExtraStreamPrefixes: string[];
+  hookToolNames: string[];
+}
 
-function prefixRe(prefixes) {
+function loadDeniedToolsConfig(): DeniedToolsConfig {
+  const policyDir = join(dirname(fileURLToPath(import.meta.url)), "../policy");
+  return JSON.parse(
+    readFileSync(join(policyDir, "denied-tools.json"), "utf8"),
+  ) as DeniedToolsConfig;
+}
+
+function prefixRe(prefixes: string[]): RegExp {
   return new RegExp(`^(${prefixes.join("|")})`, "i");
 }
 
+const config = loadDeniedToolsConfig();
 const askDeniedPrefixes = [...config.streamWritePrefixes, ...config.askDeniedExtraStreamPrefixes];
 
-/** Stream-level tool_call `name` values (lowercase / snake_case). */
 export const WRITE_TOOL_RE = prefixRe(config.streamWritePrefixes);
-
-/** Ask mode denied stream tools. */
 export const ASK_DENIED_STREAM_TOOL_RE = prefixRe(askDeniedPrefixes);
-
-/** Cursor hook `preToolUse` tool_name values (PascalCase). */
 export const DENIED_HOOK_TOOL_RE = new RegExp(`^(${config.hookToolNames.join("|")})$`);

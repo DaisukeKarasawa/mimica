@@ -8,6 +8,7 @@ import {
 } from "./mimicaDevWorkspace.js";
 import {
   DENIED_HOOK_TOOLS_FILE,
+  DENIED_TOOLS_CONFIG_FILE,
   HOOK_GUARD_MARKER,
   type HooksConfig,
   MIMICA_READ_ONLY_HOOK_SCRIPT,
@@ -15,6 +16,7 @@ import {
 
 export type EnsureReadOnlyHooksResult = { ok: true } | { ok: false; message: string };
 
+/** Skips re-install when hooks are already present; cleared only on process restart. */
 const hooksReadyCache = new Set<string>();
 
 async function isHooksAlreadyInstalled(workspacePath: string): Promise<boolean> {
@@ -47,6 +49,10 @@ function bundledHookScriptPath(): string {
 
 function bundledDeniedToolsPath(): string {
   return join(packageRoot(), "policy", DENIED_HOOK_TOOLS_FILE);
+}
+
+function bundledDeniedToolsConfigPath(): string {
+  return join(packageRoot(), "policy", DENIED_TOOLS_CONFIG_FILE);
 }
 
 function mimicaHookEntries(scriptPath: string): HooksConfig["hooks"] {
@@ -103,8 +109,10 @@ export async function ensureReadOnlyHooks(
     const hooksJsonPath = join(cursorDir, "hooks.json");
     const workspaceScriptPath = join(hooksDir, MIMICA_READ_ONLY_HOOK_SCRIPT);
     const workspaceDeniedToolsPath = join(hooksDir, DENIED_HOOK_TOOLS_FILE);
+    const workspaceDeniedToolsConfigPath = join(hooksDir, DENIED_TOOLS_CONFIG_FILE);
 
     await mkdir(hooksDir, { recursive: true });
+    await copyFile(bundledDeniedToolsConfigPath(), workspaceDeniedToolsConfigPath);
     await copyFile(bundledDeniedToolsPath(), workspaceDeniedToolsPath);
     await copyFile(scriptPath, workspaceScriptPath);
 

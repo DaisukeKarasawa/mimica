@@ -49,8 +49,4 @@ export class ReadOnlyRunGuard {
     }
     return false;
   }
-
-  async blockDeniedTask(): Promise<void> {
-    await this.blockDeniedTool("task");
-  }
 }
