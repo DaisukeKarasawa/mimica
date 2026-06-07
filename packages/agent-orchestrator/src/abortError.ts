@@ -47,9 +47,9 @@ let abortRejectionHandlerInstalled = false;
 export function installAbortRejectionHandler(): void {
   if (abortRejectionHandlerInstalled) return;
   abortRejectionHandlerInstalled = true;
-  process.on("unhandledRejection", (reason) => {
-    if (isAbortError(reason)) return;
-    console.error("Unhandled rejection:", reason);
+  process.on("unhandledRejection", (reason, promise) => {
+    if (isAbortError(reason) && trackedCanceledPromises.has(promise)) return;
+    console.error("Unhandled rejection:", promise, reason);
     setImmediate(() => {
       throw reason instanceof Error ? reason : new Error(String(reason));
     });
