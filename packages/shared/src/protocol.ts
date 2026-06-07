@@ -2,6 +2,15 @@ import type { AgentRunState, AvatarState, MessageContext, MimicaSettings } from 
 
 export type { MimicaSettings };
 
+export interface CodeSymbolResult {
+  name: string;
+  kind: string;
+  /** Workspace-relative path with POSIX separators. */
+  filePath: string;
+  startLine: number;
+  endLine: number;
+}
+
 export interface EditorContext {
   workspacePath: string;
   currentFilePath?: string;
@@ -14,12 +23,14 @@ export interface EditorContext {
 export type ClientMessage =
   | { type: "ping"; token: string }
   | { type: "context_update"; context: EditorContext; token: string }
-  | { type: "companion_ready"; token: string };
+  | { type: "companion_ready"; token: string }
+  | { type: "symbol_search_result"; requestId: string; token: string; symbols: CodeSymbolResult[] };
 
 export type ServerMessage =
   | { type: "pong" }
   | { type: "connection_ack"; port: number }
-  | { type: "context_ack"; context: EditorContext };
+  | { type: "context_ack"; context: EditorContext }
+  | { type: "symbol_search_request"; requestId: string; query: string; limit: number };
 
 export type CompanionMessage =
   | { type: "chat_submit"; sessionId: string; content: string; context?: MessageContext }
