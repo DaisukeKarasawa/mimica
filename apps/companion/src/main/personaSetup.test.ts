@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,6 +22,10 @@ function seedAllTemplates(skillContent = "three-layer persona"): void {
   writeTemplate("style.md", "style rules");
   writeTemplate("examples.md", "examples");
   writeTemplate("lines.json.example", "{}");
+}
+
+function readV1Template(name: string): string {
+  return execSync(`git show master:templates/persona/${name}`, { encoding: "utf8" });
 }
 
 beforeEach(() => {
@@ -49,8 +54,8 @@ describe("syncPersonaPackFromTemplate", () => {
     );
   });
 
-  it("overwrites stale seeded packs when pack version is older", () => {
-    writeFileSync(join(targetDir, "SKILL.md"), "legacy short-reaction-only persona", "utf8");
+  it("overwrites unchanged v1 seeded packs when pack version is older", () => {
+    writeFileSync(join(targetDir, "SKILL.md"), readV1Template("SKILL.md"), "utf8");
     writeFileSync(join(targetDir, ".pack-version"), "1\n", "utf8");
     seedAllTemplates("three-layer persona v2");
 
@@ -64,12 +69,47 @@ describe("syncPersonaPackFromTemplate", () => {
     );
   });
 
+  it("preserves customized persona files during v1 upgrade", () => {
+    writeFileSync(join(targetDir, "SKILL.md"), "user customized persona", "utf8");
+    writeFileSync(join(targetDir, "lines.json"), '{"curated": true}', "utf8");
+    writeFileSync(join(targetDir, ".pack-version"), "1\n", "utf8");
+    seedAllTemplates("three-layer persona v2");
+
+    syncPersonaPackFromTemplate(templateDir, targetDir);
+
+    assert.match(readFileSync(join(targetDir, "SKILL.md"), "utf8"), /user customized persona/);
+    assert.match(readFileSync(join(targetDir, "lines.json"), "utf8"), /curated/);
+    assert.equal(
+      Number.parseInt(readFileSync(join(targetDir, ".pack-version"), "utf8").trim(), 10),
+      PERSONA_PACK_VERSION,
+    );
+  });
+
+  it("preserves existing files on legacy installs without pack version", () => {
+    writeFileSync(join(targetDir, "SKILL.md"), "legacy persona before versioning", "utf8");
+    writeFileSync(join(targetDir, "lines.json"), '{"curated": true}', "utf8");
+    seedAllTemplates("three-layer persona v2");
+
+    syncPersonaPackFromTemplate(templateDir, targetDir);
+
+    assert.match(
+      readFileSync(join(targetDir, "SKILL.md"), "utf8"),
+      /legacy persona before versioning/,
+    );
+    assert.match(readFileSync(join(targetDir, "lines.json"), "utf8"), /curated/);
+    assert.match(readFileSync(join(targetDir, "style.md"), "utf8"), /style rules/);
+    assert.equal(
+      Number.parseInt(readFileSync(join(targetDir, ".pack-version"), "utf8").trim(), 10),
+      PERSONA_PACK_VERSION,
+    );
+  });
+
   it("does not bump pack version when upgrade copies fail", () => {
     const isolatedTarget = mkdtempSync(join(tmpdir(), "mimica-persona-fail-target-"));
     seedAllTemplates("three-layer persona v2");
     writeFileSync(join(isolatedTarget, "SKILL.md"), "legacy persona", "utf8");
     writeFileSync(join(isolatedTarget, ".pack-version"), "1\n", "utf8");
-    writeFileSync(join(isolatedTarget, "style.md"), "", { mode: 0o444 });
+    writeFileSync(join(isolatedTarget, "style.md"), readV1Template("style.md"), { mode: 0o444 });
 
     const changed = syncPersonaPackFromTemplate(templateDir, isolatedTarget);
 
