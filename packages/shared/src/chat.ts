@@ -52,6 +52,54 @@ export interface MessageContext {
   selectionEndLine?: number;
 }
 
+export interface ChatAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  /** Relative path under userData/sessions/{sessionId}/attachments/ */
+  storagePath: string;
+}
+
+export interface ImagePastePayload {
+  mimeType: string;
+  /** Base64-encoded image bytes; format validation is deferred to main-side persistence. */
+  data: string;
+}
+
+/** Structural guard only; does not validate base64 or image contents. */
+export function isImagePastePayload(payload: unknown): payload is ImagePastePayload {
+  return (
+    !!payload &&
+    typeof payload === "object" &&
+    "mimeType" in payload &&
+    "data" in payload &&
+    typeof payload.mimeType === "string" &&
+    typeof payload.data === "string"
+  );
+}
+
+/** Structural guard only; path safety must be validated by main-side code (e.g. imageAttachments). */
+export function isChatAttachment(value: unknown): value is ChatAttachment {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    "id" in value &&
+    "fileName" in value &&
+    "mimeType" in value &&
+    "storagePath" in value &&
+    typeof value.id === "string" &&
+    typeof value.fileName === "string" &&
+    typeof value.mimeType === "string" &&
+    typeof value.storagePath === "string"
+  );
+}
+
+export const MIMICA_ATTACHMENT_SCHEME = "mimica-attachment";
+
+export function chatAttachmentUrl(sessionId: string, storagePath: string): string {
+  return `${MIMICA_ATTACHMENT_SCHEME}:///${sessionId}/${storagePath}`;
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -60,6 +108,7 @@ export interface ChatMessage {
   context?: MessageContext;
   agentRunId?: string;
   toolCalls?: ToolCallInfo[];
+  attachments?: ChatAttachment[];
 }
 
 export interface ToolCallInfo {

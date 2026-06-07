@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
-import type { AgentMode, EditorContext } from "@mimica/shared";
-import { toMessageContext } from "@mimica/shared";
+import type { AgentMode, ChatAttachment, EditorContext } from "@mimica/shared";
+import { isChatAttachment, toMessageContext } from "@mimica/shared";
 import {
   AgentRunTimingTrace,
   isAgentPerfEnabled,
@@ -12,6 +12,8 @@ import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
+import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
+import { MAX_IMAGE_ATTACHMENTS, readAttachmentBase64 } from "./imageAttachments.js";
 
 export interface AgentSubmitPayload {
   sessionId: string;
@@ -19,6 +21,7 @@ export interface AgentSubmitPayload {
   workspacePath: string;
   mode: AgentMode;
   editorContext?: EditorContext | null;
+  attachments?: ChatAttachment[];
 }
 
 async function loadAgentRunner(): Promise<AgentRunner> {
@@ -67,18 +70,51 @@ export class AgentService {
       : { workspacePath: payload.workspacePath };
 
     const session = this.sessionStore.get(payload.sessionId);
-    const allMessages = session?.messages ?? [];
+    if (!session) {
+      throw new Error("Session not found");
+    }
+    if ((payload.attachments?.length ?? 0) > MAX_IMAGE_ATTACHMENTS) {
+      throw new Error(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
+    }
+    const allMessages = session.messages;
     const history = historyForAgentPrompt(allMessages, payload.content);
 
     const cwd = resolveWorkspacePath(
       editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "",
     );
 
+    const resolved = resolveSlashInput(cwd, payload.content, payload.mode);
+    if (resolved.warning) {
+      emitter.warning(resolved.warning);
+    }
+    if (resolved.kind && resolved.name) {
+      debugLogSlashResolution(resolved.kind, resolved.name, resolved.expanded.length);
+    }
+
+    const sdkImages: Array<{ data: string; mimeType: string }> = [];
+    for (const attachment of payload.attachments ?? []) {
+      if (!isChatAttachment(attachment)) {
+        emitter.warning("Invalid attachment payload was skipped");
+        continue;
+      }
+      try {
+        sdkImages.push(readAttachmentBase64(payload.sessionId, attachment));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        emitter.warning(`画像を読み取れませんでした (${attachment.fileName}): ${message}`);
+      }
+    }
+
+    let promptText = resolved.expanded;
+    if (!promptText.trim() && sdkImages.length > 0) {
+      promptText = "Please analyze the attached image(s).";
+    }
+
     const timing = isAgentPerfEnabled()
       ? new AgentRunTimingTrace(runId, {
           mode: payload.mode,
           workspacePath: cwd,
-          promptChars: payload.content.length,
+          promptChars: promptText.length,
         })
       : undefined;
     if (timing) {
@@ -88,7 +124,8 @@ export class AgentService {
     try {
       await runner.runChat({
         sessionId: payload.sessionId,
-        prompt: payload.content,
+        prompt: promptText,
+        images: sdkImages.length > 0 ? sdkImages : undefined,
         workspacePath: cwd,
         mode: payload.mode,
         context,

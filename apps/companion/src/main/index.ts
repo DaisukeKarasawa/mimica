@@ -5,7 +5,6 @@ installAbortRejectionHandler();
 import { electron } from "./electron.js";
 import {
   bindElectronApis,
-  registerAssetProtocol,
   setupAssetProtocolHandler,
   getCharacterAssetStatus,
 } from "./assetProtocol.js";
@@ -17,13 +16,24 @@ import type { BrowserWindow as BrowserWindowType } from "electron";
 import { openAllowedExternalUrl } from "./openExternal.js";
 import { seedWorkspaceAllowlist } from "./workspaceAllowlist.js";
 import { ensureCanonicalUserData } from "./ensureCanonicalUserData.js";
+import { resolveWorkspacePath } from "./paths.js";
+import {
+  bindAttachmentProtocolApis,
+  bindAttachmentSessionGuard,
+  setupAttachmentProtocolHandler,
+} from "./attachmentProtocol.js";
+import { registerPrivilegedProtocols } from "./privilegedProtocols.js";
+import { registerSlashMenuIpc } from "./ipc/slashMenu.js";
+import { registerAttachmentIpc, releaseDraftAttachments } from "./ipc/attachments.js";
 
 const electronApis = electron();
 
 bindElectronApis(electronApis);
-registerAssetProtocol();
+bindAttachmentProtocolApis(electronApis);
+registerPrivilegedProtocols(electronApis.protocol);
 
-const { app, BrowserWindow, ipcMain } = electronApis;
+const { app, BrowserWindow, ipcMain, dialog } = electronApis;
+const getMainWindow = () => mainWindow;
 ensureCanonicalUserData(app);
 let mainWindow: BrowserWindowType | null = null;
 let bridgeServer: CursorBridgeServer | null = null;
@@ -55,7 +65,9 @@ if (!gotLock) {
 
   app.whenReady().then(async () => {
     setupAssetProtocolHandler();
+    setupAttachmentProtocolHandler();
     sessionStore.load();
+    bindAttachmentSessionGuard((id) => sessionStore.get(id) != null);
     seedWorkspaceAllowlist(sessionStore.list().map((s) => s.workspacePath));
     bridgeServer = new CursorBridgeServer(DEFAULT_WS_PORT, (context) => {
       mainWindow?.webContents.send("editor-context", context);
@@ -65,8 +77,12 @@ if (!gotLock) {
     attachMainWindow(createMainWindow());
 
     ipcMain.handle("character:assets", () => getCharacterAssetStatus());
-    ipcMain.handle("agent:submit", (_e, payload) => {
+    ipcMain.handle("agent:submit", (event, payload) => {
       if (!agentService) throw new Error("Agent service is unavailable");
+      const attachmentCount = Array.isArray(payload?.attachments) ? payload.attachments.length : 0;
+      if (attachmentCount > 0 && typeof payload?.sessionId === "string") {
+        releaseDraftAttachments(event.sender.id, payload.sessionId, attachmentCount);
+      }
       return agentService.submit(payload);
     });
     ipcMain.handle("agent:cancel", () => {
@@ -93,6 +109,8 @@ if (!gotLock) {
       if (typeof url !== "string") return false;
       return openAllowedExternalUrl(url);
     });
+    registerSlashMenuIpc(ipcMain, resolveWorkspacePath);
+    registerAttachmentIpc(ipcMain, dialog, getMainWindow);
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {

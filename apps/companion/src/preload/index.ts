@@ -3,8 +3,11 @@ import type {
   AgentEventMessage,
   AgentMode,
   CharacterAssetStatus,
+  ChatAttachment,
   ChatSession,
   EditorContext,
+  ImagePastePayload,
+  SlashMenuSection,
 } from "@mimica/shared";
 import type { ChatTabShortcutAction } from "../common/chatTabShortcuts.js";
 
@@ -14,6 +17,7 @@ export interface AgentSubmitPayload {
   workspacePath: string;
   mode: AgentMode;
   editorContext?: EditorContext | null;
+  attachments?: ChatAttachment[];
 }
 
 export interface MimicaApi {
@@ -29,6 +33,11 @@ export interface MimicaApi {
   onEditorContext: (cb: (context: EditorContext) => void) => () => void;
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
   onChatTabShortcut: (cb: (action: ChatTabShortcutAction) => void) => () => void;
+  listSlashMenu: (workspacePath: string, mode: AgentMode) => Promise<SlashMenuSection[]>;
+  pickImageAttachments: (sessionId: string) => Promise<ChatAttachment[]>;
+  pasteImageAttachment: (sessionId: string, payload: ImagePastePayload) => Promise<ChatAttachment>;
+  discardImageAttachment: (sessionId: string, attachment: ChatAttachment) => Promise<void>;
+  discardImageAttachments: (sessionId: string, attachments: ChatAttachment[]) => Promise<void>;
 }
 
 const api: MimicaApi = {
@@ -56,6 +65,14 @@ const api: MimicaApi = {
     ipcRenderer.on("chat-tab-shortcut", handler);
     return () => ipcRenderer.removeListener("chat-tab-shortcut", handler);
   },
+  listSlashMenu: (workspacePath, mode) => ipcRenderer.invoke("slashMenu:list", workspacePath, mode),
+  pickImageAttachments: (sessionId) => ipcRenderer.invoke("attachments:pick", sessionId),
+  pasteImageAttachment: (sessionId, payload) =>
+    ipcRenderer.invoke("attachments:paste", sessionId, payload),
+  discardImageAttachment: (sessionId, attachment) =>
+    ipcRenderer.invoke("attachments:discard", sessionId, attachment),
+  discardImageAttachments: (sessionId, attachments) =>
+    ipcRenderer.invoke("attachments:discardMany", sessionId, attachments),
 };
 
 contextBridge.exposeInMainWorld("mimica", api);

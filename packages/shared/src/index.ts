@@ -53,6 +53,45 @@ export {
 export { toMessageContext } from "./context.js";
 
 export {
+  type SlashCommandSource,
+  type SlashCommandSummary,
+  type ResolveSlashCommandResult,
+} from "./slashCommands.js";
+
+export {
+  type SlashMenuCategory,
+  type SlashMenuItem,
+  type SlashMenuSection,
+  type ResolveSlashInputResult,
+  SLASH_MENU_SECTION_LABELS,
+} from "./slashMenu.js";
+
+export {
+  type SlashSubagentDefinition,
+  SLASH_SUBAGENT_CATALOG,
+  slashSubagentsForMode,
+} from "./slashSubagents.js";
+
+export {
+  SLASH_INPUT_PATTERN,
+  SLASH_MENU_OPEN_PATTERN,
+  SLASH_NAME_PATTERN,
+  type ParsedSlashInput,
+  parseSlashInput,
+  isSlashMenuOpen,
+  slashMenuFilterQuery,
+} from "./slashInput.js";
+
+export {
+  type ChatAttachment,
+  type ImagePastePayload,
+  isChatAttachment,
+  isImagePastePayload,
+  MIMICA_ATTACHMENT_SCHEME,
+  chatAttachmentUrl,
+} from "./chat.js";
+
+export {
   MIMICA_USER_DATA_DIR_NAME,
   MIMICA_BRIDGE_TOKEN_FILENAME,
   MIMICA_COMPANION_APP_DEFAULT_PATH,

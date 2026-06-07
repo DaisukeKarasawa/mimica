@@ -660,10 +660,11 @@
 .composer-box {
   --composer-input-max-height: 160px;
 
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 20px;
   background: rgba(13, 12, 12, 0.42);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .composer-box.mode-ask:focus-within {
