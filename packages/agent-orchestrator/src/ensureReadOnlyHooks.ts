@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -14,6 +14,28 @@ import {
 } from "./readOnlyPolicy.js";
 
 export type EnsureReadOnlyHooksResult = { ok: true } | { ok: false; message: string };
+
+const hooksReadyCache = new Set<string>();
+
+async function isHooksAlreadyInstalled(workspacePath: string): Promise<boolean> {
+  if (hooksReadyCache.has(workspacePath)) return true;
+
+  const hooksJsonPath = join(workspacePath, ".cursor", "hooks.json");
+  const workspaceScriptPath = join(workspacePath, ".cursor", "hooks", MIMICA_READ_ONLY_HOOK_SCRIPT);
+
+  try {
+    await access(workspaceScriptPath);
+    const config = JSON.parse(await readFile(hooksJsonPath, "utf8")) as HooksConfig;
+    if (hasMimicaGuard(config)) {
+      hooksReadyCache.add(workspacePath);
+      return true;
+    }
+  } catch {
+    // Not installed yet — fall through to install path.
+  }
+
+  return false;
+}
 
 function packageRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -67,6 +89,11 @@ export async function ensureReadOnlyHooks(
   try {
     if ((await isMimicaMonorepoDevRoot(workspacePath)) && !allowsReadOnlyHooksInDev()) {
       await stripMimicaReadOnlyHooksFromWorkspace(workspacePath);
+      hooksReadyCache.add(workspacePath);
+      return { ok: true };
+    }
+
+    if (await isHooksAlreadyInstalled(workspacePath)) {
       return { ok: true };
     }
 
@@ -96,6 +123,7 @@ export async function ensureReadOnlyHooks(
       await writeFile(hooksJsonPath, `${JSON.stringify(next, null, 2)}\n`);
     }
 
+    hooksReadyCache.add(workspacePath);
     return { ok: true };
   } catch (err) {
     return {

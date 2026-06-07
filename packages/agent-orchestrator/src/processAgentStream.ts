@@ -1,6 +1,7 @@
 import type { Run } from "@cursor/sdk";
 import { cancelRun, isAbortError, trackIntentionalCancelPromise } from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
+import type { AgentRunTimingTrace } from "./agentRunTiming.js";
 import type { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { streamVisibleText } from "./streamVisibleText.js";
 import { stripMetaNarration } from "./userFacingText.js";
@@ -17,8 +18,9 @@ export async function processAgentStream(params: {
   signal?: AbortSignal;
   isCancelled: () => boolean;
   readOnlyGuard?: ReadOnlyRunGuard;
+  timing?: AgentRunTimingTrace;
 }): Promise<ProcessAgentStreamResult> {
-  const { run, callbacks, signal, isCancelled, readOnlyGuard } = params;
+  const { run, callbacks, signal, isCancelled, readOnlyGuard, timing } = params;
   let sawToolCall = false;
   let preToolText = "";
   let postToolText = "";
@@ -41,6 +43,7 @@ export async function processAgentStream(params: {
       }
 
       if (event.type === "tool_call") {
+        timing?.markOnce("T2_first_activity");
         if (readOnlyGuard) {
           const blocked = await readOnlyGuard.handleStreamToolCall(event.name, event.status);
           if (blocked) break;
@@ -48,19 +51,35 @@ export async function processAgentStream(params: {
 
         if (event.status === "running") {
           sawToolCall = true;
+          timing?.markOnce("T2_first_tool");
           callbacks.onState("thinking");
           callbacks.onTool?.(event.name, event.status);
+        }
+        if (event.status === "completed") {
+          timing?.markLatest("T3_last_tool_done");
         }
         continue;
       }
 
-      if (event.type === "thinking" || event.type === "task") {
+      if (event.type === "task") {
+        timing?.markOnce("T2_first_activity");
+        if (readOnlyGuard) {
+          await readOnlyGuard.blockDeniedTask();
+          break;
+        }
+        callbacks.onState("thinking");
+        continue;
+      }
+
+      if (event.type === "thinking") {
+        timing?.markOnce("T2_first_activity");
         callbacks.onState("thinking");
         continue;
       }
 
       if (event.type !== "assistant") continue;
 
+      timing?.markOnce("T2_first_activity");
       callbacks.onState("streaming");
       for (const block of event.message.content) {
         if (block.type !== "text" || !block.text) continue;

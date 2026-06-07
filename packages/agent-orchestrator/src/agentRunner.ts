@@ -2,27 +2,33 @@ import type { Run } from "@cursor/sdk";
 import type { AgentMode, ChatMessage, MessageContext } from "@mimica/shared";
 import { cancelRun, isAbortError } from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
-import { createCursorAgent, type CursorSdkConversationMode } from "./createCursorAgent.js";
+import { AgentSessionPool } from "./agentSessionPool.js";
+import { type CursorSdkConversationMode } from "./createCursorAgent.js";
 import { ensureReadOnlyHooks } from "./ensureReadOnlyHooks.js";
 import { buildContextPrompt } from "./eventMapper.js";
 import { processAgentStream, resolveFinalAssistantText } from "./processAgentStream.js";
 import { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { READ_ONLY_HOOK_INSTALL_WARNING } from "./readOnlyPolicy.js";
+import { AgentRunTimingTrace } from "./agentRunTiming.js";
 import { resolveCursorApiKey } from "./resolveApiKey.js";
+import { trimChatHistoryForPrompt } from "./trimChatHistory.js";
 
 export type { AgentRunCallbacks } from "./agentCallbacks.js";
 
 export interface RunChatParams {
+  sessionId: string;
   prompt: string;
   workspacePath: string;
   mode: AgentMode;
   context?: MessageContext;
   history?: ChatMessage[];
   apiKey?: string;
-  /** Persona pack (SKILL.md + style/lines). When set, 調月リオの口調ルールを適用 */
+  /** Persona pack (SKILL.md + style). When set, 調月リオの口調ルールを適用 */
   personaSystemPrompt?: string;
   callbacks: AgentRunCallbacks;
   signal?: AbortSignal;
+  /** When set (MIMICA_AGENT_PERF=1), emits `[mimica:agent-perf]` timing logs. */
+  timing?: AgentRunTimingTrace;
 }
 
 const OUTPUT_RULES = `CRITICAL output rule for the user-visible message:
@@ -61,7 +67,7 @@ function sdkModeFor(mode: AgentMode): CursorSdkConversationMode {
 }
 
 function buildHistoryPrompt(messages: ChatMessage[]): string {
-  const turns = messages.filter((m) => m.role === "user" || m.role === "assistant");
+  const turns = trimChatHistoryForPrompt(messages);
   if (turns.length === 0) return "";
   const lines = turns.map((m) => {
     const label = m.role === "user" ? "User" : "Assistant";
@@ -72,7 +78,9 @@ function buildHistoryPrompt(messages: ChatMessage[]): string {
 
 export class AgentRunner {
   private activeRun: Run | null = null;
+  private activeSessionId: string | null = null;
   private cancelled = false;
+  private readonly sessionPool = new AgentSessionPool();
 
   async runChat(params: RunChatParams): Promise<void> {
     const apiKey = params.apiKey ?? resolveCursorApiKey();
@@ -83,7 +91,7 @@ export class AgentRunner {
     }
 
     this.cancelled = false;
-    const fullPrompt = this.buildFullPrompt(params);
+    this.activeSessionId = params.sessionId;
     const enforceReadOnly = params.mode === "ask";
     const sdkMode = sdkModeFor(params.mode);
 
@@ -96,23 +104,35 @@ export class AgentRunner {
       }
     }
 
-    let agent: Awaited<ReturnType<typeof createCursorAgent>>;
+    const timing = params.timing;
+    let sessionHandle: Awaited<ReturnType<AgentSessionPool["acquire"]>>;
     try {
-      agent = await createCursorAgent({
+      sessionHandle = await this.sessionPool.acquire({
+        sessionId: params.sessionId,
         apiKey,
         workspacePath: params.workspacePath,
-        mode: sdkMode,
+        mode: params.mode,
+        sdkMode,
       });
+      timing?.markOnce("T1_agent_ready");
     } catch (err) {
+      timing?.report("failed");
       params.callbacks.onState("failed");
       params.callbacks.onError(err instanceof Error ? err.message : String(err));
       return;
     }
 
+    const { agent, isFollowUp } = sessionHandle;
+    if (timing) {
+      timing.meta.isFollowUp = isFollowUp;
+    }
+    const fullPrompt = this.buildFullPrompt(params, isFollowUp);
+    const callbacks = this.wrapCallbacksForTiming(params.callbacks, timing);
+
     try {
       let readOnlyGuard: ReadOnlyRunGuard | undefined;
       if (enforceReadOnly) {
-        readOnlyGuard = new ReadOnlyRunGuard(() => this.activeRun, params.callbacks);
+        readOnlyGuard = new ReadOnlyRunGuard(() => this.activeRun, callbacks);
       }
 
       const run = await agent.send(fullPrompt, {
@@ -122,21 +142,25 @@ export class AgentRunner {
         },
       });
       this.activeRun = run;
+      timing?.markOnce("T1_send_done");
 
       const streamResult = await processAgentStream({
         run,
-        callbacks: params.callbacks,
+        callbacks,
         signal: params.signal,
         isCancelled: () => this.cancelled,
         readOnlyGuard,
+        timing,
       });
 
       if (readOnlyGuard?.isBlocked) {
+        timing?.report("blocked");
         return;
       }
 
       if (this.cancelled || params.signal?.aborted) {
-        params.callbacks.onState("cancelled");
+        timing?.report("cancelled");
+        callbacks.onState("cancelled");
         return;
       }
 
@@ -145,19 +169,23 @@ export class AgentRunner {
         result = await run.wait();
       } catch (err) {
         if (isAbortError(err) || this.cancelled) {
-          params.callbacks.onState("cancelled");
+          timing?.report("cancelled");
+          callbacks.onState("cancelled");
           return;
         }
         throw err;
       }
+      timing?.markOnce("T4_run_wait");
 
       if (result.status === "cancelled") {
-        params.callbacks.onState("cancelled");
+        timing?.report("cancelled");
+        callbacks.onState("cancelled");
         return;
       }
       if (result.status === "error") {
-        params.callbacks.onState("failed");
-        params.callbacks.onError(result.result ?? "Agent の実行に失敗しました");
+        timing?.report("failed");
+        callbacks.onState("failed");
+        callbacks.onError(result.result ?? "Agent の実行に失敗しました");
         return;
       }
 
@@ -168,18 +196,23 @@ export class AgentRunner {
         result.result,
       );
 
-      params.callbacks.onState("completed");
-      params.callbacks.onComplete(finalText);
+      this.sessionPool.markTurnSent(params.sessionId);
+      timing?.markOnce("T4_complete");
+      timing?.report("completed");
+      callbacks.onState("completed");
+      callbacks.onComplete(finalText);
     } catch (err) {
       if (isAbortError(err) || this.cancelled) {
-        params.callbacks.onState("cancelled");
+        timing?.report("cancelled");
+        callbacks.onState("cancelled");
         return;
       }
-      params.callbacks.onState("failed");
-      params.callbacks.onError(err instanceof Error ? err.message : String(err));
+      timing?.report("failed");
+      callbacks.onState("failed");
+      callbacks.onError(err instanceof Error ? err.message : String(err));
     } finally {
       this.activeRun = null;
-      agent.close();
+      this.activeSessionId = null;
     }
   }
 
@@ -188,8 +221,40 @@ export class AgentRunner {
     await cancelRun(this.activeRun);
   }
 
-  private buildFullPrompt(params: RunChatParams): string {
+  async closeSession(sessionId: string): Promise<void> {
+    if (this.activeSessionId === sessionId) {
+      await this.cancel();
+    }
+    this.sessionPool.closeSession(sessionId);
+  }
+
+  closeAllSessions(): void {
+    this.sessionPool.closeAll();
+  }
+
+  private wrapCallbacksForTiming(
+    callbacks: AgentRunCallbacks,
+    timing?: AgentRunTimingTrace,
+  ): AgentRunCallbacks {
+    if (!timing) return callbacks;
+    return {
+      ...callbacks,
+      onDelta: (chunk) => {
+        if (chunk.length > 0) {
+          timing.markOnce("T2_first_delta");
+        }
+        callbacks.onDelta(chunk);
+      },
+    };
+  }
+
+  private buildFullPrompt(params: RunChatParams, isFollowUp: boolean): string {
     const contextBlock = params.context ? buildContextPrompt(params.context) : "";
+
+    if (isFollowUp) {
+      return [contextBlock, `## User message\n${params.prompt}`].filter(Boolean).join("\n\n");
+    }
+
     const historyBlock = params.history ? buildHistoryPrompt(params.history) : "";
     return [
       preambleForMode(params.mode),

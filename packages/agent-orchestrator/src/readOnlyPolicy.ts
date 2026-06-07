@@ -2,6 +2,10 @@
 const WRITE_TOOL_RE =
   /^(write|edit|delete|shell|run_terminal|terminal|apply_patch|create|str_replace|patch|execute)/i;
 
+/** Ask mode: stream-level tools that must be blocked before execution. Sync with policy/denied-hook-tools.mjs */
+const ASK_DENIED_STREAM_TOOL_RE =
+  /^(write|edit|delete|shell|task|run_terminal|terminal|apply_patch|create|str_replace|patch|execute)/i;
+
 /** Cursor hook `preToolUse` tool_name values (PascalCase). Sync with policy/denied-hook-tools.mjs */
 const DENIED_HOOK_TOOL_RE = /^(Write|Delete|Shell|Task|Edit|ApplyPatch|Create)$/;
 
@@ -19,6 +23,11 @@ export interface HooksConfig {
 
 export function isWriteTool(name: string): boolean {
   return WRITE_TOOL_RE.test(name);
+}
+
+/** Ask mode denied tools (stream + hook naming). Includes Task/subagent dispatch. */
+export function isAskDeniedTool(name: string): boolean {
+  return ASK_DENIED_STREAM_TOOL_RE.test(name) || DENIED_HOOK_TOOL_RE.test(name);
 }
 
 export function isDeniedHookTool(name: string): boolean {

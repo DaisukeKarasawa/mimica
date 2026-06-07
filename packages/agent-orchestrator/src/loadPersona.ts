@@ -41,12 +41,15 @@ export function loadPersonaPack(
   };
 }
 
-export function buildPersonaSystemPrompt(pack: PersonaPack): string {
+export function buildPersonaSystemPrompt(
+  pack: PersonaPack,
+  options?: { includeReferenceLines?: boolean },
+): string {
   const parts = [pack.skillMarkdown.trim()];
   if (pack.styleMarkdown) {
     parts.push(`---\n${pack.styleMarkdown.trim()}`);
   }
-  if (pack.linesJson) {
+  if (options?.includeReferenceLines && pack.linesJson) {
     parts.push(`---\n## 参考セリフ (lines.json)\n${pack.linesJson.trim()}`);
   }
   return parts.join("\n\n");
