@@ -130,13 +130,13 @@ function entryStat(fullPath: string): ReturnType<typeof lstatSync> | null {
   }
 }
 
-function isRealDirectory(fullPath: string): boolean {
+export function isRealDirectory(fullPath: string): boolean {
   const stat = entryStat(fullPath);
   if (!stat) return false;
   return stat.isDirectory() && !stat.isSymbolicLink();
 }
 
-function isRealFile(fullPath: string): boolean {
+export function isRealFile(fullPath: string): boolean {
   const stat = entryStat(fullPath);
   if (!stat) return false;
   return stat.isFile() && !stat.isSymbolicLink();
@@ -150,7 +150,7 @@ export function commandNameFromFile(commandsRoot: string, filePath: string): str
 export function walkCommandFiles(
   commandsRoot: string,
 ): Array<{ name: string; absolutePath: string }> {
-  if (!existsSync(commandsRoot)) return [];
+  if (!existsSync(commandsRoot) || !isRealDirectory(commandsRoot)) return [];
 
   const found: Array<{ name: string; absolutePath: string }> = [];
   const stack = [commandsRoot];

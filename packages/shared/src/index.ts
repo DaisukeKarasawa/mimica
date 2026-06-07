@@ -114,6 +114,7 @@ export {
   scoreAtPathQueryMatch,
   parseAtMenuScope,
   extractAtPathTokens,
+  hasResolvableAtTokens,
   extractPastChatTokens,
   extractGitCommitTokens,
   extractGitBranchTokens,

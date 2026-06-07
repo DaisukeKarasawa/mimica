@@ -127,6 +127,24 @@ describe("special @ tokens", () => {
   });
 });
 
+describe("hasResolvableAtTokens", () => {
+  it("detects path, past chat, git, and code tokens", async () => {
+    const { hasResolvableAtTokens, AT_GIT_COMMIT_LABEL } = await import("./atInput.ts");
+    assert.equal(hasResolvableAtTokens("see @src/a.ts"), true);
+    assert.equal(
+      hasResolvableAtTokens("ref @Past Chat: 11111111-1111-4111-8111-111111111111"),
+      true,
+    );
+    assert.equal(hasResolvableAtTokens(`diff @${AT_GIT_COMMIT_LABEL}`), true);
+    assert.equal(hasResolvableAtTokens("@Branch (Diff with main)"), true);
+    assert.equal(
+      hasResolvableAtTokens("@Code:packages/shared/src/chat.ts:resolveCharacterShortName"),
+      true,
+    );
+    assert.equal(hasResolvableAtTokens("plain text without mentions"), false);
+  });
+});
+
 describe("matchesAtPathQuery", () => {
   it("matches basename and path substrings", async () => {
     const { matchesAtPathQuery } = await import("./atInput.ts");

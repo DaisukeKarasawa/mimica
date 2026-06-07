@@ -2,14 +2,18 @@ import { relative } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
 import type { AgentMode, ChatAttachment, EditorContext } from "@mimica/shared";
-import { extractAtPathTokens, isChatAttachment, toMessageContext } from "@mimica/shared";
+import { isChatAttachment, toMessageContext } from "@mimica/shared";
 import {
   AgentRunTimingTrace,
   isAgentPerfEnabled,
   type AgentRunner,
 } from "@mimica/agent-orchestrator";
 import { resolveWorkspacePath } from "./paths.js";
-import { resolveAgentSubmitWorkspace } from "./agentSubmitWorkspace.js";
+import {
+  resolveAgentSubmitWorkspace,
+  shouldWarnUnlinkedAtExpansion,
+  UNLINKED_AT_EXPANSION_WARNING,
+} from "./agentSubmitWorkspace.js";
 import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
@@ -114,8 +118,8 @@ export class AgentService {
       });
     } else {
       atResolved = { expanded: resolved.expanded };
-      if (extractAtPathTokens(payload.content).length > 0) {
-        emitter.warning("ワークスペースがリンクされていないため、@ メンションは展開されません。");
+      if (shouldWarnUnlinkedAtExpansion(canExpandAt, payload.content)) {
+        emitter.warning(UNLINKED_AT_EXPANSION_WARNING);
       }
     }
     if (atResolved.warning) {

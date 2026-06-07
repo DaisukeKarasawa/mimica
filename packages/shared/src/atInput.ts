@@ -199,6 +199,17 @@ export function extractGitBranchTokens(input: string): AtGitBranchToken[] {
   return tokens;
 }
 
+/** True when input contains any @ token that resolveAtInput would expand. */
+export function hasResolvableAtTokens(input: string): boolean {
+  return (
+    extractAtPathTokens(input).length > 0 ||
+    extractPastChatTokens(input).length > 0 ||
+    extractGitCommitTokens(input).length > 0 ||
+    extractGitBranchTokens(input).length > 0 ||
+    extractCodeTokens(input).length > 0
+  );
+}
+
 export function extractCodeTokens(input: string): AtCodeToken[] {
   const tokens: AtCodeToken[] = [];
   const seen = new Set<string>();

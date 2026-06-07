@@ -1,4 +1,8 @@
+import { hasResolvableAtTokens } from "@mimica/shared";
 import { resolveSlashWorkspaceOrNull } from "./cursorSlash/discovery.js";
+
+export const UNLINKED_AT_EXPANSION_WARNING =
+  "ワークスペースがリンクされていないため、@ メンションは展開されません。";
 
 export interface AgentSubmitWorkspaceResolution {
   slashWorkspace: string | null;
@@ -17,4 +21,8 @@ export function resolveAgentSubmitWorkspace(
   }
 
   return { slashWorkspace: null, cwd: "", canExpandAt: false };
+}
+
+export function shouldWarnUnlinkedAtExpansion(canExpandAt: boolean, content: string): boolean {
+  return !canExpandAt && hasResolvableAtTokens(content);
 }

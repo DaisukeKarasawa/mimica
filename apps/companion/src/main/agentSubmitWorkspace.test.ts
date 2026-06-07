@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { resolveAgentSubmitWorkspace } from "./agentSubmitWorkspace.js";
+import { AT_GIT_COMMIT_LABEL } from "@mimica/shared";
+import {
+  resolveAgentSubmitWorkspace,
+  shouldWarnUnlinkedAtExpansion,
+} from "./agentSubmitWorkspace.js";
 
 describe("resolveAgentSubmitWorkspace", () => {
   const resolveWorkspacePath = (raw: string): string => {
@@ -30,5 +34,23 @@ describe("resolveAgentSubmitWorkspace", () => {
     assert.equal(result.slashWorkspace, null);
     assert.equal(result.cwd, "");
     assert.equal(result.canExpandAt, false);
+  });
+});
+
+describe("shouldWarnUnlinkedAtExpansion", () => {
+  it("warns for special @ tokens when workspace is unlinked", () => {
+    assert.equal(
+      shouldWarnUnlinkedAtExpansion(false, "ref @Past Chat: 11111111-1111-4111-8111-111111111111"),
+      true,
+    );
+    assert.equal(shouldWarnUnlinkedAtExpansion(false, `see @${AT_GIT_COMMIT_LABEL}`), true);
+    assert.equal(shouldWarnUnlinkedAtExpansion(false, "@Branch (Diff with main)"), true);
+    assert.equal(shouldWarnUnlinkedAtExpansion(false, "@Code:src/a.ts:foo"), true);
+    assert.equal(shouldWarnUnlinkedAtExpansion(false, "read @src/a.ts"), true);
+  });
+
+  it("does not warn when workspace is linked or input has no @ tokens", () => {
+    assert.equal(shouldWarnUnlinkedAtExpansion(true, "read @src/a.ts"), false);
+    assert.equal(shouldWarnUnlinkedAtExpansion(false, "plain message"), false);
   });
 });

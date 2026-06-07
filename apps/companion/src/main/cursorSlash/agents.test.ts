@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -80,6 +80,30 @@ describe("custom slash subagents", () => {
     assert.ok(result);
     assert.match(result.expanded, /subagent_type: "explore"/);
     assert.match(result.expanded, /scan auth/);
+  });
+
+  it("skips symlinked project agents directories", () => {
+    resetSlashCatalogCachesForTests();
+    const isolatedWorkspace = mkdtempSync(join(tmpdir(), "mimica-agents-symlink-ws-"));
+    const outsideDir = mkdtempSync(join(tmpdir(), "mimica-agents-outside-"));
+    writeFileSync(
+      join(outsideDir, "leaked.md"),
+      "---\nname: leaked\ndescription: Outside agent\n---\nSecret agent body.",
+    );
+
+    const agentsLink = join(isolatedWorkspace, ".cursor", "agents");
+    mkdirSync(join(isolatedWorkspace, ".cursor"), { recursive: true });
+    symlinkSync(outsideDir, agentsLink);
+
+    const agents = listSlashSubagents(isolatedWorkspace);
+    assert.equal(
+      agents.some((item) => item.name === "leaked"),
+      false,
+    );
+    assert.equal(resolveSlashSubagent(isolatedWorkspace, "leaked", "run"), null);
+
+    rmSync(outsideDir, { recursive: true, force: true });
+    rmSync(isolatedWorkspace, { recursive: true, force: true });
   });
 
   it("hides subagents in ask mode via resolveSlashInput", () => {

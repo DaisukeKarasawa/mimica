@@ -9,6 +9,8 @@ import {
 import { getCachedCatalog, slashSubagentsCatalogMtime, subagentCatalogStore } from "./catalog.js";
 import {
   catalogCacheKey,
+  isRealDirectory,
+  isRealFile,
   normalizeWorkspacePath,
   projectAgentsDir,
   userAgentsDir,
@@ -77,6 +79,8 @@ function readCustomAgentsFromDir(
   dir: string,
   source: CustomAgentEntry["source"],
 ): CustomAgentEntry[] {
+  if (!existsSync(dir) || !isRealDirectory(dir)) return [];
+
   let entries;
   try {
     entries = readdirSync(dir, { withFileTypes: true });
@@ -86,8 +90,9 @@ function readCustomAgentsFromDir(
 
   const agents: CustomAgentEntry[] = [];
   for (const entry of entries) {
-    if (!entry.isFile() || extname(entry.name) !== ".md") continue;
-    const loaded = loadCustomAgentFile(join(dir, entry.name), source);
+    const absolutePath = join(dir, entry.name);
+    if (!isRealFile(absolutePath) || extname(entry.name) !== ".md") continue;
+    const loaded = loadCustomAgentFile(absolutePath, source);
     if (loaded) agents.push(loaded);
   }
   return agents;

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -12,6 +12,7 @@ import {
   userAgentsSkillsRoot,
   userCommandsDir,
   userSkillsRoot,
+  walkCommandFiles,
 } from "./discovery.js";
 import { resolveSlashInput } from "./index.js";
 import { listSlashSkills, resolveSlashSkill } from "./skills.js";
@@ -179,6 +180,23 @@ describe("extended slash discovery", () => {
       assert.ok(found);
       assert.equal(found?.source, "user");
     });
+  });
+
+  it("skips symlinked project commands roots", () => {
+    resetSlashCatalogCachesForTests();
+    const isolatedWorkspace = mkdtempSync(join(tmpdir(), "mimica-discovery-symlink-ws-"));
+    const outsideDir = mkdtempSync(join(tmpdir(), "mimica-discovery-outside-cmds-"));
+    writeFileSync(join(outsideDir, "leaked.md"), "# Leaked\n\nSecret command body.");
+
+    const commandsLink = join(isolatedWorkspace, ".cursor", "commands");
+    mkdirSync(join(isolatedWorkspace, ".cursor"), { recursive: true });
+    symlinkSync(outsideDir, commandsLink);
+
+    assert.deepEqual(walkCommandFiles(commandsLink), []);
+    assert.equal(resolveSlashCommand(isolatedWorkspace, "leaked"), null);
+
+    rmSync(outsideDir, { recursive: true, force: true });
+    rmSync(isolatedWorkspace, { recursive: true, force: true });
   });
 
   it("resolveSlashWorkspaceOrNull returns null for missing or invalid paths", () => {
