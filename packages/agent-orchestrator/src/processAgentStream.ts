@@ -1,5 +1,5 @@
 import type { Run } from "@cursor/sdk";
-import { cancelRun, isAbortError } from "./abortError.js";
+import { cancelRun, isAbortError, trackIntentionalCancelPromise } from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import type { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { streamVisibleText } from "./streamVisibleText.js";
@@ -25,14 +25,14 @@ export async function processAgentStream(params: {
   let preToolVisible = "";
   let postToolVisible = "";
 
-  try {
+  const consumeStream = async (): Promise<void> => {
     for await (const event of run.stream()) {
       if (readOnlyGuard?.isBlocked) break;
 
       if (isCancelled() || signal?.aborted) {
         await cancelRun(run);
         callbacks.onState("cancelled");
-        return { sawToolCall, preToolText, postToolText };
+        return;
       }
 
       if (event.type === "request") {
@@ -76,6 +76,10 @@ export async function processAgentStream(params: {
         }
       }
     }
+  };
+
+  try {
+    await trackIntentionalCancelPromise(consumeStream());
   } catch (err) {
     if (isAbortError(err) || isCancelled() || signal?.aborted) {
       callbacks.onState("cancelled");

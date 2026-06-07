@@ -19,20 +19,29 @@ function splitJapaneseSentences(paragraph: string): string[] {
 }
 
 function stripTrailingMetaSentences(block: string): string {
-  const sentences = splitJapaneseSentences(block.trim());
+  const trimmed = block.trim();
+  if (!trimmed) return "";
+
+  const sentences = splitJapaneseSentences(trimmed);
   if (sentences.length === 0) return "";
 
-  const kept = [...sentences];
-  while (kept.length > 0) {
-    const last = kept[kept.length - 1]!;
+  let removeCount = 0;
+  for (let i = sentences.length - 1; i >= 0; i--) {
+    const last = sentences[i]!;
     const body = last.replace(/[。?？!！]\s*$/, "").trim();
     if (body.length > 0 && body.length < 120 && isMetaNarrationParagraph(last)) {
-      kept.pop();
+      removeCount++;
       continue;
     }
     break;
   }
-  return kept.join("").trim();
+
+  if (removeCount === 0) return trimmed;
+  if (removeCount === sentences.length) return "";
+
+  const firstRemoved = sentences[sentences.length - removeCount]!;
+  const cutAt = trimmed.indexOf(firstRemoved);
+  return cutAt === -1 ? trimmed : trimmed.slice(0, cutAt).trimEnd();
 }
 
 export function isMetaNarrationParagraph(paragraph: string): boolean {
