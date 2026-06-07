@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type { MimicaSettings } from "./chat.js";
 import type { CharacterMetadata } from "./avatar.js";
 
@@ -40,10 +40,17 @@ export function isValidCharacterPackRoot(packRoot: string): boolean {
     const metadata = JSON.parse(readFileSync(metaPath, "utf8")) as CharacterMetadata;
     if (typeof metadata.skelFile !== "string" || metadata.skelFile.trim() === "") return false;
     if (typeof metadata.atlasFile !== "string" || metadata.atlasFile.trim() === "") return false;
-    return (
-      existsSync(join(packRoot, metadata.skelFile)) &&
-      existsSync(join(packRoot, metadata.atlasFile))
-    );
+
+    const rootNorm = `${realpathSync(packRoot)}/`;
+    const isContained = (relPath: string) => {
+      if (isAbsolute(relPath)) return false;
+      const filePath = join(packRoot, relPath);
+      if (!existsSync(filePath)) return false;
+      const resolved = realpathSync(filePath);
+      return resolved.startsWith(rootNorm);
+    };
+
+    return isContained(metadata.skelFile) && isContained(metadata.atlasFile);
   } catch {
     return false;
   }
