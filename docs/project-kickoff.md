@@ -59,7 +59,7 @@ Cursor Extension          Electron Companion App
 | Agent 表示名     | チャットヘッダ **`調月リオ`**（`AGENT_DISPLAY_NAME`）。バブル内の名前行は出さない                     |
 | Agent アイコン   | 表示する（`icon.png`）                                                                                |
 | ユーザーアイコン | 非表示                                                                                                |
-| persona 反映     | 口調・口癖・短いリアクションのみ。技術回答本文は通常品質                                              |
+| persona 反映     | 三層モデル（事実・手順は無地、説明に軽い口調、導入・締めに強いキャラ）                                |
 
 #### 「チャット UI」とは
 

@@ -67,11 +67,11 @@ requested outcome.
 Mimica's initial character is 調月リオ. Persona and presentation follow
 `docs/requirements.md` and `templates/persona/`.
 
-- **User conversation level:** persona intent (tone, short reactions, display
+- **User conversation level:** persona intent (tone, layered voice, display
   name). Do not weaken technical answer quality for role-play.
 - **Agent default:** reflect persona through `templates/persona/SKILL.md`,
-  `style.md`, and `lines.json` when wiring prompts or UI copy; keep technical
-  explanations accurate and readable.
+  `style.md`, and `lines.json` when wiring prompts or UI copy: neutral facts/steps
+  (A), light tone on explanatory prose (B), strong tone on intro/closing (C).
 - **Character rendering:** Spine assets live under `~/MimicaAssets/characters/rio/`
   per `docs/spine-asset-guide.md`. Do not commit real Spine binaries, textures,
   or reference media into Git.
