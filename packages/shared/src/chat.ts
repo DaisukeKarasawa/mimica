@@ -52,6 +52,20 @@ export interface MessageContext {
   selectionEndLine?: number;
 }
 
+export interface ChatAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  /** Relative path under userData/sessions/{sessionId}/attachments/ */
+  storagePath: string;
+}
+
+export const MIMICA_ATTACHMENT_SCHEME = "mimica-attachment";
+
+export function chatAttachmentUrl(sessionId: string, storagePath: string): string {
+  return `${MIMICA_ATTACHMENT_SCHEME}:///${sessionId}/${storagePath}`;
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -60,6 +74,7 @@ export interface ChatMessage {
   context?: MessageContext;
   agentRunId?: string;
   toolCalls?: ToolCallInfo[];
+  attachments?: ChatAttachment[];
 }
 
 export interface ToolCallInfo {
