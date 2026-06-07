@@ -1,15 +1,20 @@
-import { useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { CHAT_PANEL_MIN_WIDTH } from "../lib/chatPanelWidth";
 import { useChatPanelWidth } from "../hooks/useChatPanelWidth";
 
 interface MainSplitLayoutProps {
   stage: ReactNode;
   chat: ReactNode;
+  onSplitReady?: () => void;
 }
 
-export function MainSplitLayout({ stage, chat }: MainSplitLayoutProps) {
+export function MainSplitLayout({ stage, chat, onSplitReady }: MainSplitLayoutProps) {
   const mainRef = useRef<HTMLElement>(null);
   const { chatWidth, onHandlePointerDown, isReady } = useChatPanelWidth(mainRef);
+
+  useEffect(() => {
+    if (isReady) onSplitReady?.();
+  }, [isReady, onSplitReady]);
 
   const style = isReady ? ({ "--chat-panel-width": `${chatWidth}px` } as CSSProperties) : undefined;
 

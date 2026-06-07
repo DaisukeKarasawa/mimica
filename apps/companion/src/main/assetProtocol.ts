@@ -10,6 +10,8 @@ export const CHARACTER_ASSET_SCHEME = "mimica-asset";
 export const CHARACTER_ASSET_BASE = `${CHARACTER_ASSET_SCHEME}://local/`;
 
 let assetRoot: string | null = null;
+let assetRootRealNorm: string | null = null;
+let protocolHandlerRegistered = false;
 let electronApis: Pick<ElectronMain, "protocol" | "net"> | null = null;
 
 const CHAT_ICON_NAMES = ["icon.png", "icon.jpg", "icon.jpeg", "icon.webp"] as const;
@@ -65,23 +67,36 @@ export function registerAssetProtocol(): void {
   ]);
 }
 
-export function setupAssetProtocolHandler(): void {
-  const { protocol, net } = apis();
-  let realRootNorm: string;
+function syncAssetRootRealNorm(): boolean {
   try {
     const root = syncAssetRootFromSettings();
-    realRootNorm = `${realpathSync(root)}/`;
+    assetRootRealNorm = `${realpathSync(root)}/`;
+    return true;
   } catch {
+    assetRootRealNorm = null;
+    return false;
+  }
+}
+
+/** Register or refresh the mimica-asset protocol handler (safe to call repeatedly). */
+export function setupAssetProtocolHandler(): boolean {
+  if (!syncAssetRootRealNorm()) {
     console.error(
       "[mimica] Character asset root is unavailable; mimica-asset:// requests will 404",
     );
-    return;
+    return false;
   }
+
+  if (protocolHandlerRegistered) return true;
+
+  const { protocol, net } = apis();
   protocol.handle(CHARACTER_ASSET_SCHEME, (request: Request) => {
+    syncAssetRootFromSettings();
+    const realRootNorm = assetRootRealNorm;
     const url = new URL(request.url);
     const rel = decodeURIComponent(url.pathname).replace(/^\/+/, "");
     const root = assetRoot;
-    if (!root) {
+    if (!root || !realRootNorm) {
       return new Response("Not Found", { status: 404 });
     }
     const filePath = normalize(join(root, rel));
@@ -96,9 +111,16 @@ export function setupAssetProtocolHandler(): void {
     }
     return net.fetch(pathToFileURL(realPath).href);
   });
+  protocolHandlerRegistered = true;
+  return true;
+}
+
+export function ensureAssetProtocolHandler(): boolean {
+  return setupAssetProtocolHandler();
 }
 
 export function getCharacterAssetStatus(): CharacterAssetStatus {
+  ensureAssetProtocolHandler();
   const settings = getActiveMimicaSettings();
   const root = syncAssetRootFromSettings();
 

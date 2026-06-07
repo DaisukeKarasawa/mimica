@@ -22,6 +22,7 @@ export default function App() {
   const [avatarState, setAvatarState] = useState<AvatarState>("idle");
   const [isStreaming, setIsStreaming] = useState(false);
   const [characterAssets, setCharacterAssets] = useState<CharacterAssetStatus | null>(null);
+  const [splitLayoutReady, setSplitLayoutReady] = useState(false);
   const [agentMode, setAgentMode] = useState<AgentMode>(DEFAULT_SETTINGS.defaultAgentMode);
   const [tabsBarVisible, setTabsBarVisible] = useState(true);
 
@@ -57,10 +58,24 @@ export default function App() {
   const linkedWorkspacePath = editorContext?.workspacePath ?? null;
 
   useEffect(() => {
-    void window.mimica.getCharacterAssets().then(setCharacterAssets);
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const loadAssets = async (attempt = 0) => {
+      const status = await window.mimica.getCharacterAssets();
+      if (cancelled) return;
+      setCharacterAssets(status);
+      if (!status.ready && attempt < 8) {
+        retryTimer = setTimeout(() => void loadAssets(attempt + 1), 1500);
+      }
+    };
+
+    void loadAssets();
     const unsubCtx = window.mimica.onEditorContext(setEditorContext);
     const unsubAgent = window.mimica.onAgentEvent(handleAgentEvent);
     return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
       unsubCtx();
       unsubAgent();
     };
@@ -222,7 +237,14 @@ export default function App() {
     <div className="app">
       <TopBar />
       <MainSplitLayout
-        stage={<CharacterStage avatarState={avatarState} assets={characterAssets} />}
+        onSplitReady={() => setSplitLayoutReady(true)}
+        stage={
+          <CharacterStage
+            avatarState={avatarState}
+            assets={characterAssets}
+            layoutReady={splitLayoutReady}
+          />
+        }
         chat={
           <ChatPanel
             openSessions={tabs.openSessions}

@@ -5,6 +5,8 @@ import { SpineStageController } from "@mimica/character-runtime";
 interface CharacterStageProps {
   avatarState: AvatarState;
   assets: CharacterAssetStatus | null;
+  /** True once the split layout has a stable width (stage host is non-zero). */
+  layoutReady?: boolean;
 }
 
 function resolvePetDebug(): boolean {
@@ -25,24 +27,27 @@ function resolvePetDebug(): boolean {
   return false;
 }
 
-export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
+export function CharacterStage({ avatarState, assets, layoutReady = true }: CharacterStageProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<SpineStageController | null>(null);
   const [spineReady, setSpineReady] = useState(false);
+  const [mountError, setMountError] = useState<string | null>(null);
 
   const petEnabled = Boolean(assets?.metadata?.interaction?.pet);
   const petIdle = avatarState === "idle";
 
   useEffect(() => {
     const host = hostRef.current;
-    if (!host || !assets?.ready || !assets.metadata || !assets.motionMap) {
+    if (!host || !layoutReady || !assets?.ready || !assets.metadata || !assets.motionMap) {
       setSpineReady(false);
+      setMountError(null);
       return;
     }
 
     let cancelled = false;
     const controller = new SpineStageController();
     controllerRef.current = controller;
+    setMountError(null);
 
     void controller
       .mount(host, {
@@ -61,9 +66,11 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
         }
       })
       .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
         console.error("[CharacterStage] Spine mount failed:", err);
         if (!cancelled) {
           setSpineReady(false);
+          setMountError(message);
         }
       });
 
@@ -72,8 +79,10 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
       controller.destroy();
       controllerRef.current = null;
       setSpineReady(false);
+      setMountError(null);
     };
   }, [
+    layoutReady,
     assets?.ready,
     assets?.baseUrl,
     assets?.metadata?.skelFile,
@@ -87,7 +96,25 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
     }
   }, [avatarState, spineReady]);
 
+  useEffect(() => {
+    if (!layoutReady || !spineReady || !controllerRef.current) return;
+    requestAnimationFrame(() => {
+      controllerRef.current?.refreshLayout();
+    });
+  }, [layoutReady, spineReady]);
+
   const showPlaceholder = !assets?.ready || !spineReady;
+  const statusMessage = (() => {
+    if (!assets) return "キャラクター素材を確認しています…";
+    if (!assets.ready) {
+      const missing =
+        assets.missing.length > 0 ? assets.missing.join(", ") : "metadata / motion-map";
+      return `Spine 素材が見つかりません: ${missing}`;
+    }
+    if (mountError) return `Spine の読み込みに失敗しました: ${mountError}`;
+    return null;
+  })();
+
   const stageClassName = [
     "stage",
     spineReady ? "stage--spine-active" : "",
@@ -107,6 +134,12 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
       )}
 
       <div ref={hostRef} className="spine-host" aria-hidden={showPlaceholder} />
+
+      {statusMessage && (
+        <p className="stage-status" role="status">
+          {statusMessage}
+        </p>
+      )}
 
       {showPlaceholder && (
         <div className={`character placeholder ${avatarState}`} aria-hidden="true">
