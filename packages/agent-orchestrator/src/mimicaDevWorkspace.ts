@@ -2,6 +2,7 @@ import { access, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   DENIED_HOOK_TOOLS_FILE,
+  DENIED_TOOLS_CONFIG_FILE,
   HOOK_GUARD_MARKER,
   type HooksConfig,
   MIMICA_READ_ONLY_HOOK_SCRIPT,
@@ -33,7 +34,11 @@ export async function stripMimicaReadOnlyHooksFromWorkspace(workspacePath: strin
   const hooksDir = join(cursorDir, "hooks");
   const hooksJsonPath = join(cursorDir, "hooks.json");
 
-  for (const file of [MIMICA_READ_ONLY_HOOK_SCRIPT, DENIED_HOOK_TOOLS_FILE]) {
+  for (const file of [
+    MIMICA_READ_ONLY_HOOK_SCRIPT,
+    DENIED_HOOK_TOOLS_FILE,
+    DENIED_TOOLS_CONFIG_FILE,
+  ]) {
     try {
       await unlink(join(hooksDir, file));
     } catch {

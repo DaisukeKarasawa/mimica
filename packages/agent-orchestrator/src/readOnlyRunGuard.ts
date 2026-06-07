@@ -1,7 +1,7 @@
 import type { Run } from "@cursor/sdk";
 import { cancelRun } from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
-import { isWriteTool, READ_ONLY_TOOL_ERROR } from "./readOnlyPolicy.js";
+import { isAskDeniedTool, READ_ONLY_TOOL_ERROR } from "./readOnlyPolicy.js";
 import { isBlockedToolCallStatus, toolCallName } from "./toolCallName.js";
 
 /** Single enforcement point for Ask-mode write-tool blocking (onDelta + stream). */
@@ -17,7 +17,7 @@ export class ReadOnlyRunGuard {
     return this.blocked;
   }
 
-  async blockWriteTool(name: string): Promise<void> {
+  async blockDeniedTool(name: string): Promise<void> {
     if (this.blocked) return;
     this.blocked = true;
     try {
@@ -36,15 +36,15 @@ export class ReadOnlyRunGuard {
     if (this.blocked || isCancelled() || signal?.aborted) return;
     if (update.type !== "tool-call-started" && update.type !== "partial-tool-call") return;
     const name = toolCallName(update.toolCall);
-    if (name && isWriteTool(name)) {
-      await this.blockWriteTool(name);
+    if (name && isAskDeniedTool(name)) {
+      await this.blockDeniedTool(name);
     }
   }
 
   async handleStreamToolCall(name: string, status: string | undefined): Promise<boolean> {
     if (this.blocked) return false;
-    if (isWriteTool(name) && isBlockedToolCallStatus(status)) {
-      await this.blockWriteTool(name);
+    if (isAskDeniedTool(name) && isBlockedToolCallStatus(status)) {
+      await this.blockDeniedTool(name);
       return true;
     }
     return false;

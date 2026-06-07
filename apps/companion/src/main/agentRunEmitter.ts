@@ -71,4 +71,14 @@ export class AgentRunEmitter {
       message,
     });
   }
+
+  perf(t0EpochMs: number): void {
+    if (!this.isActive()) return;
+    emitAgentEvent(this.wc, {
+      type: "agent_perf",
+      sessionId: this.sessionId,
+      runId: this.runId,
+      t0EpochMs,
+    });
+  }
 }

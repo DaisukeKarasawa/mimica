@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { electron } from "./electron.js";
@@ -8,6 +8,10 @@ import { resolveExpandedPath } from "./paths.js";
 const LOG_PREFIX = "[personaSetup]";
 
 let cachedTemplatePersonaDir: string | undefined;
+let cachedPersonaPrompt: string | undefined;
+let cachedPersonaSourcePath: string | undefined;
+let cachedPersonaSourceMtimeMs: number | undefined;
+let cachedPersonaStyleMtimeMs: number | undefined;
 
 function devTemplatePersonaDir(): string {
   const companionRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -49,12 +53,8 @@ function readPersonaPack(skillPath: string): string | null {
   const dir = dirname(resolved);
   const parts = [readFileSync(resolved, "utf8").trim()];
   const stylePath = join(dir, "style.md");
-  const linesPath = join(dir, "lines.json");
   if (existsSync(stylePath)) {
     parts.push(`---\n${readFileSync(stylePath, "utf8").trim()}`);
-  }
-  if (existsSync(linesPath)) {
-    parts.push(`---\n## 参考セリフ (lines.json)\n${readFileSync(linesPath, "utf8").trim()}`);
   }
   return parts.join("\n\n");
 }
@@ -87,9 +87,34 @@ export function ensurePersonaPackOnDisk(): void {
   }
 }
 
+function personaSourceMtimeMs(sourcePath: string): number | undefined {
+  try {
+    return statSync(sourcePath).mtimeMs;
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolvePersonaSystemPrompt(): string | undefined {
   ensurePersonaPackOnDisk();
   const settings = getActiveMimicaSettings();
-  const prompt = readPersonaPack(resolveExpandedPath(settings.personaPackPath));
-  return prompt ?? undefined;
+  const sourcePath = resolveExpandedPath(settings.personaPackPath);
+  const sourceMtimeMs = personaSourceMtimeMs(sourcePath);
+  const stylePath = join(dirname(sourcePath), "style.md");
+  const styleMtimeMs = personaSourceMtimeMs(stylePath);
+  if (
+    cachedPersonaPrompt &&
+    cachedPersonaSourcePath === sourcePath &&
+    cachedPersonaSourceMtimeMs === sourceMtimeMs &&
+    cachedPersonaStyleMtimeMs === styleMtimeMs
+  ) {
+    return cachedPersonaPrompt;
+  }
+  const prompt = readPersonaPack(sourcePath);
+  if (!prompt) return undefined;
+  cachedPersonaSourcePath = sourcePath;
+  cachedPersonaSourceMtimeMs = sourceMtimeMs;
+  cachedPersonaStyleMtimeMs = styleMtimeMs;
+  cachedPersonaPrompt = prompt;
+  return prompt;
 }

@@ -3,6 +3,9 @@ import type { Run } from "@cursor/sdk";
 export function isAbortError(err: unknown): boolean {
   if (err instanceof DOMException && err.name === "AbortError") return true;
   if (err instanceof Error && err.name === "AbortError") return true;
+  if (typeof err === "object" && err !== null && "name" in err && err.name === "AbortError") {
+    return true;
+  }
   return false;
 }
 
@@ -40,7 +43,7 @@ export async function cancelRun(run: Run | null | undefined): Promise<void> {
 
 let abortRejectionHandlerInstalled = false;
 
-/** Suppress unhandled AbortError rejections from tracked SDK cancel promises only. */
+/** Suppress orphan AbortError rejections from SDK cancel/close (internal promises). */
 export function installAbortRejectionHandler(): void {
   if (abortRejectionHandlerInstalled) return;
   abortRejectionHandlerInstalled = true;

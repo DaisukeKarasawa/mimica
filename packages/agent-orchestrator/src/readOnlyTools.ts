@@ -1,5 +1,6 @@
 /** Re-exports — prefer `./readOnlyPolicy.js` for new code. */
 export {
+  isAskDeniedTool,
   isWriteTool,
   isDeniedHookTool,
   READ_ONLY_TOOL_ERROR,

@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type {
-  AgentMode,
-  AvatarState,
-  ChatMessage,
-  CharacterAssetStatus,
-  EditorContext,
-} from "@mimica/shared";
+import type { AgentMode, AvatarState, ChatMessage, EditorContext } from "@mimica/shared";
 import { DEFAULT_SETTINGS, resolveCharacterShortNameEn } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
@@ -14,6 +8,7 @@ import { CharacterStage } from "./components/CharacterStage";
 import { ChatPanel } from "./components/ChatPanel";
 import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
+import { useCharacterAssets } from "./hooks/useCharacterAssets";
 import { useSessionTabs } from "./hooks/useSessionTabs";
 import { matchChatTabShortcut, type ChatTabShortcutAction } from "./lib/chatTabShortcuts";
 
@@ -21,7 +16,8 @@ export default function App() {
   const [editorContext, setEditorContext] = useState<EditorContext | null>(null);
   const [avatarState, setAvatarState] = useState<AvatarState>("idle");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [characterAssets, setCharacterAssets] = useState<CharacterAssetStatus | null>(null);
+  const characterAssets = useCharacterAssets();
+  const [splitLayoutReady, setSplitLayoutReady] = useState(false);
   const [agentMode, setAgentMode] = useState<AgentMode>(DEFAULT_SETTINGS.defaultAgentMode);
   const [tabsBarVisible, setTabsBarVisible] = useState(true);
 
@@ -57,7 +53,6 @@ export default function App() {
   const linkedWorkspacePath = editorContext?.workspacePath ?? null;
 
   useEffect(() => {
-    void window.mimica.getCharacterAssets().then(setCharacterAssets);
     const unsubCtx = window.mimica.onEditorContext(setEditorContext);
     const unsubAgent = window.mimica.onAgentEvent(handleAgentEvent);
     return () => {
@@ -222,7 +217,14 @@ export default function App() {
     <div className="app">
       <TopBar />
       <MainSplitLayout
-        stage={<CharacterStage avatarState={avatarState} assets={characterAssets} />}
+        onSplitReady={() => setSplitLayoutReady(true)}
+        stage={
+          <CharacterStage
+            avatarState={avatarState}
+            assets={characterAssets}
+            layoutReady={splitLayoutReady}
+          />
+        }
         chat={
           <ChatPanel
             openSessions={tabs.openSessions}

@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -8,12 +8,36 @@ import {
 } from "./mimicaDevWorkspace.js";
 import {
   DENIED_HOOK_TOOLS_FILE,
+  DENIED_TOOLS_CONFIG_FILE,
   HOOK_GUARD_MARKER,
   type HooksConfig,
   MIMICA_READ_ONLY_HOOK_SCRIPT,
 } from "./readOnlyPolicy.js";
 
 export type EnsureReadOnlyHooksResult = { ok: true } | { ok: false; message: string };
+
+/** Skips re-install when hooks are already present; cleared only on process restart. */
+const hooksReadyCache = new Set<string>();
+
+async function isHooksAlreadyInstalled(workspacePath: string): Promise<boolean> {
+  if (hooksReadyCache.has(workspacePath)) return true;
+
+  const hooksJsonPath = join(workspacePath, ".cursor", "hooks.json");
+  const workspaceScriptPath = join(workspacePath, ".cursor", "hooks", MIMICA_READ_ONLY_HOOK_SCRIPT);
+
+  try {
+    await access(workspaceScriptPath);
+    const config = JSON.parse(await readFile(hooksJsonPath, "utf8")) as HooksConfig;
+    if (hasMimicaGuard(config)) {
+      hooksReadyCache.add(workspacePath);
+      return true;
+    }
+  } catch {
+    // Not installed yet — fall through to install path.
+  }
+
+  return false;
+}
 
 function packageRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -25,6 +49,10 @@ function bundledHookScriptPath(): string {
 
 function bundledDeniedToolsPath(): string {
   return join(packageRoot(), "policy", DENIED_HOOK_TOOLS_FILE);
+}
+
+function bundledDeniedToolsConfigPath(): string {
+  return join(packageRoot(), "policy", DENIED_TOOLS_CONFIG_FILE);
 }
 
 function mimicaHookEntries(scriptPath: string): HooksConfig["hooks"] {
@@ -60,6 +88,14 @@ function mergeHooks(existing: HooksConfig, mimica: HooksConfig["hooks"]): HooksC
   return merged;
 }
 
+async function syncBundledHookArtifacts(workspacePath: string): Promise<void> {
+  const hooksDir = join(workspacePath, ".cursor", "hooks");
+  await mkdir(hooksDir, { recursive: true });
+  await copyFile(bundledDeniedToolsConfigPath(), join(hooksDir, DENIED_TOOLS_CONFIG_FILE));
+  await copyFile(bundledDeniedToolsPath(), join(hooksDir, DENIED_HOOK_TOOLS_FILE));
+  await copyFile(bundledHookScriptPath(), join(hooksDir, MIMICA_READ_ONLY_HOOK_SCRIPT));
+}
+
 /** Install Mimica read-only hook scripts into the agent workspace (pre-dispatch enforcement). */
 export async function ensureReadOnlyHooks(
   workspacePath: string,
@@ -67,19 +103,21 @@ export async function ensureReadOnlyHooks(
   try {
     if ((await isMimicaMonorepoDevRoot(workspacePath)) && !allowsReadOnlyHooksInDev()) {
       await stripMimicaReadOnlyHooksFromWorkspace(workspacePath);
+      hooksReadyCache.add(workspacePath);
       return { ok: true };
     }
 
-    const scriptPath = bundledHookScriptPath();
+    if (await isHooksAlreadyInstalled(workspacePath)) {
+      await syncBundledHookArtifacts(workspacePath);
+      return { ok: true };
+    }
+
     const cursorDir = join(workspacePath, ".cursor");
     const hooksDir = join(cursorDir, "hooks");
     const hooksJsonPath = join(cursorDir, "hooks.json");
     const workspaceScriptPath = join(hooksDir, MIMICA_READ_ONLY_HOOK_SCRIPT);
-    const workspaceDeniedToolsPath = join(hooksDir, DENIED_HOOK_TOOLS_FILE);
 
-    await mkdir(hooksDir, { recursive: true });
-    await copyFile(bundledDeniedToolsPath(), workspaceDeniedToolsPath);
-    await copyFile(scriptPath, workspaceScriptPath);
+    await syncBundledHookArtifacts(workspacePath);
 
     let config: HooksConfig = { version: 1, hooks: {} };
     try {
@@ -96,6 +134,7 @@ export async function ensureReadOnlyHooks(
       await writeFile(hooksJsonPath, `${JSON.stringify(next, null, 2)}\n`);
     }
 
+    hooksReadyCache.add(workspacePath);
     return { ok: true };
   } catch (err) {
     return {

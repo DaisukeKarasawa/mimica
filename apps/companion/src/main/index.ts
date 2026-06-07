@@ -34,6 +34,9 @@ function attachMainWindow(win: BrowserWindowType): void {
   mainWindow = win;
   agentService = new AgentService(() => mainWindow?.webContents, sessionStore);
   mainWindow.on("closed", () => {
+    void agentService?.dispose().catch((err) => {
+      console.error("[agentService] dispose failed:", err);
+    });
     mainWindow = null;
     agentService = null;
   });
@@ -75,7 +78,12 @@ if (!gotLock) {
     ipcMain.handle("sessions:create", (_e, workspacePath: string) =>
       sessionStore.create(workspacePath),
     );
-    ipcMain.handle("sessions:delete", (_e, id: string) => sessionStore.delete(id));
+    ipcMain.handle("sessions:delete", async (_e, id: string) => {
+      if (agentService) {
+        await agentService.closeSession(id);
+      }
+      sessionStore.delete(id);
+    });
     ipcMain.handle("sessions:save", (_e, session) => sessionStore.save(session));
     ipcMain.handle("bridge:status", () => ({
       connected: bridgeServer?.hasClient() ?? false,

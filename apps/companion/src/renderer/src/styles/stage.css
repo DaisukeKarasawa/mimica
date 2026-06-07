@@ -45,3 +45,22 @@
   mask-image: radial-gradient(circle at center, black 30%, transparent 82%);
   opacity: 0.62;
 }
+
+.stage-status {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 3;
+  max-width: min(92%, 520px);
+  margin: 0;
+  padding: 8px 12px;
+  transform: translateX(-50%);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 12, 24, 0.78);
+  color: rgba(235, 240, 255, 0.92);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+  pointer-events: none;
+}
