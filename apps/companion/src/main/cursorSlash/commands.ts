@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { SlashCommandSource, SlashCommandSummary } from "@mimica/shared";
-import { commandCatalogStore, getCachedCatalog } from "./catalog.js";
+import { commandCatalogStore, getCachedCatalog, slashCommandsCatalogMtime } from "./catalog.js";
 import {
   catalogCacheKey,
   normalizeWorkspacePath,
@@ -76,8 +76,12 @@ function buildCommandCatalog(workspacePath: string | null): Map<string, CommandE
 function getCommandCatalog(workspacePath: string | null): Map<string, CommandEntry> {
   const normalized = normalizeWorkspacePath(workspacePath);
   const cacheKey = catalogCacheKey(normalized);
-  return getCachedCatalog(cacheKey, normalized, commandCatalogStore(), () =>
-    buildCommandCatalog(normalized),
+  return getCachedCatalog(
+    cacheKey,
+    normalized,
+    commandCatalogStore(),
+    () => buildCommandCatalog(normalized),
+    slashCommandsCatalogMtime,
   );
 }
 

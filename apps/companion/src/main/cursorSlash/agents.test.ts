@@ -5,30 +5,51 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { resetSlashCatalogCachesForTests } from "./catalog.js";
 import { listSlashSubagents, resolveSlashSubagent } from "./agents.js";
+import { userAgentsDir } from "./discovery.js";
 import { resolveSlashInput } from "./index.js";
 
 const workspacePath = mkdtempSync(join(tmpdir(), "mimica-agents-test-"));
+const fakeHome = mkdtempSync(join(tmpdir(), "mimica-agents-test-home-"));
+const originalHome = process.env.HOME;
+const originalUserProfile = process.env.USERPROFILE;
+
+function withFakeHome<T>(fn: () => T): T {
+  process.env.HOME = fakeHome;
+  process.env.USERPROFILE = fakeHome;
+  resetSlashCatalogCachesForTests();
+  return fn();
+}
 
 after(() => {
   rmSync(workspacePath, { recursive: true, force: true });
+  rmSync(fakeHome, { recursive: true, force: true });
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
+  if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = originalUserProfile;
 });
 
 describe("custom slash subagents", () => {
   it("lists project custom agents and prefers them over user agents", () => {
-    resetSlashCatalogCachesForTests();
-    const projectDir = join(workspacePath, ".cursor", "agents");
-    const userDir = join(tmpdir(), "mimica-agents-user-skip");
-    mkdirSync(projectDir, { recursive: true });
-    writeFileSync(
-      join(projectDir, "reviewer.md"),
-      "---\nname: reviewer\ndescription: Project reviewer\n---\nYou review project code.",
-    );
+    withFakeHome(() => {
+      const projectDir = join(workspacePath, ".cursor", "agents");
+      const userDir = userAgentsDir();
+      mkdirSync(projectDir, { recursive: true });
+      mkdirSync(userDir, { recursive: true });
+      writeFileSync(
+        join(userDir, "reviewer.md"),
+        "---\nname: reviewer\ndescription: User reviewer\n---\nUser agent body.",
+      );
+      writeFileSync(
+        join(projectDir, "reviewer.md"),
+        "---\nname: reviewer\ndescription: Project reviewer\n---\nYou review project code.",
+      );
 
-    const agents = listSlashSubagents(workspacePath);
-    const found = agents.find((item) => item.name === "reviewer");
-    assert.ok(found);
-    assert.equal(found?.source, "project");
-    void userDir;
+      const agents = listSlashSubagents(workspacePath);
+      const found = agents.find((item) => item.name === "reviewer");
+      assert.ok(found);
+      assert.equal(found?.source, "project");
+    });
   });
 
   it("expands custom subagent body into the resolved prompt", () => {

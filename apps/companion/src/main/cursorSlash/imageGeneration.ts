@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { SlashMenuItem } from "@mimica/shared";
 import { normalizeWorkspacePath } from "./discovery.js";
@@ -17,6 +17,15 @@ export const IMAGE_ATTACH_MENU_ITEM: SlashMenuItem = {
 
 export function defaultGeneratedImageDir(workspacePath: string): string {
   return join(workspacePath, "assets");
+}
+
+function isAssetsDirectory(assetsDir: string): boolean {
+  if (!existsSync(assetsDir)) return false;
+  try {
+    return statSync(assetsDir).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 export function resolveSlashImageGeneration(
@@ -41,11 +50,11 @@ export function resolveSlashImageGeneration(
   }
 
   const assetsDir = defaultGeneratedImageDir(normalized);
-  let assetsReady = existsSync(assetsDir);
-  if (!assetsReady) {
+  let assetsReady = isAssetsDirectory(assetsDir);
+  if (!assetsReady && !existsSync(assetsDir)) {
     try {
       mkdirSync(assetsDir, { recursive: true });
-      assetsReady = true;
+      assetsReady = isAssetsDirectory(assetsDir);
     } catch {
       assetsReady = false;
     }

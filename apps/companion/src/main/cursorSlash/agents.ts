@@ -6,7 +6,7 @@ import {
   SLASH_SUBAGENT_CATALOG,
   type SlashSubagentDefinition,
 } from "@mimica/shared";
-import { getCachedCatalog, subagentCatalogStore } from "./catalog.js";
+import { getCachedCatalog, slashSubagentsCatalogMtime, subagentCatalogStore } from "./catalog.js";
 import {
   catalogCacheKey,
   normalizeWorkspacePath,
@@ -131,8 +131,12 @@ function buildSubagentCatalog(workspacePath: string | null): Map<string, Subagen
 function getSubagentCatalog(workspacePath: string | null): Map<string, SubagentCatalogEntry> {
   const normalized = normalizeWorkspacePath(workspacePath);
   const cacheKey = catalogCacheKey(normalized);
-  return getCachedCatalog(cacheKey, normalized, subagentCatalogStore(), () =>
-    buildSubagentCatalog(normalized),
+  return getCachedCatalog(
+    cacheKey,
+    normalized,
+    subagentCatalogStore(),
+    () => buildSubagentCatalog(normalized),
+    slashSubagentsCatalogMtime,
   );
 }
 

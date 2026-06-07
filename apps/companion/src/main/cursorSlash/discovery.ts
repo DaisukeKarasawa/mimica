@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { extname, join, relative } from "node:path";
 import { SLASH_COMMAND_NAME_PATTERN } from "@mimica/shared";
@@ -41,13 +41,22 @@ export function resolveSlashWorkspaceOrNull(
 }
 
 const MTIME_TTL_MS = 1000;
-let mtimeSyncMemo: { key: string; value: number } | null = null;
 const mtimeTtlCache = new Map<string, { value: number; at: number }>();
 
 /** Test-only: clear mtime memo/TTL between isolated fixtures. */
 export function clearSlashCatalogRootsMtimeCaches(): void {
-  mtimeSyncMemo = null;
   mtimeTtlCache.clear();
+}
+
+function cachedMtime(cacheKey: string, compute: () => number): number {
+  const now = Date.now();
+  const ttlEntry = mtimeTtlCache.get(cacheKey);
+  if (ttlEntry && now - ttlEntry.at < MTIME_TTL_MS) {
+    return ttlEntry.value;
+  }
+  const value = compute();
+  mtimeTtlCache.set(cacheKey, { value, at: now });
+  return value;
 }
 
 function cursorHome(...segments: string[]): string {
@@ -113,6 +122,26 @@ function shouldSkipWalkDir(dirName: string, absolutePath: string): boolean {
   return false;
 }
 
+function entryStat(fullPath: string): ReturnType<typeof lstatSync> | null {
+  try {
+    return lstatSync(fullPath);
+  } catch {
+    return null;
+  }
+}
+
+function isRealDirectory(fullPath: string): boolean {
+  const stat = entryStat(fullPath);
+  if (!stat) return false;
+  return stat.isDirectory() && !stat.isSymbolicLink();
+}
+
+function isRealFile(fullPath: string): boolean {
+  const stat = entryStat(fullPath);
+  if (!stat) return false;
+  return stat.isFile() && !stat.isSymbolicLink();
+}
+
 export function commandNameFromFile(commandsRoot: string, filePath: string): string {
   const rel = relative(commandsRoot, filePath).replace(/\\/g, "/");
   return rel.endsWith(".md") ? rel.slice(0, -3) : rel;
@@ -136,10 +165,10 @@ export function walkCommandFiles(
     }
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
-      if (entry.isDirectory()) {
+      if (isRealDirectory(fullPath)) {
         if (shouldSkipWalkDir(entry.name, fullPath)) continue;
         stack.push(fullPath);
-      } else if (entry.isFile() && extname(entry.name) === ".md") {
+      } else if (isRealFile(fullPath) && extname(entry.name) === ".md") {
         const name = commandNameFromFile(commandsRoot, fullPath);
         if (SLASH_COMMAND_NAME_PATTERN.test(name)) {
           found.push({ name, absolutePath: fullPath });
@@ -174,10 +203,10 @@ export function walkSkillFiles(root: string): string[] {
     }
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
-      if (entry.isDirectory()) {
+      if (isRealDirectory(fullPath)) {
         if (shouldSkipWalkDir(entry.name, fullPath)) continue;
         stack.push(fullPath);
-      } else if (entry.isFile() && entry.name === SKILL_FILE) {
+      } else if (isRealFile(fullPath) && entry.name === SKILL_FILE) {
         found.push(fullPath);
       }
     }
@@ -214,16 +243,16 @@ export function findWorkspaceSkillRoots(workspacePath: string): string[] {
       continue;
     }
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
       const fullPath = join(dir, entry.name);
+      if (!isRealDirectory(fullPath)) continue;
       if (shouldSkipWalkDir(entry.name, fullPath)) continue;
 
       if (entry.name === ".cursor") {
         const skillsDir = join(fullPath, "skills");
-        if (existsSync(skillsDir)) roots.add(skillsDir);
+        if (existsSync(skillsDir) && isRealDirectory(skillsDir)) roots.add(skillsDir);
       } else if (entry.name === ".agents") {
         const skillsDir = join(fullPath, "skills");
-        if (existsSync(skillsDir)) roots.add(skillsDir);
+        if (existsSync(skillsDir) && isRealDirectory(skillsDir)) roots.add(skillsDir);
       }
 
       stack.push(fullPath);
@@ -245,22 +274,56 @@ function dirMtime(path: string): number {
   return fileMtime(path);
 }
 
-function computeSlashCatalogRootsMtime(workspacePath: string | null): number {
+function skillsContentMtime(root: string, pluginOnly = false): number {
+  let max = dirMtime(root);
+  const files = pluginOnly ? walkPluginSkillFiles(root) : walkSkillFiles(root);
+  for (const skillFile of files) {
+    max = Math.max(max, fileMtime(skillFile));
+  }
+  return max;
+}
+
+function agentsContentMtime(agentsRoot: string): number {
+  let max = dirMtime(agentsRoot);
+  if (!existsSync(agentsRoot)) return max;
+
+  let entries;
+  try {
+    entries = readdirSync(agentsRoot, { withFileTypes: true });
+  } catch {
+    return max;
+  }
+
+  for (const entry of entries) {
+    if (extname(entry.name) !== ".md") continue;
+    const fullPath = join(agentsRoot, entry.name);
+    if (isRealFile(fullPath)) {
+      max = Math.max(max, fileMtime(fullPath));
+    }
+  }
+  return max;
+}
+
+function computeCommandsCatalogMtime(workspacePath: string | null): number {
+  const mtimes = [commandsContentMtime(userCommandsDir())];
+  if (workspacePath) {
+    mtimes.push(commandsContentMtime(projectCommandsDir(workspacePath)));
+  }
+  return Math.max(...mtimes, 0);
+}
+
+function computeSkillsCatalogMtime(workspacePath: string | null): number {
   const mtimes = [
-    commandsContentMtime(userCommandsDir()),
-    dirMtime(userSkillsRoot()),
-    dirMtime(bundledSkillsRoot()),
-    dirMtime(pluginSkillsCacheRoot()),
-    dirMtime(userAgentsSkillsRoot()),
-    dirMtime(userAgentsDir()),
+    skillsContentMtime(userSkillsRoot()),
+    skillsContentMtime(bundledSkillsRoot()),
+    skillsContentMtime(pluginSkillsCacheRoot(), true),
+    skillsContentMtime(userAgentsSkillsRoot()),
   ];
 
   if (workspacePath) {
     mtimes.push(
-      commandsContentMtime(projectCommandsDir(workspacePath)),
       dirMtime(projectSkillsRoot(workspacePath)),
       dirMtime(projectAgentsSkillsRoot(workspacePath)),
-      dirMtime(projectAgentsDir(workspacePath)),
       workspaceSkillsContentMtime(workspacePath),
     );
   }
@@ -268,21 +331,40 @@ function computeSlashCatalogRootsMtime(workspacePath: string | null): number {
   return Math.max(...mtimes, 0);
 }
 
-export function slashCatalogRootsMtime(workspacePath: string | null): number {
-  const key = catalogCacheKey(workspacePath);
-  if (mtimeSyncMemo?.key === key) return mtimeSyncMemo.value;
-
-  const now = Date.now();
-  const ttlEntry = mtimeTtlCache.get(key);
-  if (ttlEntry && now - ttlEntry.at < MTIME_TTL_MS) {
-    mtimeSyncMemo = { key, value: ttlEntry.value };
-    return ttlEntry.value;
+function computeSubagentsCatalogMtime(workspacePath: string | null): number {
+  const mtimes = [agentsContentMtime(userAgentsDir())];
+  if (workspacePath) {
+    mtimes.push(agentsContentMtime(projectAgentsDir(workspacePath)));
   }
+  return Math.max(...mtimes, 0);
+}
 
-  const value = computeSlashCatalogRootsMtime(workspacePath);
-  mtimeSyncMemo = { key, value };
-  mtimeTtlCache.set(key, { value, at: now });
-  return value;
+/** @deprecated Use slashCommandsCatalogMtime, slashSkillsCatalogMtime, or slashSubagentsCatalogMtime. */
+export function slashCatalogRootsMtime(workspacePath: string | null): number {
+  const key = `all:${catalogCacheKey(workspacePath)}`;
+  return cachedMtime(key, () => {
+    const mtimes = [
+      computeCommandsCatalogMtime(workspacePath),
+      computeSkillsCatalogMtime(workspacePath),
+      computeSubagentsCatalogMtime(workspacePath),
+    ];
+    return Math.max(...mtimes, 0);
+  });
+}
+
+export function slashCommandsCatalogMtime(workspacePath: string | null): number {
+  const key = `commands:${catalogCacheKey(workspacePath)}`;
+  return cachedMtime(key, () => computeCommandsCatalogMtime(workspacePath));
+}
+
+export function slashSkillsCatalogMtime(workspacePath: string | null): number {
+  const key = `skills:${catalogCacheKey(workspacePath)}`;
+  return cachedMtime(key, () => computeSkillsCatalogMtime(workspacePath));
+}
+
+export function slashSubagentsCatalogMtime(workspacePath: string | null): number {
+  const key = `subagents:${catalogCacheKey(workspacePath)}`;
+  return cachedMtime(key, () => computeSubagentsCatalogMtime(workspacePath));
 }
 
 function workspaceSkillsContentMtime(workspacePath: string): number {

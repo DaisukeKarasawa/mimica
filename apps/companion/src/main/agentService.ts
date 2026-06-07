@@ -2,18 +2,18 @@ import { relative } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
 import type { AgentMode, ChatAttachment, EditorContext } from "@mimica/shared";
-import { isChatAttachment, toMessageContext } from "@mimica/shared";
+import { extractAtPathTokens, isChatAttachment, toMessageContext } from "@mimica/shared";
 import {
   AgentRunTimingTrace,
   isAgentPerfEnabled,
   type AgentRunner,
 } from "@mimica/agent-orchestrator";
 import { resolveWorkspacePath } from "./paths.js";
+import { resolveAgentSubmitWorkspace } from "./agentSubmitWorkspace.js";
 import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
-import { resolveSlashWorkspaceOrNull } from "./cursorSlash/discovery.js";
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
 import { debugLogAtResolution, resolveAtInput } from "./cursorAt/index.js";
 import { MAX_IMAGE_ATTACHMENTS, readAttachmentBase64 } from "./imageAttachments.js";
@@ -85,8 +85,10 @@ export class AgentService {
     const rawWorkspace =
       editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "";
 
-    const slashWorkspace = resolveSlashWorkspaceOrNull(rawWorkspace, resolveWorkspacePath);
-    const cwd = slashWorkspace ?? resolveWorkspacePath(rawWorkspace);
+    const { slashWorkspace, cwd, canExpandAt } = resolveAgentSubmitWorkspace(
+      rawWorkspace,
+      resolveWorkspacePath,
+    );
 
     const resolved = resolveSlashInput(slashWorkspace, payload.content, payload.mode);
     if (resolved.warning) {
@@ -96,18 +98,26 @@ export class AgentService {
       debugLogSlashResolution(resolved.kind, resolved.name, resolved.expanded.length);
     }
 
-    const skipAtPaths: string[] = [];
-    if (editorContext?.currentFilePath) {
-      const rel = relative(cwd, editorContext.currentFilePath).replace(/\\/g, "/");
-      if (rel && !rel.startsWith("..")) {
-        skipAtPaths.push(rel);
+    let atResolved: Awaited<ReturnType<typeof resolveAtInput>>;
+    if (canExpandAt) {
+      const skipAtPaths: string[] = [];
+      if (editorContext?.currentFilePath) {
+        const rel = relative(cwd, editorContext.currentFilePath).replace(/\\/g, "/");
+        if (rel && !rel.startsWith("..")) {
+          skipAtPaths.push(rel);
+        }
+      }
+      atResolved = await resolveAtInput(cwd, resolved.expanded, {
+        tokenSource: payload.content,
+        skipPaths: skipAtPaths,
+        getSession: (id) => this.sessionStore.get(id),
+      });
+    } else {
+      atResolved = { expanded: resolved.expanded };
+      if (extractAtPathTokens(payload.content).length > 0) {
+        emitter.warning("ワークスペースがリンクされていないため、@ メンションは展開されません。");
       }
     }
-    const atResolved = await resolveAtInput(cwd, resolved.expanded, {
-      tokenSource: payload.content,
-      skipPaths: skipAtPaths,
-      getSession: (id) => this.sessionStore.get(id),
-    });
     if (atResolved.warning) {
       emitter.warning(atResolved.warning);
     }

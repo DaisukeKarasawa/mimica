@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { basename, join, relative } from "node:path";
 import type { SlashCommandSource, SlashMenuItem } from "@mimica/shared";
 import { SLASH_NAME_PATTERN } from "@mimica/shared";
-import { getCachedCatalog, skillCatalogStore } from "./catalog.js";
+import { getCachedCatalog, skillCatalogStore, slashSkillsCatalogMtime } from "./catalog.js";
 import {
   bundledSkillsRoot,
   catalogCacheKey,
@@ -109,8 +109,8 @@ function buildSkillCatalog(workspacePath: string | null): Map<string, SkillEntry
   // Lowest priority first: plugin → bundled → user → project (project wins).
   addSkillsFromRoot(byName, pluginSkillsCacheRoot(), "plugin", workspacePath, false);
   addSkillsFromRoot(byName, bundledSkillsRoot(), "bundled", workspacePath, false);
-  addSkillsFromRoot(byName, userSkillsRoot(), "user", workspacePath, false);
-  addSkillsFromRoot(byName, userAgentsSkillsRoot(), "user", workspacePath, false);
+  addSkillsFromRoot(byName, userSkillsRoot(), "user", workspacePath, true);
+  addSkillsFromRoot(byName, userAgentsSkillsRoot(), "user", workspacePath, true);
 
   if (workspacePath) {
     for (const root of findWorkspaceSkillRoots(workspacePath)) {
@@ -124,8 +124,12 @@ function buildSkillCatalog(workspacePath: string | null): Map<string, SkillEntry
 function getSkillCatalog(workspacePath: string | null): Map<string, SkillEntry> {
   const normalized = normalizeWorkspacePath(workspacePath);
   const cacheKey = catalogCacheKey(normalized);
-  return getCachedCatalog(cacheKey, normalized, skillCatalogStore(), () =>
-    buildSkillCatalog(normalized),
+  return getCachedCatalog(
+    cacheKey,
+    normalized,
+    skillCatalogStore(),
+    () => buildSkillCatalog(normalized),
+    slashSkillsCatalogMtime,
   );
 }
 

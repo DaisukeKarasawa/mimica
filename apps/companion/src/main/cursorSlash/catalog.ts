@@ -1,4 +1,9 @@
-import { clearSlashCatalogRootsMtimeCaches, slashCatalogRootsMtime } from "./discovery.js";
+import {
+  clearSlashCatalogRootsMtimeCaches,
+  slashCommandsCatalogMtime,
+  slashSkillsCatalogMtime,
+  slashSubagentsCatalogMtime,
+} from "./discovery.js";
 
 interface CatalogCache<T> {
   rootsMtime: number;
@@ -14,8 +19,9 @@ export function getCachedCatalog<T>(
   workspacePath: string | null,
   store: Map<string, CatalogCache<unknown>>,
   build: () => T,
+  rootsMtimeGetter: (workspacePath: string | null) => number,
 ): T {
-  const rootsMtime = slashCatalogRootsMtime(workspacePath);
+  const rootsMtime = rootsMtimeGetter(workspacePath);
   const existing = store.get(cacheKey);
   if (existing && existing.rootsMtime === rootsMtime) {
     return existing.data as T;
@@ -36,6 +42,8 @@ export function skillCatalogStore(): Map<string, CatalogCache<unknown>> {
 export function subagentCatalogStore(): Map<string, CatalogCache<unknown>> {
   return subagentCaches;
 }
+
+export { slashCommandsCatalogMtime, slashSkillsCatalogMtime, slashSubagentsCatalogMtime };
 
 /** Test-only: clear cached slash catalogs between isolated fixtures. */
 export function resetSlashCatalogCachesForTests(): void {

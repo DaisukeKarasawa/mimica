@@ -15,7 +15,7 @@ export const SLASH_INPUT_PATTERN = new RegExp(
 
 /** Composer menu: `/` plus optional partial token (no trailing space yet). */
 export const SLASH_MENU_OPEN_PATTERN = new RegExp(
-  `^/(${SLASH_COMMAND_SEGMENT}(?:/${SLASH_COMMAND_SEGMENT})*)?$`,
+  `^/(${SLASH_COMMAND_SEGMENT}(?:/${SLASH_COMMAND_SEGMENT})*/?)?$`,
 );
 
 export interface ParsedSlashInput {
@@ -31,7 +31,8 @@ export function parseSlashInput(input: string): ParsedSlashInput | null {
 
 export function slashMenuFilterQuery(value: string): string {
   const match = value.match(SLASH_MENU_OPEN_PATTERN);
-  return match?.[1] ?? "";
+  const raw = match?.[1] ?? "";
+  return raw.endsWith("/") ? raw.slice(0, -1) : raw;
 }
 
 export function isSlashMenuOpen(value: string): boolean {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -26,6 +26,20 @@ describe("slash image generation", () => {
     assert.match(result.expanded, /GenerateImage/);
     assert.match(result.expanded, /simple app icon/);
     assert.ok(result.expanded.includes(defaultGeneratedImageDir(workspacePath)));
+  });
+
+  it("warns when assets path exists as a file instead of a directory", () => {
+    const ws = mkdtempSync(join(tmpdir(), "mimica-image-gen-file-assets-"));
+    try {
+      writeFileSync(defaultGeneratedImageDir(ws), "not a directory");
+      const result = resolveSlashImageGeneration(ws, "simple app icon");
+      assert.ok(result);
+      assert.ok(result.warning);
+      assert.match(result.warning ?? "", /Could not create assets directory/);
+      assert.doesNotMatch(result.expanded, /Save generated images under/);
+    } finally {
+      rmSync(ws, { recursive: true, force: true });
+    }
   });
 
   it("resolves /image before other slash kinds", () => {

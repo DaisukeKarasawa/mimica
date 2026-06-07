@@ -50,5 +50,11 @@ describe("slash menu open helpers", () => {
     assert.equal(slashMenuFilterQuery("/com"), "com");
     assert.equal(slashMenuFilterQuery("/"), "");
     assert.equal(slashMenuFilterQuery("/git-actions"), "git-actions");
+    assert.equal(slashMenuFilterQuery("/git-actions/"), "git-actions");
+  });
+
+  it("treats trailing slash as open menu input", () => {
+    assert.equal(isSlashMenuOpen("/git-actions/"), true);
+    assert.equal(slashMenuFilterQuery("/git-actions/"), "git-actions");
   });
 });
