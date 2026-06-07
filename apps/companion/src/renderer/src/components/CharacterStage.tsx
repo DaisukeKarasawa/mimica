@@ -60,7 +60,8 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
           });
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("[CharacterStage] Spine mount failed:", err);
         if (!cancelled) {
           setSpineReady(false);
         }
