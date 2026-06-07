@@ -9,14 +9,27 @@ export interface ComposerMenuKeyboardTarget<T> {
   onEscape: () => void;
 }
 
+function isImeComposing(event: KeyboardEvent): boolean {
+  return event.nativeEvent.isComposing || event.keyCode === 229;
+}
+
 /** Returns true when the key event was handled by an open composer menu. */
 export function handleComposerMenuKeyDown<T>(
   event: KeyboardEvent,
   menu: ComposerMenuKeyboardTarget<T> | null | undefined,
 ): boolean {
-  if (!menu?.open || menu.filteredItems.length === 0) return false;
+  if (!menu?.open) return false;
+  if (isImeComposing(event)) return false;
 
   const { filteredItems, highlightedIndex, setHighlightedIndex, onSelect, onEscape } = menu;
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    onEscape();
+    return true;
+  }
+
+  if (filteredItems.length === 0) return false;
 
   if (event.key === "ArrowDown") {
     event.preventDefault();
@@ -32,11 +45,6 @@ export function handleComposerMenuKeyDown<T>(
     event.preventDefault();
     const selected = filteredItems[highlightedIndex];
     if (selected) void onSelect(selected);
-    return true;
-  }
-  if (event.key === "Escape") {
-    event.preventDefault();
-    onEscape();
     return true;
   }
 

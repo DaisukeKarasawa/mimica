@@ -60,9 +60,14 @@ export function useAtMenuSections(
 
     let cancelled = false;
     const timer = setTimeout(() => {
-      void window.mimica.searchAtMenu(workspacePath, query, sessionId).then((results) => {
-        if (!cancelled) setSections(results);
-      });
+      void window.mimica
+        .searchAtMenu(workspacePath, query, sessionId)
+        .then((results) => {
+          if (!cancelled) setSections(results);
+        })
+        .catch(() => {
+          if (!cancelled) setSections([]);
+        });
     }, SEARCH_DEBOUNCE_MS);
 
     return () => {
@@ -142,7 +147,7 @@ export function AtMentionMenu({
   itemRefs.current.length = items.length;
 
   return (
-    <div className="slash-menu at-menu" role="listbox" aria-label="At mention menu">
+    <div className="slash-menu at-menu" role="listbox" aria-label="@メンションメニュー">
       {!workspaceLinked ? (
         <p className="slash-menu-empty">workspace をリンクすると @ でファイルを参照できます</p>
       ) : filteredItems.length === 0 ? (

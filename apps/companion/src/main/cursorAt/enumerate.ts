@@ -43,9 +43,14 @@ function buildPathIndex(workspacePath: string): PathIndexEntry[] {
 
   const walk = (relativeDir: string, depth: number): void => {
     if (depth > MAX_WALK_DEPTH) return;
-    const absDir = relativeDir
-      ? assertContained(join(workspacePath, relativeDir), workspacePath)
-      : workspacePath;
+    let absDir: string;
+    try {
+      absDir = relativeDir
+        ? assertContained(join(workspacePath, relativeDir), workspacePath)
+        : workspacePath;
+    } catch {
+      return;
+    }
 
     let children: string[];
     try {
@@ -127,9 +132,14 @@ function listDirectChildren(
   limit: number,
 ): AtMenuItem[] {
   const ignore = getIgnoreFilter(workspacePath);
-  const absParent = parentDir
-    ? assertContained(join(workspacePath, parentDir), workspacePath)
-    : workspacePath;
+  let absParent: string;
+  try {
+    absParent = parentDir
+      ? assertContained(join(workspacePath, parentDir), workspacePath)
+      : workspacePath;
+  } catch {
+    return [];
+  }
 
   let children: string[];
   try {

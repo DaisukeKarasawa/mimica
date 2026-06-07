@@ -31,10 +31,42 @@ function runGit(
   };
 }
 
+function appendStdoutUpToBytes(
+  current: string,
+  chunk: string,
+  maxBytes: number,
+): { text: string; bytes: number; truncated: boolean } {
+  const currentBytes = Buffer.byteLength(current, "utf8");
+  if (currentBytes >= maxBytes) {
+    return { text: current, bytes: currentBytes, truncated: true };
+  }
+
+  const remaining = maxBytes - currentBytes;
+  const chunkBuf = Buffer.from(chunk, "utf8");
+  if (chunkBuf.length <= remaining) {
+    return {
+      text: current + chunk,
+      bytes: currentBytes + chunkBuf.length,
+      truncated: false,
+    };
+  }
+
+  let cut = remaining;
+  while (cut > 0 && (chunkBuf[cut] & 0xc0) === 0x80) cut -= 1;
+  const partial = cut > 0 ? chunkBuf.subarray(0, cut).toString("utf8") : "";
+  return {
+    text: current + partial,
+    bytes: currentBytes + Buffer.byteLength(partial, "utf8"),
+    truncated: true,
+  };
+}
+
 function runGitAsync(
   workspacePath: string,
   args: string[],
-): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  options?: { maxStdoutBytes?: number },
+): Promise<{ ok: boolean; stdout: string; stderr: string; truncated: boolean }> {
+  const maxStdoutBytes = options?.maxStdoutBytes;
   return new Promise((resolve) => {
     const child = spawn("git", ["--no-pager", ...args], {
       cwd: workspacePath,
@@ -42,15 +74,29 @@ function runGitAsync(
 
     let stdout = "";
     let stderr = "";
+    let stdoutBytes = 0;
+    let truncated = false;
     const timer = setTimeout(() => {
       child.kill();
-      resolve({ ok: false, stdout: "", stderr: "git command timed out" });
+      resolve({ ok: false, stdout: "", stderr: "git command timed out", truncated: false });
     }, GIT_TIMEOUT_MS);
 
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
     child.stdout?.on("data", (chunk: string) => {
-      stdout += chunk;
+      if (truncated) return;
+      if (!maxStdoutBytes) {
+        stdout += chunk;
+        stdoutBytes = Buffer.byteLength(stdout, "utf8");
+        return;
+      }
+      const next = appendStdoutUpToBytes(stdout, chunk, maxStdoutBytes);
+      stdout = next.text;
+      stdoutBytes = next.bytes;
+      if (next.truncated) {
+        truncated = true;
+        child.kill();
+      }
     });
     child.stderr?.on("data", (chunk: string) => {
       stderr += chunk;
@@ -61,11 +107,12 @@ function runGitAsync(
         ok: false,
         stdout: "",
         stderr: error.message,
+        truncated: false,
       });
     });
     child.on("close", (code: number | null) => {
       clearTimeout(timer);
-      resolve({ ok: code === 0, stdout, stderr });
+      resolve({ ok: code === 0 || truncated, stdout, stderr, truncated });
     });
   });
 }
@@ -145,12 +192,25 @@ function truncateDiff(diff: string): { body: string; truncated: boolean } {
   return { body, truncated: true };
 }
 
+function finalizeDiff(
+  stdout: string,
+  truncatedDuringRead: boolean,
+): { body: string; truncated: boolean } {
+  if (!truncatedDuringRead && Buffer.byteLength(stdout, "utf8") <= MAX_GIT_DIFF_BYTES) {
+    return { body: stdout, truncated: false };
+  }
+  const { body, truncated } = truncateDiff(stdout);
+  return { body, truncated: truncated || truncatedDuringRead };
+}
+
 export async function getWorkingTreeDiff(workspacePath: string): Promise<GitDiffResult> {
   if (!isGitRepository(workspacePath)) {
     return { diff: "", truncated: false, empty: true, warning: "Git リポジトリではありません" };
   }
 
-  const result = await runGitAsync(workspacePath, ["diff", "HEAD"]);
+  const result = await runGitAsync(workspacePath, ["diff", "HEAD"], {
+    maxStdoutBytes: MAX_GIT_DIFF_BYTES,
+  });
   if (!result.ok) {
     return {
       diff: "",
@@ -165,7 +225,7 @@ export async function getWorkingTreeDiff(workspacePath: string): Promise<GitDiff
     return { diff: "", truncated: false, empty: true };
   }
 
-  const { body, truncated } = truncateDiff(diff);
+  const { body, truncated } = finalizeDiff(diff, result.truncated);
   return {
     diff: body,
     truncated,
@@ -205,7 +265,9 @@ export async function getBranchDiff(
     };
   }
 
-  const result = await runGitAsync(workspacePath, ["diff", `${base}...HEAD`]);
+  const result = await runGitAsync(workspacePath, ["diff", `${base}...HEAD`], {
+    maxStdoutBytes: MAX_GIT_DIFF_BYTES,
+  });
   if (!result.ok) {
     return {
       diff: "",
@@ -221,7 +283,7 @@ export async function getBranchDiff(
     return { diff: "", truncated: false, empty: true, baseBranch: base };
   }
 
-  const { body, truncated } = truncateDiff(diff);
+  const { body, truncated } = finalizeDiff(diff, result.truncated);
   return {
     diff: body,
     truncated,

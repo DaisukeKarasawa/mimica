@@ -2,7 +2,6 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentEventMessage,
   AgentMode,
-  AtMenuItem,
   AtMenuSection,
   CharacterAssetStatus,
   ChatAttachment,

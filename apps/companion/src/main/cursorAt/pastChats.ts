@@ -9,6 +9,8 @@ function normalizeWorkspacePath(path: string): string {
   return normalize(path).replace(/\\/g, "/");
 }
 
+export { normalizeWorkspacePath };
+
 function matchesPastChatQuery(session: ChatSession, query: string): boolean {
   if (!query) return true;
   const lower = query.toLowerCase();

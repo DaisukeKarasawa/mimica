@@ -15,7 +15,7 @@ import { expandCodeMention } from "./codeSymbols.js";
 import { resolveRelativePath } from "./enumerate.js";
 import { formatGitDiffBlock, getBranchDiff, getWorkingTreeDiff } from "./gitContext.js";
 import { WorkspaceIgnoreFilter } from "./ignoreFilter.js";
-import { formatPastChatForPrompt } from "./pastChats.js";
+import { formatPastChatForPrompt, normalizeWorkspacePath } from "./pastChats.js";
 import { languageHintFromPath } from "./util.js";
 
 export const MAX_AT_FILE_LINES = 800;
@@ -152,11 +152,21 @@ export async function resolveAtInput(
   const warnings: string[] = [];
   const resolvedPaths: string[] = [];
   let expanded = input;
+  const normalizedWorkspace = normalizeWorkspacePath(workspacePath);
+
+  const skip = new Set(
+    (options?.skipPaths ?? []).map((path) => normalizePathForCompare(path)).filter(Boolean),
+  );
+  const pathTokens = extractAtPathTokens(input);
 
   for (const token of extractPastChatTokens(expanded)) {
     const session = options?.getSession?.(token.sessionId);
     if (!session) {
       warnings.push(`@Past Chat: ${token.sessionId} のセッションが見つかりません`);
+      continue;
+    }
+    if (normalizeWorkspacePath(session.workspacePath) !== normalizedWorkspace) {
+      warnings.push(`@Past Chat: ${token.sessionId} はこの workspace では参照できません`);
       continue;
     }
     const result = formatPastChatForPrompt(session);
@@ -210,11 +220,6 @@ export async function resolveAtInput(
     if (result.warning) warnings.push(result.warning);
     resolvedPaths.push(`${token.filePath}:${token.symbolName}`);
   }
-
-  const skip = new Set(
-    (options?.skipPaths ?? []).map((path) => normalizePathForCompare(path)).filter(Boolean),
-  );
-  const pathTokens = extractAtPathTokens(expanded);
 
   const pathExpansions = await Promise.all(
     pathTokens.map(async (token) => {

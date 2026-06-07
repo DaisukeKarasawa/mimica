@@ -4,11 +4,17 @@ import { join } from "node:path";
 const ALWAYS_IGNORED_SEGMENTS = new Set([".git", "node_modules"]);
 
 function globToRegExp(pattern: string): RegExp {
-  let normalized = pattern.replace(/\\/g, "/");
-  if (normalized.startsWith("/")) normalized = normalized.slice(1);
-  if (normalized.endsWith("/")) normalized = `${normalized}*`;
+  const rawPattern = pattern.replace(/\\/g, "/");
+  let normalized = rawPattern;
+  const anchoredToRoot = normalized.startsWith("/");
+  if (anchoredToRoot) normalized = normalized.slice(1);
+  if (normalized.endsWith("/")) normalized = normalized.slice(0, -1);
 
-  let regex = "^";
+  const hasWildcards = normalized.includes("*") || normalized.includes("?");
+  const isDirectoryPattern = rawPattern.endsWith("/") || !hasWildcards;
+  const hasSlash = normalized.includes("/");
+  let regex = anchoredToRoot || hasSlash ? "^" : "(^|.*/)";
+
   for (let i = 0; i < normalized.length; i += 1) {
     const ch = normalized[i];
     if (ch === "*") {
@@ -21,10 +27,13 @@ function globToRegExp(pattern: string): RegExp {
       continue;
     }
     if (ch === "?") {
-      regex += ".";
+      regex += "[^/]";
       continue;
     }
     regex += ch.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  }
+  if (isDirectoryPattern) {
+    regex += "(?:/.*)?";
   }
   regex += "$";
   return new RegExp(regex);
@@ -36,7 +45,6 @@ interface IgnoreRule {
 }
 
 export class WorkspaceIgnoreFilter {
-  private readonly segmentIgnores = new Set(ALWAYS_IGNORED_SEGMENTS);
   private readonly rules: IgnoreRule[] = [];
 
   constructor(workspacePath: string) {
@@ -52,9 +60,6 @@ export class WorkspaceIgnoreFilter {
       if (!line || line.startsWith("#")) continue;
       const negated = line.startsWith("!");
       const body = negated ? line.slice(1) : line;
-      if (/^[\w.-]+(\/)?$/.test(body)) {
-        this.segmentIgnores.add(body.replace(/\/$/, ""));
-      }
       try {
         this.rules.push({ negated, regex: globToRegExp(body) });
       } catch {
@@ -68,7 +73,7 @@ export class WorkspaceIgnoreFilter {
     if (!normalized) return false;
 
     const segments = normalized.split("/");
-    if (segments.some((segment) => this.segmentIgnores.has(segment))) {
+    if (segments.some((segment) => ALWAYS_IGNORED_SEGMENTS.has(segment))) {
       return true;
     }
 
