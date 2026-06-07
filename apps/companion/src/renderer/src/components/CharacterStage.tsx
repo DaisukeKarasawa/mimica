@@ -28,7 +28,6 @@ function resolvePetDebug(): boolean {
 export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<SpineStageController | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [spineReady, setSpineReady] = useState(false);
 
   const petEnabled = Boolean(assets?.metadata?.interaction?.pet);
@@ -55,16 +54,15 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
       .then(() => {
         if (!cancelled) {
           setSpineReady(true);
-          setLoadError(null);
           controller.setAvatarState(avatarState);
           requestAnimationFrame(() => {
             if (!cancelled) controller.refreshLayout();
           });
         }
       })
-      .catch((err: unknown) => {
+      .catch((err) => {
+        console.error("[CharacterStage] Spine mount failed:", err);
         if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : String(err));
           setSpineReady(false);
         }
       });
@@ -124,18 +122,6 @@ export function CharacterStage({ avatarState, assets }: CharacterStageProps) {
           <div className="body" />
         </div>
       )}
-
-      <div className="stage-overlay">
-        <span className="stage-hint">
-          {loadError
-            ? `Spine 読込エラー: ${loadError}`
-            : assets?.ready
-              ? spineReady
-                ? "調月リオ（Spine）"
-                : "Spine 読込中…"
-              : `素材未配置: ${assets?.missing.join(", ") ?? "metadata.json"}`}
-        </span>
-      </div>
     </section>
   );
 }

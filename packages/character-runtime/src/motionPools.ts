@@ -14,6 +14,22 @@ export function isTalkAnimation(name: string): boolean {
   return /^Talk_/i.test(name);
 }
 
+/** BA Spine: Talk_XX_M = body motion, Talk_XX_A = mouth/face attachment keys. */
+export function isTalkMotionAnimation(name: string): boolean {
+  return /^Talk_\d+_M$/i.test(name);
+}
+
+/** Returns the paired Talk_XX_A name for Talk_XX_M, or undefined. */
+export function talkAttachmentPair(motionAnimName: string): string | undefined {
+  const match = /^Talk_(\d+)_M$/i.exec(motionAnimName);
+  if (!match) return undefined;
+  return `Talk_${match[1]}_A`;
+}
+
+export function isTalkAttachmentAnimation(name: string): boolean {
+  return /^Talk_\d+_A$/i.test(name);
+}
+
 /** idle ランダムプール用（Talk_* / Start_Idle_* 以外の Idle_*） */
 export function isIdlePoolAnimation(name: string): boolean {
   return /^Idle_/i.test(name) && !isBlockedAnimation(name) && !isTalkAnimation(name);
@@ -36,6 +52,8 @@ export function collectIdlePool(motionMap: MotionMap): string[] {
 export function collectTalkPool(motionMap: MotionMap): string[] {
   const entry = motionMap.talking;
   const listed = uniqueNames([...(entry?.animations ?? []), ...(entry?.fallback ?? [])]);
+  const talkMotion = listed.filter(isTalkMotionAnimation);
+  if (talkMotion.length > 0) return talkMotion;
   const talkOnly = listed.filter(isTalkAnimation);
   if (talkOnly.length > 0) return talkOnly;
   return listed.filter((n) => !isBlockedAnimation(n));

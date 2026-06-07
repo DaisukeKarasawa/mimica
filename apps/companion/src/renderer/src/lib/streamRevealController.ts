@@ -46,6 +46,15 @@ export class StreamRevealController {
     this.receivedContent += chunk;
   }
 
+  /** ツール境界などでツール前のストリーム表示を破棄する */
+  clearReceived(): void {
+    this.receivedContent = "";
+    this.revealedCount = 0;
+    this.revealCarry = 0;
+    this.lastRevealTickAt = 0;
+    this.pendingComplete = null;
+  }
+
   setReceivedIfLonger(content: string): void {
     if (codePointCount(content) >= codePointCount(this.receivedContent)) {
       this.receivedContent = content;

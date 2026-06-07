@@ -1,4 +1,5 @@
 import type { Run } from "@cursor/sdk";
+import { cancelRun } from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import { isWriteTool, READ_ONLY_TOOL_ERROR } from "./readOnlyPolicy.js";
 import { isBlockedToolCallStatus, toolCallName } from "./toolCallName.js";
@@ -20,7 +21,7 @@ export class ReadOnlyRunGuard {
     if (this.blocked) return;
     this.blocked = true;
     try {
-      await this.getRun()?.cancel();
+      await cancelRun(this.getRun());
     } finally {
       this.callbacks.onState("failed");
       this.callbacks.onError(READ_ONLY_TOOL_ERROR(name));

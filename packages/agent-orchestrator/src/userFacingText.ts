@@ -1,16 +1,76 @@
 /** ユーザーに見せないメタ発話（計画・手順の独り言）の検出 */
 
-const META_LINE =
-  /(調べます|確認します|読み取ります|検索します|調査します|取得します|続けます|合わせます|反映させます|洗い出します)/;
+const META_VERB =
+  /(?:調べ|確認|読み取り|読み|検索|調査|取得|続け|合わせ|反映させ|洗い出し|見てみ|追い|特定|探索|確認して)(?:します|ます|る|ていきます)/;
+
+/** 段落末尾の作業宣言（「関連コードを読みます。」など） */
+const META_CLOSING = new RegExp(
+  `^\\s*(?:関連コードを|コードを|実装を|原因を|箇所を)?${META_VERB.source}[。?？!！]?\\s*$`,
+);
 
 const META_TOPIC =
   /(ペルソナ(設定)?|ワークスペース内|返答のトーン|メッセージが途中で切れ|最新の予報|ツールを実行|ファイルを読)/;
 
+function splitJapaneseSentences(paragraph: string): string[] {
+  return paragraph
+    .split(/(?<=[。?？!！])|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function stripTrailingMetaSentences(block: string): string {
+  const trimmed = block.trim();
+  if (!trimmed) return "";
+
+  const sentences = splitJapaneseSentences(trimmed);
+  if (sentences.length === 0) return "";
+
+  let removeCount = 0;
+  for (let i = sentences.length - 1; i >= 0; i--) {
+    const last = sentences[i]!;
+    const body = last.replace(/[。?？!！]\s*$/, "").trim();
+    if (body.length > 0 && body.length < 120 && isMetaNarrationParagraph(last)) {
+      removeCount++;
+      continue;
+    }
+    break;
+  }
+
+  if (removeCount === 0) return trimmed;
+  if (removeCount === sentences.length) return "";
+
+  let cutAt = trimmed.length;
+  for (let i = sentences.length - 1; i >= sentences.length - removeCount; i--) {
+    const sentence = sentences[i]!;
+    const pos = trimmed.lastIndexOf(sentence, cutAt - 1);
+    if (pos === -1) return trimmed;
+    cutAt = pos;
+  }
+  return trimmed.slice(0, cutAt).trimEnd();
+}
+
 export function isMetaNarrationParagraph(paragraph: string): boolean {
   const t = paragraph.trim();
   if (!t) return true;
-  if (META_LINE.test(t) && t.length < 220) return true;
-  if (META_TOPIC.test(t) && META_LINE.test(t)) return true;
+  if (t.length < 120 && META_CLOSING.test(t)) {
+    if (META_TOPIC.test(t)) return true;
+    if (
+      /(?:関連コード|コード|実装|原因|箇所|ファイル|ツール|ワークスペース|まず|続けて|次に)/.test(t)
+    ) {
+      return true;
+    }
+    // 単独の作業宣言（「調べます。」など）。「問題を確認します。」のような短い回答は残す
+    if (splitJapaneseSentences(t).length === 1 && t.length < 40) {
+      if (
+        /^(?:関連コード|コード|実装|原因|ファイル|ツール|まず|続けて|次に|調べ|読み|検索|調査|取得|洗い出|探索)/.test(
+          t,
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+  if (META_TOPIC.test(t) && META_CLOSING.test(t)) return true;
   if (/^まず、?/.test(t) && META_TOPIC.test(t)) return true;
   return false;
 }
@@ -27,7 +87,9 @@ function isStructuralMarkdownLine(line: string): boolean {
 
 function isMetaContentLine(line: string): boolean {
   const t = line.trim();
-  return isMetaNarrationParagraph(t) || META_LINE.test(t);
+  const sentences = splitJapaneseSentences(t);
+  if (sentences.length > 1) return false;
+  return isMetaNarrationParagraph(t);
 }
 
 function stripMetaLines(block: string): string {
@@ -42,7 +104,8 @@ function stripMetaLines(block: string): string {
     return isMetaContentLine(line);
   });
 
-  return entireBlockIsMeta ? "" : trimmed;
+  if (entireBlockIsMeta) return "";
+  return stripTrailingMetaSentences(trimmed);
 }
 
 /** ツール呼び出し前の assistant 本文からはユーザー向け段落だけ残す（全体がメタだけなら空） */

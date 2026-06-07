@@ -95,6 +95,11 @@ export default function App() {
     tabs.setAllSessions,
   ]);
 
+  const resolveWorkspacePath = useCallback(
+    () => linkedWorkspacePath ?? tabs.activeSession?.workspacePath ?? null,
+    [linkedWorkspacePath, tabs.activeSession?.workspacePath],
+  );
+
   const applyChatTabShortcut = useCallback(
     (action: ChatTabShortcutAction) => {
       if (typeof action === "object" && action.type === "selectTab") {
@@ -103,11 +108,13 @@ export default function App() {
       }
 
       switch (action) {
-        case "new":
-          if (linkedWorkspacePath) {
-            void tabs.handleNewSession(linkedWorkspacePath);
+        case "new": {
+          const workspacePath = resolveWorkspacePath();
+          if (workspacePath) {
+            void tabs.handleNewSession(workspacePath);
           }
           break;
+        }
         case "close": {
           const target =
             tabs.activeSessionId && tabs.openTabIds.includes(tabs.activeSessionId)
@@ -131,7 +138,7 @@ export default function App() {
       }
     },
     [
-      linkedWorkspacePath,
+      resolveWorkspacePath,
       tabs.activeSessionId,
       tabs.openTabIds,
       tabs.handleNewSession,
@@ -161,7 +168,7 @@ export default function App() {
   }, [applyChatTabShortcut]);
 
   const handleSend = async (content: string) => {
-    const workspacePath = linkedWorkspacePath ?? tabs.activeSession?.workspacePath;
+    const workspacePath = resolveWorkspacePath();
     if (!workspacePath) return;
 
     let session = tabs.activeSession;
