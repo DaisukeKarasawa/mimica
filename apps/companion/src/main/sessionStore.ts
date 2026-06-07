@@ -5,6 +5,7 @@ import {
   existsSync,
   readdirSync,
   unlinkSync,
+  rmSync,
 } from "node:fs";
 import { join } from "node:path";
 import { v4 as uuidv4 } from "uuid";
@@ -116,10 +117,21 @@ export class SessionStore {
     if (!safeId) return;
     this.sessions.delete(safeId);
     this.removePersistedFile(safeId);
+    this.removeAttachmentDir(safeId);
   }
 
   setSaveChatHistory(enabled: boolean): void {
     this.saveChatHistory = enabled;
+  }
+
+  private removeAttachmentDir(id: string): void {
+    const dir = join(sessionsDir(), id, "attachments");
+    if (!existsSync(dir)) return;
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch (err) {
+      console.error(`Failed to delete attachment dir: ${dir}`, err);
+    }
   }
 
   private removePersistedFile(id: string): void {

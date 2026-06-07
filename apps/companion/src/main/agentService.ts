@@ -12,6 +12,9 @@ import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
+import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlashInput.js";
+import { readAttachmentBase64 } from "./imageAttachments.js";
+import type { ChatAttachment } from "@mimica/shared";
 
 export interface AgentSubmitPayload {
   sessionId: string;
@@ -19,6 +22,7 @@ export interface AgentSubmitPayload {
   workspacePath: string;
   mode: AgentMode;
   editorContext?: EditorContext | null;
+  attachments?: ChatAttachment[];
 }
 
 async function loadAgentRunner(): Promise<AgentRunner> {
@@ -74,11 +78,34 @@ export class AgentService {
       editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "",
     );
 
+    const resolved = resolveSlashInput(cwd, payload.content, payload.mode);
+    if (resolved.warning) {
+      emitter.warning(resolved.warning);
+    }
+    if (resolved.kind && resolved.name) {
+      debugLogSlashResolution(resolved.kind, resolved.name, resolved.expanded.length);
+    }
+
+    const sdkImages: Array<{ data: string; mimeType: string }> = [];
+    for (const attachment of payload.attachments ?? []) {
+      try {
+        sdkImages.push(readAttachmentBase64(payload.sessionId, attachment));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        emitter.warning(`画像を読み取れませんでした (${attachment.fileName}): ${message}`);
+      }
+    }
+
+    let promptText = resolved.expanded;
+    if (!promptText.trim() && sdkImages.length > 0) {
+      promptText = "Please analyze the attached image(s).";
+    }
+
     const timing = isAgentPerfEnabled()
       ? new AgentRunTimingTrace(runId, {
           mode: payload.mode,
           workspacePath: cwd,
-          promptChars: payload.content.length,
+          promptChars: promptText.length,
         })
       : undefined;
     if (timing) {
@@ -88,7 +115,8 @@ export class AgentService {
     try {
       await runner.runChat({
         sessionId: payload.sessionId,
-        prompt: payload.content,
+        prompt: promptText,
+        images: sdkImages.length > 0 ? sdkImages : undefined,
         workspacePath: cwd,
         mode: payload.mode,
         context,

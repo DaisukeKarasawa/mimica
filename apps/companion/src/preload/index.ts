@@ -3,8 +3,10 @@ import type {
   AgentEventMessage,
   AgentMode,
   CharacterAssetStatus,
+  ChatAttachment,
   ChatSession,
   EditorContext,
+  SlashMenuSection,
 } from "@mimica/shared";
 import type { ChatTabShortcutAction } from "../common/chatTabShortcuts.js";
 
@@ -14,6 +16,7 @@ export interface AgentSubmitPayload {
   workspacePath: string;
   mode: AgentMode;
   editorContext?: EditorContext | null;
+  attachments?: ChatAttachment[];
 }
 
 export interface MimicaApi {
@@ -29,6 +32,12 @@ export interface MimicaApi {
   onEditorContext: (cb: (context: EditorContext) => void) => () => void;
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
   onChatTabShortcut: (cb: (action: ChatTabShortcutAction) => void) => () => void;
+  listSlashMenu: (workspacePath: string, mode: AgentMode) => Promise<SlashMenuSection[]>;
+  pickImageAttachments: (sessionId: string, currentCount: number) => Promise<ChatAttachment[]>;
+  pasteImageAttachment: (
+    sessionId: string,
+    payload: { mimeType: string; data: string },
+  ) => Promise<ChatAttachment>;
 }
 
 const api: MimicaApi = {
@@ -56,6 +65,11 @@ const api: MimicaApi = {
     ipcRenderer.on("chat-tab-shortcut", handler);
     return () => ipcRenderer.removeListener("chat-tab-shortcut", handler);
   },
+  listSlashMenu: (workspacePath, mode) => ipcRenderer.invoke("slashMenu:list", workspacePath, mode),
+  pickImageAttachments: (sessionId, currentCount) =>
+    ipcRenderer.invoke("attachments:pick", sessionId, currentCount),
+  pasteImageAttachment: (sessionId, payload) =>
+    ipcRenderer.invoke("attachments:paste", sessionId, payload),
 };
 
 contextBridge.exposeInMainWorld("mimica", api);
