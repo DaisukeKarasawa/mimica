@@ -77,7 +77,7 @@ export function registerAttachmentIpc(
   dialog: Dialog,
   getMainWindow: () => BrowserWindowType | null,
 ): void {
-  ipcMain.handle("attachments:pick", async (event, sessionId: unknown, _currentCount: unknown) => {
+  ipcMain.handle("attachments:pick", async (event, sessionId: unknown) => {
     if (typeof sessionId !== "string" || !sessionId.trim()) {
       throw new ImageAttachmentError("Session is required to attach images");
     }
@@ -123,32 +123,29 @@ export function registerAttachmentIpc(
     return saved;
   });
 
-  ipcMain.handle(
-    "attachments:paste",
-    (event, sessionId: unknown, _currentCount: unknown, payload: unknown) => {
-      if (typeof sessionId !== "string" || !sessionId.trim()) {
-        throw new ImageAttachmentError("Session is required to attach images");
-      }
-      const key = draftKeyFromEvent(sessionId, event);
-      if (remainingDraftSlots(key) <= 0) {
-        throw new ImageAttachmentError(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
-      }
-      if (!isImagePastePayload(payload)) {
-        throw new ImageAttachmentError("Invalid pasted image payload");
-      }
-      assertPastePayloadSize(payload);
-      if (!reserveDraftSlots(key, 1)) {
-        throw new ImageAttachmentError(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
-      }
-      try {
-        const buffer = Buffer.from(payload.data, "base64");
-        return saveImageFromBuffer(sessionId, buffer, payload.mimeType, "pasted-image");
-      } catch (error) {
-        releaseDraftSlots(key, 1);
-        throw error;
-      }
-    },
-  );
+  ipcMain.handle("attachments:paste", (event, sessionId: unknown, payload: unknown) => {
+    if (typeof sessionId !== "string" || !sessionId.trim()) {
+      throw new ImageAttachmentError("Session is required to attach images");
+    }
+    const key = draftKeyFromEvent(sessionId, event);
+    if (remainingDraftSlots(key) <= 0) {
+      throw new ImageAttachmentError(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
+    }
+    if (!isImagePastePayload(payload)) {
+      throw new ImageAttachmentError("Invalid pasted image payload");
+    }
+    assertPastePayloadSize(payload);
+    if (!reserveDraftSlots(key, 1)) {
+      throw new ImageAttachmentError(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
+    }
+    try {
+      const buffer = Buffer.from(payload.data, "base64");
+      return saveImageFromBuffer(sessionId, buffer, payload.mimeType, "pasted-image");
+    } catch (error) {
+      releaseDraftSlots(key, 1);
+      throw error;
+    }
+  });
 
   ipcMain.handle("attachments:discard", (event, sessionId: unknown, attachment: unknown) => {
     if (typeof sessionId !== "string" || !sessionId.trim()) {

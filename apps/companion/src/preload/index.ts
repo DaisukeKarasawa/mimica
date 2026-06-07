@@ -34,12 +34,8 @@ export interface MimicaApi {
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
   onChatTabShortcut: (cb: (action: ChatTabShortcutAction) => void) => () => void;
   listSlashMenu: (workspacePath: string, mode: AgentMode) => Promise<SlashMenuSection[]>;
-  pickImageAttachments: (sessionId: string, currentCount: number) => Promise<ChatAttachment[]>;
-  pasteImageAttachment: (
-    sessionId: string,
-    currentCount: number,
-    payload: ImagePastePayload,
-  ) => Promise<ChatAttachment>;
+  pickImageAttachments: (sessionId: string) => Promise<ChatAttachment[]>;
+  pasteImageAttachment: (sessionId: string, payload: ImagePastePayload) => Promise<ChatAttachment>;
   discardImageAttachment: (sessionId: string, attachment: ChatAttachment) => Promise<void>;
   discardImageAttachments: (sessionId: string, attachments: ChatAttachment[]) => Promise<void>;
 }
@@ -70,10 +66,9 @@ const api: MimicaApi = {
     return () => ipcRenderer.removeListener("chat-tab-shortcut", handler);
   },
   listSlashMenu: (workspacePath, mode) => ipcRenderer.invoke("slashMenu:list", workspacePath, mode),
-  pickImageAttachments: (sessionId, currentCount) =>
-    ipcRenderer.invoke("attachments:pick", sessionId, currentCount),
-  pasteImageAttachment: (sessionId, currentCount, payload) =>
-    ipcRenderer.invoke("attachments:paste", sessionId, currentCount, payload),
+  pickImageAttachments: (sessionId) => ipcRenderer.invoke("attachments:pick", sessionId),
+  pasteImageAttachment: (sessionId, payload) =>
+    ipcRenderer.invoke("attachments:paste", sessionId, payload),
   discardImageAttachment: (sessionId, attachment) =>
     ipcRenderer.invoke("attachments:discard", sessionId, attachment),
   discardImageAttachments: (sessionId, attachments) =>

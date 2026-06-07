@@ -91,7 +91,7 @@ export function ChatComposer({
       return;
     }
     try {
-      const picked = await window.mimica.pickImageAttachments(sessionId, attachments.length);
+      const picked = await window.mimica.pickImageAttachments(sessionId);
       if (picked.length > 0) {
         onAttachmentsChange([...attachments, ...picked]);
         onChange("");
@@ -116,7 +116,7 @@ export function ChatComposer({
       }
       try {
         const data = await fileToBase64(file);
-        const saved = await window.mimica.pasteImageAttachment(sessionId, attachments.length, {
+        const saved = await window.mimica.pasteImageAttachment(sessionId, {
           mimeType: file.type,
           data,
         });
