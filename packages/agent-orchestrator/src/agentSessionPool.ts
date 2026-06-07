@@ -12,6 +12,7 @@ interface PooledSession {
   workspacePath: string;
   mode: AgentMode;
   apiKey: string;
+  personaFingerprint: string;
   turnsSent: number;
 }
 
@@ -31,13 +32,16 @@ export class AgentSessionPool {
     workspacePath: string;
     mode: AgentMode;
     sdkMode: CursorSdkConversationMode;
+    personaFingerprint?: string;
   }): Promise<AgentSessionHandle> {
+    const personaFingerprint = params.personaFingerprint ?? "";
     const existing = this.sessions.get(params.sessionId);
     if (
       existing &&
       existing.workspacePath === params.workspacePath &&
       existing.mode === params.mode &&
-      existing.apiKey === params.apiKey
+      existing.apiKey === params.apiKey &&
+      existing.personaFingerprint === personaFingerprint
     ) {
       return { agent: existing.agent, isFollowUp: existing.turnsSent > 0 };
     }
@@ -58,6 +62,7 @@ export class AgentSessionPool {
       workspacePath: params.workspacePath,
       mode: params.mode,
       apiKey: params.apiKey,
+      personaFingerprint,
       turnsSent: 0,
     });
 
@@ -67,6 +72,14 @@ export class AgentSessionPool {
   markTurnSent(sessionId: string): void {
     const session = this.sessions.get(sessionId);
     if (session) session.turnsSent += 1;
+  }
+
+  /** Drop a pooled agent after a non-completed turn so the next send starts fresh. */
+  invalidateSession(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    session.agent.close();
+    this.sessions.delete(sessionId);
   }
 
   closeSession(sessionId: string): void {

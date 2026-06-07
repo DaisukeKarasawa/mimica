@@ -88,6 +88,14 @@ function mergeHooks(existing: HooksConfig, mimica: HooksConfig["hooks"]): HooksC
   return merged;
 }
 
+async function syncBundledHookArtifacts(workspacePath: string): Promise<void> {
+  const hooksDir = join(workspacePath, ".cursor", "hooks");
+  await mkdir(hooksDir, { recursive: true });
+  await copyFile(bundledDeniedToolsConfigPath(), join(hooksDir, DENIED_TOOLS_CONFIG_FILE));
+  await copyFile(bundledDeniedToolsPath(), join(hooksDir, DENIED_HOOK_TOOLS_FILE));
+  await copyFile(bundledHookScriptPath(), join(hooksDir, MIMICA_READ_ONLY_HOOK_SCRIPT));
+}
+
 /** Install Mimica read-only hook scripts into the agent workspace (pre-dispatch enforcement). */
 export async function ensureReadOnlyHooks(
   workspacePath: string,
@@ -100,21 +108,16 @@ export async function ensureReadOnlyHooks(
     }
 
     if (await isHooksAlreadyInstalled(workspacePath)) {
+      await syncBundledHookArtifacts(workspacePath);
       return { ok: true };
     }
 
-    const scriptPath = bundledHookScriptPath();
     const cursorDir = join(workspacePath, ".cursor");
     const hooksDir = join(cursorDir, "hooks");
     const hooksJsonPath = join(cursorDir, "hooks.json");
     const workspaceScriptPath = join(hooksDir, MIMICA_READ_ONLY_HOOK_SCRIPT);
-    const workspaceDeniedToolsPath = join(hooksDir, DENIED_HOOK_TOOLS_FILE);
-    const workspaceDeniedToolsConfigPath = join(hooksDir, DENIED_TOOLS_CONFIG_FILE);
 
-    await mkdir(hooksDir, { recursive: true });
-    await copyFile(bundledDeniedToolsConfigPath(), workspaceDeniedToolsConfigPath);
-    await copyFile(bundledDeniedToolsPath(), workspaceDeniedToolsPath);
-    await copyFile(scriptPath, workspaceScriptPath);
+    await syncBundledHookArtifacts(workspacePath);
 
     let config: HooksConfig = { version: 1, hooks: {} };
     try {

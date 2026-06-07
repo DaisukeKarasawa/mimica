@@ -81,6 +81,7 @@ export class AgentRunner {
   private activeRun: Run | null = null;
   private activeSessionId: string | null = null;
   private cancelled = false;
+  private runGeneration = 0;
   private readonly sessionPool = new AgentSessionPool();
 
   async runChat(params: RunChatParams): Promise<void> {
@@ -91,8 +92,8 @@ export class AgentRunner {
       return;
     }
 
+    const runGen = ++this.runGeneration;
     this.cancelled = false;
-    this.activeSessionId = params.sessionId;
     const enforceReadOnly = params.mode === "ask";
     const sdkMode = sdkModeFor(params.mode);
 
@@ -114,6 +115,7 @@ export class AgentRunner {
         workspacePath: params.workspacePath,
         mode: params.mode,
         sdkMode,
+        personaFingerprint: params.personaSystemPrompt ?? "",
       });
       timing?.markOnce("T1_agent_ready");
     } catch (err) {
@@ -142,7 +144,10 @@ export class AgentRunner {
           await readOnlyGuard?.handleSendDelta(update, () => this.cancelled, params.signal);
         },
       });
-      this.activeRun = run;
+      if (this.runGeneration === runGen) {
+        this.activeRun = run;
+        this.activeSessionId = params.sessionId;
+      }
       timing?.markOnce("T1_send_done");
 
       const streamResult = await processAgentStream({
@@ -155,11 +160,13 @@ export class AgentRunner {
       });
 
       if (readOnlyGuard?.isBlocked) {
+        this.sessionPool.invalidateSession(params.sessionId);
         timing?.report("blocked");
         return;
       }
 
       if (this.cancelled || params.signal?.aborted) {
+        this.sessionPool.invalidateSession(params.sessionId);
         timing?.report("cancelled");
         callbacks.onState("cancelled");
         return;
@@ -170,6 +177,7 @@ export class AgentRunner {
         result = await run.wait();
       } catch (err) {
         if (isAbortError(err) || this.cancelled) {
+          this.sessionPool.invalidateSession(params.sessionId);
           timing?.report("cancelled");
           callbacks.onState("cancelled");
           return;
@@ -179,11 +187,13 @@ export class AgentRunner {
       timing?.markOnce("T4_run_wait");
 
       if (result.status === "cancelled") {
+        this.sessionPool.invalidateSession(params.sessionId);
         timing?.report("cancelled");
         callbacks.onState("cancelled");
         return;
       }
       if (result.status === "error") {
+        this.sessionPool.invalidateSession(params.sessionId);
         timing?.report("failed");
         callbacks.onState("failed");
         callbacks.onError(result.result ?? "Agent の実行に失敗しました");
@@ -204,16 +214,20 @@ export class AgentRunner {
       callbacks.onComplete(finalText);
     } catch (err) {
       if (isAbortError(err) || this.cancelled) {
+        this.sessionPool.invalidateSession(params.sessionId);
         timing?.report("cancelled");
         callbacks.onState("cancelled");
         return;
       }
+      this.sessionPool.invalidateSession(params.sessionId);
       timing?.report("failed");
       callbacks.onState("failed");
       callbacks.onError(err instanceof Error ? err.message : String(err));
     } finally {
-      this.activeRun = null;
-      this.activeSessionId = null;
+      if (this.runGeneration === runGen) {
+        this.activeRun = null;
+        this.activeSessionId = null;
+      }
     }
   }
 
