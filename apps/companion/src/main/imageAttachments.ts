@@ -9,25 +9,11 @@ import {
 import { basename, extname, join } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import type { ChatAttachment } from "@mimica/shared";
+import { IMAGE_EXT_BY_MIME, IMAGE_MIME_BY_EXT, mimeFromExtension } from "./mime.js";
 import { userDataJoin } from "./userDataPaths.js";
 
 export const MAX_IMAGE_ATTACHMENTS = 4;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-
-const MIME_BY_EXT: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".gif": "image/gif",
-};
-
-const EXT_BY_MIME: Record<string, string> = {
-  "image/png": ".png",
-  "image/jpeg": ".jpg",
-  "image/webp": ".webp",
-  "image/gif": ".gif",
-};
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -50,8 +36,8 @@ function attachmentsDir(sessionId: string): string {
 }
 
 function mimeFromPath(filePath: string): string | null {
-  const ext = extname(filePath).toLowerCase();
-  return MIME_BY_EXT[ext] ?? null;
+  const mimeType = mimeFromExtension(extname(filePath), IMAGE_MIME_BY_EXT, "");
+  return mimeType || null;
 }
 
 function assertSupportedImage(filePath: string): { mimeType: string; size: number } {
@@ -74,7 +60,7 @@ function assertSupportedImage(filePath: string): { mimeType: string; size: numbe
 }
 
 function storageFileName(attachmentId: string, mimeType: string): string {
-  const ext = EXT_BY_MIME[mimeType] ?? ".bin";
+  const ext = IMAGE_EXT_BY_MIME[mimeType] ?? ".bin";
   return `${attachmentId}${ext}`;
 }
 
@@ -101,7 +87,7 @@ export function saveImageFromBuffer(
   mimeType: string,
   fileName = "pasted-image",
 ): ChatAttachment {
-  if (!EXT_BY_MIME[mimeType]) {
+  if (!IMAGE_EXT_BY_MIME[mimeType]) {
     throw new ImageAttachmentError(`Unsupported image type: ${mimeType}`);
   }
   if (buffer.byteLength > MAX_IMAGE_BYTES) {
@@ -140,7 +126,7 @@ export function readAttachmentBase64(
 ): { data: string; mimeType: string } {
   const fullPath = resolveAttachmentPath(sessionId, attachment.storagePath);
   const mimeType = attachment.mimeType || mimeFromPath(fullPath);
-  if (!mimeType || !EXT_BY_MIME[mimeType]) {
+  if (!mimeType || !IMAGE_EXT_BY_MIME[mimeType]) {
     throw new ImageAttachmentError(`Unsupported attachment: ${attachment.fileName}`);
   }
   return {

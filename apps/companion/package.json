@@ -13,7 +13,8 @@
     "pack:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
     "package:mac": "pnpm copy-pack && pnpm build && pnpm run pack:mac",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "tsx --test src/main/cursorSlash/resolve.test.ts"
   },
   "dependencies": {
     "@mimica/agent-orchestrator": "workspace:*",
@@ -36,6 +37,7 @@
     "electron": "^39.8.5",
     "electron-builder": "^25.1.8",
     "electron-vite": "^5.0.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.2",
     "vite": "^6.4.2"
   },

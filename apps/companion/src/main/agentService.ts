@@ -12,7 +12,7 @@ import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
-import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlashInput.js";
+import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
 import { readAttachmentBase64 } from "./imageAttachments.js";
 import type { ChatAttachment } from "@mimica/shared";
 

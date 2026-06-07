@@ -5,18 +5,43 @@ import type {
   SlashMenuItem,
   SlashMenuSection,
 } from "@mimica/shared";
-import { SLASH_MENU_SECTION_LABELS } from "@mimica/shared";
-import { listSlashCommands, resolveSlashCommand } from "./cursorSlashCommands.js";
-import { listSlashSkills, resolveSlashSkill } from "./cursorSlashSkills.js";
-import { listSlashSubagents, resolveSlashSubagent } from "./cursorSlashSubagents.js";
-
-const SLASH_INPUT_PATTERN = /^\/([A-Za-z0-9][A-Za-z0-9_-]*)(?:\s+([\s\S]*))?$/;
+import { parseSlashInput, SLASH_MENU_SECTION_LABELS, slashSubagentsForMode } from "@mimica/shared";
+import { listSlashCommands, resolveSlashCommand } from "./commands.js";
+import { listSlashSkills, resolveSlashSkill } from "./skills.js";
 
 const IMAGE_MENU_ITEM: SlashMenuItem = {
   kind: "image",
   name: "image",
   description: "画像を添付（PNG / JPEG / WebP / GIF）",
 };
+
+function listSlashSubagents(mode: AgentMode): SlashMenuItem[] {
+  return slashSubagentsForMode(mode).map((subagent) => ({
+    kind: "subagent" as const,
+    name: subagent.id,
+    description: subagent.description,
+  }));
+}
+
+function resolveSlashSubagent(
+  subagentId: string,
+  remainder?: string,
+): { expanded: string; subagentId: string } | null {
+  const known = slashSubagentsForMode("agent").some((item) => item.id === subagentId);
+  if (!known) return null;
+
+  const prompt = remainder?.trim() || "Handle the user request.";
+  const expanded = [
+    "## Subagent dispatch",
+    "",
+    `Use the Task tool with \`subagent_type: "${subagentId}"\` to handle the following request.`,
+    "",
+    "Pass this as the subagent prompt:",
+    prompt,
+  ].join("\n");
+
+  return { expanded, subagentId };
+}
 
 export function listSlashMenuSections(workspacePath: string, mode: AgentMode): SlashMenuSection[] {
   const commands = listSlashCommands(workspacePath).map(
@@ -60,25 +85,20 @@ export function listSlashMenuSections(workspacePath: string, mode: AgentMode): S
   return sections;
 }
 
-export function flattenSlashMenuSections(sections: SlashMenuSection[]): SlashMenuItem[] {
-  return sections.flatMap((section) => section.items);
-}
-
 export function resolveSlashInput(
   workspacePath: string,
   input: string,
   mode: AgentMode,
 ): ResolveSlashInputResult {
-  const trimmed = input.trim();
-  const match = trimmed.match(SLASH_INPUT_PATTERN);
-  if (!match) {
+  const parsed = parseSlashInput(input);
+  if (!parsed) {
     return { expanded: input };
   }
 
-  const [, token, remainder] = match;
+  const { token, remainder } = parsed;
 
-  const commandResult = resolveSlashCommand(workspacePath, trimmed);
-  if (commandResult.commandName) {
+  const commandResult = resolveSlashCommand(workspacePath, token, remainder);
+  if (commandResult) {
     return {
       expanded: commandResult.expanded,
       kind: "command",

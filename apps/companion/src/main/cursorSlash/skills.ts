@@ -2,9 +2,10 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, relative } from "node:path";
 import type { SlashCommandSource, SlashMenuItem } from "@mimica/shared";
+import { SLASH_NAME_PATTERN } from "@mimica/shared";
+import { getCachedCatalog, skillCatalogStore } from "./catalog.js";
 
 const SKILL_FILE = "SKILL.md";
-const SKILL_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 interface SkillEntry {
   name: string;
@@ -61,7 +62,7 @@ function walkSkillFiles(root: string): string[] {
 function skillNameFromPath(skillFilePath: string, content: string): string {
   const frontmatter = parseFrontmatter(content);
   const fromFrontmatter = frontmatter.name?.replace(/^['"]|['"]$/g, "").trim();
-  if (fromFrontmatter && SKILL_NAME_PATTERN.test(fromFrontmatter)) {
+  if (fromFrontmatter && SLASH_NAME_PATTERN.test(fromFrontmatter)) {
     return fromFrontmatter;
   }
   return basename(join(skillFilePath, ".."));
@@ -95,7 +96,7 @@ function loadSkillEntry(
     return null;
   }
   const name = skillNameFromPath(absolutePath, content);
-  if (!SKILL_NAME_PATTERN.test(name)) return null;
+  if (!SLASH_NAME_PATTERN.test(name)) return null;
   const workspaceRelativePath =
     source === "project" ? relative(workspacePath, absolutePath) : undefined;
   return {
@@ -107,7 +108,7 @@ function loadSkillEntry(
   };
 }
 
-function collectSkills(workspacePath: string): Map<string, SkillEntry> {
+function buildSkillCatalog(workspacePath: string): Map<string, SkillEntry> {
   const byName = new Map<string, SkillEntry>();
 
   for (const filePath of walkSkillFiles(projectSkillsRoot(workspacePath))) {
@@ -125,8 +126,14 @@ function collectSkills(workspacePath: string): Map<string, SkillEntry> {
   return byName;
 }
 
+function getSkillCatalog(workspacePath: string): Map<string, SkillEntry> {
+  return getCachedCatalog(workspacePath, skillCatalogStore(), () =>
+    buildSkillCatalog(workspacePath),
+  );
+}
+
 export function listSlashSkills(workspacePath: string): SlashMenuItem[] {
-  return [...collectSkills(workspacePath).values()]
+  return [...getSkillCatalog(workspacePath).values()]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((entry) => ({
       kind: "skill" as const,
@@ -141,14 +148,11 @@ export function resolveSlashSkill(
   skillName: string,
   remainder?: string,
 ): { expanded: string; skillName: string } | { warning: string; skillName: string } | null {
-  const entry = collectSkills(workspacePath).get(skillName);
+  const entry = getSkillCatalog(workspacePath).get(skillName);
   if (!entry) return null;
 
-  try {
-    readFileSync(entry.absolutePath, "utf8");
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { warning: `Could not load skill /${skillName}: ${message}`, skillName };
+  if (!existsSync(entry.absolutePath)) {
+    return { warning: `Could not load skill /${skillName}: file not found`, skillName };
   }
 
   const skillPath = entry.workspaceRelativePath ?? entry.absolutePath.replace(homedir(), "~");
@@ -166,8 +170,4 @@ export function resolveSlashSkill(
     lines.push("", "---", "", "## Additional context", "", extra);
   }
   return { expanded: lines.join("\n"), skillName: entry.name };
-}
-
-export function skillFileExists(workspacePath: string, skillName: string): boolean {
-  return collectSkills(workspacePath).has(skillName);
 }

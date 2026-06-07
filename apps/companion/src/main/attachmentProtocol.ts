@@ -1,19 +1,13 @@
-import { readFileSync } from "node:fs";
+import { extname } from "node:path";
 import type { ElectronMain } from "./electron.js";
 import { resolveAttachmentPath } from "./imageAttachments.js";
+import { IMAGE_MIME_BY_EXT, mimeFromExtension } from "./mime.js";
+import { fileProtocolResponse } from "./protocolFileResponse.js";
 
 export const ATTACHMENT_SCHEME = "mimica-attachment";
 
 let electronApis: Pick<ElectronMain, "protocol"> | null = null;
 let handlerRegistered = false;
-
-const MIME_BY_EXT: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".gif": "image/gif",
-};
 
 export function bindAttachmentProtocolApis(apis: Pick<ElectronMain, "protocol">): void {
   electronApis = apis;
@@ -36,10 +30,8 @@ export function setupAttachmentProtocolHandler(): void {
       }
       const [sessionId, storagePath] = parts;
       const filePath = resolveAttachmentPath(sessionId, decodeURIComponent(storagePath));
-      const ext = storagePath.slice(storagePath.lastIndexOf(".")).toLowerCase();
-      const mimeType = MIME_BY_EXT[ext] ?? "application/octet-stream";
-      const data = readFileSync(filePath);
-      return new Response(data, { headers: { "Content-Type": mimeType } });
+      const mimeType = mimeFromExtension(extname(storagePath), IMAGE_MIME_BY_EXT);
+      return fileProtocolResponse(filePath, mimeType);
     } catch {
       return new Response("Not found", { status: 404 });
     }

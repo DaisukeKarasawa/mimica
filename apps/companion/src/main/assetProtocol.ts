@@ -1,5 +1,7 @@
 import { readFileSync, existsSync, realpathSync } from "node:fs";
 import { basename, dirname, extname, join, normalize, relative } from "node:path";
+import { ASSET_MIME_BY_EXT } from "./mime.js";
+import { fileProtocolResponseByExt } from "./protocolFileResponse.js";
 import type { CharacterAssetStatus, CharacterMetadata, MotionMap } from "@mimica/shared";
 import type { ElectronMain } from "./electron.js";
 import { getActiveMimicaSettings } from "./characterPack.js";
@@ -12,16 +14,6 @@ let assetRoot: string | null = null;
 let assetRootRealNorm: string | null = null;
 let protocolHandlerRegistered = false;
 let electronApis: Pick<ElectronMain, "protocol"> | null = null;
-
-const MIME_BY_EXT: Record<string, string> = {
-  ".skel": "application/octet-stream",
-  ".atlas": "text/plain",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".json": "application/json",
-};
 
 const CHAT_ICON_NAMES = ["icon.png", "icon.jpg", "icon.jpeg", "icon.webp"] as const;
 
@@ -58,14 +50,6 @@ export function resolveChatIconFile(assetRootDir: string, configuredPath: string
   }
 
   return null;
-}
-
-function assetResponseHeaders(mimeType: string): HeadersInit {
-  return {
-    "Content-Type": mimeType,
-    "Access-Control-Allow-Origin": "*",
-    "Cache-Control": "no-cache",
-  };
 }
 
 function syncAssetRootRealNorm(): boolean {
@@ -116,15 +100,10 @@ export function setupAssetProtocolHandler(): boolean {
     if (!realPath.startsWith(realRootNorm)) {
       return new Response("Forbidden", { status: 403 });
     }
-    try {
-      const data = readFileSync(realPath);
-      const mimeType = MIME_BY_EXT[extname(rel).toLowerCase()] ?? "application/octet-stream";
-      return new Response(data, { headers: assetResponseHeaders(mimeType) });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[mimica-asset] read failed for ${realPath}: ${message}`);
-      return new Response("Not Found", { status: 404 });
-    }
+    return fileProtocolResponseByExt(realPath, ASSET_MIME_BY_EXT, {
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "no-cache",
+    });
   });
   protocolHandlerRegistered = true;
   return true;
