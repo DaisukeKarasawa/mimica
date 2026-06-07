@@ -15,7 +15,11 @@ export function filterSlashMenuSections(
   return sections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => item.name.toLowerCase().startsWith(lower)),
+      items: section.items.filter((item) => {
+        const name = item.name.toLowerCase();
+        const description = item.description.toLowerCase();
+        return name.includes(lower) || description.includes(lower);
+      }),
     }))
     .filter((section) => section.items.length > 0);
 }
@@ -31,13 +35,8 @@ export function useSlashMenuSections(
   const [sections, setSections] = useState<SlashMenuSection[]>([]);
 
   useEffect(() => {
-    if (!workspacePath) {
-      setSections([]);
-      return;
-    }
-
     let cancelled = false;
-    void window.mimica.listSlashMenu(workspacePath, agentMode).then((list) => {
+    void window.mimica.listSlashMenu(workspacePath ?? "", agentMode).then((list) => {
       if (!cancelled) setSections(list);
     });
 
@@ -104,6 +103,7 @@ function buildMenuRows(sections: SlashMenuSection[]): {
 
 function itemLabel(item: SlashMenuItem): string {
   if (item.kind === "skill") return item.name;
+  if (item.kind === "image" && item.name === "attach") return "attach";
   return `/${item.name}`;
 }
 
