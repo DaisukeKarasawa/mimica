@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { extractCodeSnippet } from "./codeSymbols.js";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, describe, it } from "node:test";
+import { expandCodeMention, extractCodeSnippet, MAX_CODE_MENTION_BYTES } from "./codeSymbols.js";
 
 describe("extractCodeSnippet", () => {
   it("extracts lines around a symbol", () => {
@@ -24,5 +27,37 @@ describe("extractCodeSnippet", () => {
     assert.ok(result.startLine <= result.endLine);
     assert.ok(result.snippet.length > 0);
     assert.equal(result.endLine, 4);
+  });
+});
+
+describe("expandCodeMention", () => {
+  const workspacePath = mkdtempSync(join(tmpdir(), "mimica-code-symbol-test-"));
+
+  after(() => {
+    rmSync(workspacePath, { recursive: true, force: true });
+  });
+
+  it("expands a normal-sized file", async () => {
+    const relPath = "src/foo.ts";
+    mkdirSync(join(workspacePath, "src"), { recursive: true });
+    writeFileSync(
+      join(workspacePath, relPath),
+      ["export function foo() {", "  return 1;", "}"].join("\n"),
+    );
+
+    const result = await expandCodeMention(workspacePath, relPath, "foo");
+    assert.match(result.text, /Referenced code symbol/);
+    assert.match(result.text, /export function foo/);
+    assert.equal(result.warning, undefined);
+  });
+
+  it("returns a warning without reading oversized files", async () => {
+    const relPath = "src/large.ts";
+    mkdirSync(join(workspacePath, "src"), { recursive: true });
+    writeFileSync(join(workspacePath, relPath), "x".repeat(MAX_CODE_MENTION_BYTES + 1));
+
+    const result = await expandCodeMention(workspacePath, relPath, "foo");
+    assert.equal(result.text, `@Code:${relPath}:foo`);
+    assert.match(result.warning ?? "", /サイズ上限/);
   });
 });

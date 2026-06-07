@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
 import type { AtMenuItem, CodeSymbolResult } from "@mimica/shared";
 import { AT_MENU_MAX_RESULTS, matchesAtPathQuery } from "@mimica/shared";
 import { resolveRelativePath } from "./enumerate.js";
@@ -7,6 +7,8 @@ import { languageHintFromPath } from "./util.js";
 export const MAX_CODE_SNIPPET_LINES = 80;
 export const CODE_CONTEXT_BEFORE = 5;
 export const CODE_CONTEXT_AFTER = 40;
+/** Matches file @ mention byte cap in `index.ts` (`MAX_AT_FILE_BYTES`). */
+export const MAX_CODE_MENTION_BYTES = 256 * 1024;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -52,12 +54,12 @@ export function extractCodeSnippet(
   return { snippet, startLine: start, endLine: end };
 }
 
-export function expandCodeMention(
+export async function expandCodeMention(
   workspacePath: string,
   filePath: string,
   symbolName: string,
   hintLine?: number,
-): { text: string; warning?: string } {
+): Promise<{ text: string; warning?: string }> {
   const resolved = resolveRelativePath(workspacePath, filePath);
   if (!resolved || resolved.kind !== "file") {
     return {
@@ -68,7 +70,14 @@ export function expandCodeMention(
 
   let content: string;
   try {
-    content = readFileSync(resolved.absPath, "utf8");
+    const fileStat = await stat(resolved.absPath);
+    if (fileStat.size > MAX_CODE_MENTION_BYTES) {
+      return {
+        text: `@Code:${filePath}:${symbolName}`,
+        warning: `@Code:${filePath}:${symbolName} はサイズ上限を超えています`,
+      };
+    }
+    content = await readFile(resolved.absPath, "utf8");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {

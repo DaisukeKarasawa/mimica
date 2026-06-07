@@ -220,7 +220,7 @@ export async function resolveAtInput(
   }
 
   for (const token of codeTokens) {
-    const result = expandCodeMention(workspacePath, token.filePath, token.symbolName);
+    const result = await expandCodeMention(workspacePath, token.filePath, token.symbolName);
     expanded = expanded.replace(token.raw, result.text);
     if (result.warning) warnings.push(result.warning);
     resolvedPaths.push(`${token.filePath}:${token.symbolName}`);
