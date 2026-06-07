@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { AgentMode, AvatarState, ChatMessage, EditorContext } from "@mimica/shared";
+import type {
+  AgentMode,
+  AvatarState,
+  ChatAttachment,
+  ChatMessage,
+  EditorContext,
+} from "@mimica/shared";
 import { DEFAULT_SETTINGS, resolveCharacterShortNameEn } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
@@ -162,7 +168,7 @@ export default function App() {
     };
   }, [applyChatTabShortcut]);
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, attachments?: ChatAttachment[]) => {
     const workspacePath = resolveWorkspacePath();
     if (!workspacePath) return;
 
@@ -177,10 +183,12 @@ export default function App() {
       content,
       createdAt: new Date().toISOString(),
       context: editorContext ?? undefined,
+      attachments: attachments?.length ? attachments : undefined,
     };
     let title = session.title;
     if (session.messages.length === 0) {
-      title = content.slice(0, 24) + (content.length > 24 ? "…" : "");
+      const titleSource = content.trim() || (attachments?.length ? "Image" : "");
+      title = titleSource.slice(0, 24) + (titleSource.length > 24 ? "…" : "");
     }
     const updated = {
       ...session,
@@ -200,6 +208,7 @@ export default function App() {
         workspacePath,
         mode: agentMode,
         editorContext,
+        attachments,
       });
     } catch {
       setIsStreaming(false);
@@ -237,6 +246,7 @@ export default function App() {
             avatarState={avatarState}
             agentMode={agentMode}
             characterShortName={characterShortName}
+            workspacePath={resolveWorkspacePath()}
             onAgentModeChange={setAgentMode}
             chatIconUrl={characterAssets?.chatIconUrl}
             onSelectSession={(id) => {

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import type { AgentMode, AvatarState, ChatSession } from "@mimica/shared";
+import type { AgentMode, AvatarState, ChatAttachment, ChatSession } from "@mimica/shared";
 import { AGENT_DISPLAY_NAME } from "@mimica/shared";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
 import { ChatComposer } from "./ChatComposer";
+import { MessageAttachments } from "./ComposerAttachments";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { ThinkingIndicator } from "./ThinkingIndicator";
@@ -21,6 +22,7 @@ interface ChatPanelProps {
   avatarState: AvatarState;
   agentMode: AgentMode;
   characterShortName: string;
+  workspacePath: string | null;
   onAgentModeChange: (mode: AgentMode) => void;
   chatIconUrl?: string | null;
   onSelectSession: (id: string) => void;
@@ -28,7 +30,7 @@ interface ChatPanelProps {
   onReorderTab: (draggedId: string, toIndex: number) => void;
   onSelectHistorySession: (id: string) => void;
   onDeleteSession: (id: string) => void;
-  onSend: (text: string) => void;
+  onSend: (text: string, attachments?: ChatAttachment[]) => void;
   onCancel: () => void;
 }
 
@@ -43,6 +45,7 @@ export function ChatPanel({
   avatarState,
   agentMode,
   characterShortName,
+  workspacePath,
   onAgentModeChange,
   chatIconUrl,
   onSelectSession,
@@ -54,6 +57,8 @@ export function ChatPanel({
   onCancel,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const tabsReorderable = openSessions.length > 1;
   const tabIds = openSessions.map((session) => session.id);
   const { draggingId, dropTargetIndex, registerTabRef, tabPointerHandlers, handleTabClick } =
@@ -82,10 +87,13 @@ export function ChatPanel({
 
   const handleSubmit = () => {
     const text = input.trim();
-    if (!text || isStreaming) return;
+    if ((!text && attachments.length === 0) || isStreaming) return;
+    const outgoing = attachments;
     setInput("");
+    setAttachments([]);
+    setAttachmentError(null);
     scrollToBottom({ force: true });
-    onSend(text);
+    onSend(text, outgoing.length > 0 ? outgoing : undefined);
   };
 
   return (
@@ -158,7 +166,15 @@ export function ChatPanel({
                   return (
                     <div key={msg.id} className="msg user">
                       <div className="bubble-shell">
-                        <div className="bubble">{msg.content}</div>
+                        <div className="bubble">
+                          {msg.content ? <p className="message-text">{msg.content}</p> : null}
+                          {activeSession && msg.attachments?.length ? (
+                            <MessageAttachments
+                              sessionId={activeSession.id}
+                              attachments={msg.attachments}
+                            />
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   );
@@ -185,13 +201,23 @@ export function ChatPanel({
             </div>
 
             <div className="composer">
+              {attachmentError ? (
+                <p className="composer-attachment-error" role="alert">
+                  {attachmentError}
+                </p>
+              ) : null}
               <ChatComposer
                 value={input}
                 agentMode={agentMode}
                 characterShortName={characterShortName}
+                workspacePath={workspacePath}
+                sessionId={activeSession?.id ?? null}
+                attachments={attachments}
                 disabled={!activeSession}
                 streaming={isStreaming}
                 onChange={setInput}
+                onAttachmentsChange={setAttachments}
+                onAttachmentError={setAttachmentError}
                 onAgentModeChange={onAgentModeChange}
                 onSubmit={handleSubmit}
                 onCancel={onCancel}

@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import type { AgentMode } from "@mimica/shared";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { AgentMode, ChatAttachment } from "@mimica/shared";
 import { agentModeComposerPlaceholder, cycleAgentMode } from "@mimica/shared";
+import { ComposerAttachments } from "./ComposerAttachments";
+import {
+  filterSlashMenuSections,
+  flattenSlashMenuItems,
+  isSlashMenuOpen,
+  SlashCommandMenu,
+  slashMenuFilterQuery,
+  useSlashMenuSections,
+} from "./SlashCommandMenu";
 
 /** Matches `.composer-input` max-height in chat.css */
 const COMPOSER_INPUT_MAX_HEIGHT_PX = 160;
@@ -9,28 +18,44 @@ interface ChatComposerProps {
   value: string;
   agentMode: AgentMode;
   characterShortName: string;
+  workspacePath: string | null;
+  sessionId: string | null;
+  attachments: ChatAttachment[];
   disabled?: boolean;
   streaming?: boolean;
   onChange: (value: string) => void;
+  onAttachmentsChange: (attachments: ChatAttachment[]) => void;
   onAgentModeChange: (mode: AgentMode) => void;
   onSubmit: () => void;
   onCancel: () => void;
+  onAttachmentError?: (message: string) => void;
 }
 
 export function ChatComposer({
   value,
   agentMode,
   characterShortName,
+  workspacePath,
+  sessionId,
+  attachments,
   disabled,
   streaming,
   onChange,
+  onAttachmentsChange,
   onAgentModeChange,
   onSubmit,
   onCancel,
+  onAttachmentError,
 }: ChatComposerProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const sections = useSlashMenuSections(workspacePath, agentMode);
   const controlsLocked = disabled || streaming;
-  const canSend = !controlsLocked && value.trim().length > 0;
+  const canSend = !controlsLocked && (value.trim().length > 0 || attachments.length > 0);
+  const slashQuery = slashMenuFilterQuery(value);
+  const slashMenuOpen = !controlsLocked && isSlashMenuOpen(value);
+  const filteredSections = filterSlashMenuSections(sections, slashQuery);
+  const filteredItems = flattenSlashMenuItems(filteredSections);
 
   const syncInputHeight = useCallback(() => {
     const el = inputRef.current;
@@ -61,6 +86,82 @@ export function ChatComposer({
     observer.observe(el);
     return () => observer.disconnect();
   }, [syncInputHeight]);
+
+  useEffect(() => {
+    if (slashMenuOpen) {
+      setHighlightedIndex(0);
+    }
+  }, [slashMenuOpen, slashQuery]);
+
+  const reportAttachmentError = useCallback(
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      onAttachmentError?.(message);
+    },
+    [onAttachmentError],
+  );
+
+  const pickImages = useCallback(async () => {
+    if (!sessionId) {
+      onAttachmentError?.("画像を添付するにはチャットセッションが必要です");
+      return;
+    }
+    try {
+      const picked = await window.mimica.pickImageAttachments(sessionId, attachments.length);
+      if (picked.length > 0) {
+        onAttachmentsChange([...attachments, ...picked]);
+        onChange("");
+      }
+    } catch (error) {
+      reportAttachmentError(error);
+    }
+  }, [
+    attachments,
+    onAttachmentError,
+    onAttachmentsChange,
+    onChange,
+    reportAttachmentError,
+    sessionId,
+  ]);
+
+  const pasteImage = useCallback(
+    async (file: File) => {
+      if (!sessionId) {
+        onAttachmentError?.("画像を添付するにはチャットセッションが必要です");
+        return;
+      }
+      try {
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        const data = btoa(binary);
+        const saved = await window.mimica.pasteImageAttachment(sessionId, {
+          mimeType: file.type,
+          data,
+        });
+        onAttachmentsChange([...attachments, saved]);
+      } catch (error) {
+        reportAttachmentError(error);
+      }
+    },
+    [attachments, onAttachmentError, onAttachmentsChange, reportAttachmentError, sessionId],
+  );
+
+  const selectSlashItem = useCallback(
+    async (name: string, kind: string) => {
+      if (kind === "image") {
+        await pickImages();
+        return;
+      }
+      onChange(`/${name} `);
+      queueMicrotask(() => inputRef.current?.focus());
+    },
+    [onChange, pickImages],
+  );
 
   const sendButton = streaming ? (
     <button
@@ -98,6 +199,24 @@ export function ChatComposer({
 
   return (
     <div className={`composer-box mode-${agentMode} ${disabled ? "is-disabled" : ""}`}>
+      <SlashCommandMenu
+        value={value}
+        sections={sections}
+        disabled={controlsLocked}
+        highlightedIndex={highlightedIndex}
+        onHighlightChange={setHighlightedIndex}
+        onSelect={(item) => void selectSlashItem(item.name, item.kind)}
+      />
+      {sessionId ? (
+        <ComposerAttachments
+          sessionId={sessionId}
+          attachments={attachments}
+          disabled={controlsLocked}
+          onRemove={(attachmentId) =>
+            onAttachmentsChange(attachments.filter((item) => item.id !== attachmentId))
+          }
+        />
+      ) : null}
       <div className="composer-row">
         <textarea
           ref={inputRef}
@@ -107,7 +226,46 @@ export function ChatComposer({
           disabled={disabled}
           rows={1}
           onChange={(e) => onChange(e.target.value)}
+          onPaste={(event) => {
+            if (controlsLocked) return;
+            const items = event.clipboardData?.items;
+            if (!items) return;
+            for (const item of items) {
+              if (!item.type.startsWith("image/")) continue;
+              const file = item.getAsFile();
+              if (!file) continue;
+              event.preventDefault();
+              void pasteImage(file);
+              return;
+            }
+          }}
           onKeyDown={(e) => {
+            if (slashMenuOpen && filteredItems.length > 0) {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setHighlightedIndex((index) => (index + 1) % filteredItems.length);
+                return;
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setHighlightedIndex(
+                  (index) => (index - 1 + filteredItems.length) % filteredItems.length,
+                );
+                return;
+              }
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                const selected = filteredItems[highlightedIndex];
+                if (selected) void selectSlashItem(selected.name, selected.kind);
+                return;
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                onChange("");
+                return;
+              }
+            }
+
             if (e.key === "Tab" && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
               if (!controlsLocked) {
                 e.preventDefault();
