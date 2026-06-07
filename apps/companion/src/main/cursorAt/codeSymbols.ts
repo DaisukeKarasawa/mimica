@@ -1,9 +1,7 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { AtMenuItem, CodeSymbolResult } from "@mimica/shared";
 import { AT_MENU_MAX_RESULTS, matchesAtPathQuery } from "@mimica/shared";
-import { assertContained } from "../paths.js";
-import { WorkspaceIgnoreFilter } from "./ignoreFilter.js";
+import { resolveRelativePath } from "./enumerate.js";
 import { languageHintFromPath } from "./util.js";
 
 export const MAX_CODE_SNIPPET_LINES = 80;
@@ -60,27 +58,17 @@ export function expandCodeMention(
   symbolName: string,
   hintLine?: number,
 ): { text: string; warning?: string } {
-  let absPath: string;
-  try {
-    absPath = assertContained(join(workspacePath, filePath), workspacePath);
-  } catch {
+  const resolved = resolveRelativePath(workspacePath, filePath);
+  if (!resolved || resolved.kind !== "file") {
     return {
       text: `@Code:${filePath}:${symbolName}`,
       warning: `@Code:${filePath}:${symbolName} は workspace 内に見つかりません`,
     };
   }
 
-  const ignore = new WorkspaceIgnoreFilter(workspacePath);
-  if (ignore.isIgnored(filePath)) {
-    return {
-      text: `@Code:${filePath}:${symbolName}`,
-      warning: `@Code:${filePath}:${symbolName} は ignore 対象のため参照できません`,
-    };
-  }
-
   let content: string;
   try {
-    content = readFileSync(absPath, "utf8");
+    content = readFileSync(resolved.absPath, "utf8");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {

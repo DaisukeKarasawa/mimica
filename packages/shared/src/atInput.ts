@@ -5,7 +5,7 @@ import { AT_GIT_COMMIT_LABEL, atGitBranchLabel } from "./atMenu.js";
 export const AT_MENU_OPEN_PATTERN = /(?:^|\s)@([^\s@]*)$/;
 
 /** `@path` tokens embedded in a message (resolution at submit time). */
-export const AT_PATH_TOKEN_PATTERN = /@([^\s@]+)/g;
+export const AT_PATH_TOKEN_PATTERN = /(?<=^|\s)@([^\s@]+)/g;
 
 export const AT_PAST_CHAT_TOKEN_PATTERN = /@Past Chat: ([0-9a-f-]{36})/gi;
 export const AT_GIT_COMMIT_TOKEN = `@${AT_GIT_COMMIT_LABEL}`;

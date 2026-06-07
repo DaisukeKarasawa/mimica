@@ -91,6 +91,13 @@ describe("extractAtPathTokens", () => {
       { raw: "@packages/Past/foo.ts", path: "packages/Past/foo.ts" },
     ]);
   });
+
+  it("requires a token boundary before @ path mentions", () => {
+    assert.deepEqual(extractAtPathTokens("contact foo@package.json"), []);
+    assert.deepEqual(extractAtPathTokens("email user@host then @src/a.ts"), [
+      { raw: "@src/a.ts", path: "src/a.ts" },
+    ]);
+  });
 });
 
 describe("special @ tokens", () => {

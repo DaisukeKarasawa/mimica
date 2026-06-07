@@ -8,7 +8,7 @@ import {
   parseAtMenuScope,
   scoreAtPathQueryMatch,
 } from "@mimica/shared";
-import { assertContained } from "../paths.js";
+import { assertContained, assertRealContained } from "../paths.js";
 import { WorkspaceIgnoreFilter } from "./ignoreFilter.js";
 
 const MAX_WALK_DEPTH = 24;
@@ -240,13 +240,18 @@ export function resolveRelativePath(
     return null;
   }
 
+  try {
+    absPath = assertRealContained(absPath, workspacePath);
+  } catch {
+    return null;
+  }
+
   let stat;
   try {
     stat = lstatSync(absPath);
   } catch {
     return null;
   }
-  if (stat.isSymbolicLink()) return null;
 
   if (stat.isDirectory()) {
     return { absPath, kind: "folder" };

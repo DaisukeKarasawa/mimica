@@ -25,6 +25,8 @@ export const MAX_AT_FOLDER_ENTRIES = 500;
 export interface ResolveAtInputOptions {
   skipPaths?: string[];
   getSession?: (id: string) => ChatSession | undefined;
+  /** Extract @ tokens from this string; defaults to `input`. */
+  tokenSource?: string;
 }
 
 function truncateFileContent(content: string): { body: string; truncated: boolean } {
@@ -157,9 +159,14 @@ export async function resolveAtInput(
   const skip = new Set(
     (options?.skipPaths ?? []).map((path) => normalizePathForCompare(path)).filter(Boolean),
   );
-  const pathTokens = extractAtPathTokens(input);
+  const tokenSource = options?.tokenSource ?? input;
+  const pathTokens = extractAtPathTokens(tokenSource);
+  const pastChatTokens = extractPastChatTokens(tokenSource);
+  const gitCommitTokens = extractGitCommitTokens(tokenSource);
+  const branchTokens = extractGitBranchTokens(tokenSource);
+  const codeTokens = extractCodeTokens(tokenSource);
 
-  for (const token of extractPastChatTokens(expanded)) {
+  for (const token of pastChatTokens) {
     const session = options?.getSession?.(token.sessionId);
     if (!session) {
       warnings.push(`@Past Chat: ${token.sessionId} のセッションが見つかりません`);
@@ -174,7 +181,6 @@ export async function resolveAtInput(
     if (result.warning) warnings.push(result.warning);
   }
 
-  const gitCommitTokens = extractGitCommitTokens(expanded);
   if (gitCommitTokens.length > 0) {
     const diffResult = await getWorkingTreeDiff(workspacePath);
     if (diffResult.warning && !diffResult.empty) warnings.push(diffResult.warning);
@@ -191,7 +197,6 @@ export async function resolveAtInput(
     }
   }
 
-  const branchTokens = extractGitBranchTokens(expanded);
   if (branchTokens.length > 0) {
     const branchDiffs = await Promise.all(
       branchTokens.map(async (token) => ({
@@ -214,7 +219,7 @@ export async function resolveAtInput(
     }
   }
 
-  for (const token of extractCodeTokens(expanded)) {
+  for (const token of codeTokens) {
     const result = expandCodeMention(workspacePath, token.filePath, token.symbolName);
     expanded = expanded.replace(token.raw, result.text);
     if (result.warning) warnings.push(result.warning);

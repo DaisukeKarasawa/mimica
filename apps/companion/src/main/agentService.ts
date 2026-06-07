@@ -101,6 +101,7 @@ export class AgentService {
       }
     }
     const atResolved = await resolveAtInput(cwd, resolved.expanded, {
+      tokenSource: payload.content,
       skipPaths: skipAtPaths,
       getSession: (id) => this.sessionStore.get(id),
     });
