@@ -81,11 +81,21 @@ export class AgentService {
     const allMessages = session.messages;
     const history = historyForAgentPrompt(allMessages, payload.content);
 
-    const cwd = resolveWorkspacePath(
-      editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "",
-    );
+    const rawWorkspace =
+      editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "";
 
-    const resolved = resolveSlashInput(cwd, payload.content, payload.mode);
+    let slashWorkspace: string | null = null;
+    if (rawWorkspace.trim()) {
+      try {
+        slashWorkspace = resolveWorkspacePath(rawWorkspace);
+      } catch {
+        // Fall back to user-level slash commands and skills.
+      }
+    }
+
+    const cwd = resolveWorkspacePath(rawWorkspace);
+
+    const resolved = resolveSlashInput(slashWorkspace, payload.content, payload.mode);
     if (resolved.warning) {
       emitter.warning(resolved.warning);
     }

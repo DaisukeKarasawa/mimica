@@ -5,45 +5,20 @@ import type {
   SlashMenuItem,
   SlashMenuSection,
 } from "@mimica/shared";
-import { parseSlashInput, SLASH_MENU_SECTION_LABELS, slashSubagentsForMode } from "@mimica/shared";
+import { parseSlashInput, SLASH_MENU_SECTION_LABELS } from "@mimica/shared";
+import { listSlashSubagents, resolveSlashSubagent } from "./agents.js";
 import { listSlashCommands, resolveSlashCommand } from "./commands.js";
+import {
+  IMAGE_ATTACH_MENU_ITEM,
+  IMAGE_GENERATE_MENU_ITEM,
+  resolveSlashImageGeneration,
+} from "./imageGeneration.js";
 import { listSlashSkills, resolveSlashSkill } from "./skills.js";
 
-const IMAGE_MENU_ITEM: SlashMenuItem = {
-  kind: "image",
-  name: "image",
-  description: "画像を添付（PNG / JPEG / WebP / GIF）",
-};
-
-function listSlashSubagents(mode: AgentMode): SlashMenuItem[] {
-  return slashSubagentsForMode(mode).map((subagent) => ({
-    kind: "subagent" as const,
-    name: subagent.id,
-    description: subagent.description,
-  }));
-}
-
-function resolveSlashSubagent(
-  subagentId: string,
-  remainder?: string,
-): { expanded: string; subagentId: string } | null {
-  const known = slashSubagentsForMode("agent").some((item) => item.id === subagentId);
-  if (!known) return null;
-
-  const prompt = remainder?.trim() || "Handle the user request.";
-  const expanded = [
-    "## Subagent dispatch",
-    "",
-    `Use the Task tool with \`subagent_type: "${subagentId}"\` to handle the following request.`,
-    "",
-    "Pass this as the subagent prompt:",
-    prompt,
-  ].join("\n");
-
-  return { expanded, subagentId };
-}
-
-export function listSlashMenuSections(workspacePath: string, mode: AgentMode): SlashMenuSection[] {
+export function listSlashMenuSections(
+  workspacePath: string | null,
+  mode: AgentMode,
+): SlashMenuSection[] {
   const commands = listSlashCommands(workspacePath).map(
     (command): SlashMenuItem => ({
       kind: "command",
@@ -53,7 +28,7 @@ export function listSlashMenuSections(workspacePath: string, mode: AgentMode): S
     }),
   );
   const skills = listSlashSkills(workspacePath);
-  const subagents = listSlashSubagents(mode);
+  const subagents = mode === "ask" ? [] : listSlashSubagents(workspacePath);
 
   const sections: SlashMenuSection[] = [];
   if (commands.length > 0) {
@@ -80,13 +55,13 @@ export function listSlashMenuSections(workspacePath: string, mode: AgentMode): S
   sections.push({
     category: "image",
     label: SLASH_MENU_SECTION_LABELS.image,
-    items: [IMAGE_MENU_ITEM],
+    items: [IMAGE_GENERATE_MENU_ITEM, IMAGE_ATTACH_MENU_ITEM],
   });
   return sections;
 }
 
 export function resolveSlashInput(
-  workspacePath: string,
+  workspacePath: string | null,
   input: string,
   mode: AgentMode,
 ): ResolveSlashInputResult {
@@ -96,6 +71,18 @@ export function resolveSlashInput(
   }
 
   const { token, remainder } = parsed;
+
+  if (token === "image") {
+    const imageResult = resolveSlashImageGeneration(workspacePath, remainder);
+    if (imageResult) {
+      return {
+        expanded: imageResult.expanded,
+        kind: "image",
+        name: "image",
+        warning: imageResult.warning,
+      };
+    }
+  }
 
   const commandResult = resolveSlashCommand(workspacePath, token, remainder);
   if (commandResult) {
@@ -125,12 +112,13 @@ export function resolveSlashInput(
   }
 
   if (mode !== "ask") {
-    const subagentResult = resolveSlashSubagent(token, remainder);
+    const subagentResult = resolveSlashSubagent(workspacePath, token, remainder);
     if (subagentResult) {
       return {
         expanded: subagentResult.expanded,
         kind: "subagent",
         name: subagentResult.subagentId,
+        warning: subagentResult.warning,
       };
     }
   }

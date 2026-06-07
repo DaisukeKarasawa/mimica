@@ -1,27 +1,19 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename, extname, join } from "node:path";
+import { readFileSync } from "node:fs";
 import type { SlashCommandSource, SlashCommandSummary } from "@mimica/shared";
-import { SLASH_NAME_PATTERN } from "@mimica/shared";
 import { commandCatalogStore, getCachedCatalog } from "./catalog.js";
+import {
+  catalogCacheKey,
+  normalizeWorkspacePath,
+  projectCommandsDir,
+  userCommandsDir,
+  walkCommandFiles,
+} from "./discovery.js";
 
-function userCommandsDir(): string {
-  return join(homedir(), ".cursor", "commands");
-}
-
-function projectCommandsDir(workspacePath: string): string {
-  return join(workspacePath, ".cursor", "commands");
-}
-
-function readCommandNames(dir: string): string[] {
-  try {
-    return readdirSync(dir, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && extname(entry.name) === ".md")
-      .map((entry) => basename(entry.name, ".md"))
-      .filter((name) => SLASH_NAME_PATTERN.test(name));
-  } catch {
-    return [];
-  }
+interface CommandEntry {
+  name: string;
+  description: string;
+  absolutePath: string;
+  source: SlashCommandSource;
 }
 
 function extractSlashCommandDescription(content: string, name: string): string {
@@ -40,46 +32,62 @@ function extractSlashCommandDescription(content: string, name: string): string {
   return name;
 }
 
-function commandFilePath(
-  workspacePath: string,
+function loadCommandEntry(
   name: string,
-): { path: string; source: SlashCommandSource } | null {
-  const projectPath = join(projectCommandsDir(workspacePath), `${name}.md`);
-  if (existsSync(projectPath)) {
-    return { path: projectPath, source: "project" };
+  absolutePath: string,
+  source: SlashCommandSource,
+): CommandEntry {
+  let description = name;
+  try {
+    const body = readFileSync(absolutePath, "utf8");
+    description = extractSlashCommandDescription(body, name);
+  } catch {
+    // keep fallback description
   }
-
-  const userPath = join(userCommandsDir(), `${name}.md`);
-  if (existsSync(userPath)) {
-    return { path: userPath, source: "user" };
-  }
-
-  return null;
+  return { name, description, absolutePath, source };
 }
 
-function buildCommandCatalog(workspacePath: string): SlashCommandSummary[] {
-  const projectNames = new Set(readCommandNames(projectCommandsDir(workspacePath)));
-  const userNames = readCommandNames(userCommandsDir()).filter((name) => !projectNames.has(name));
-  const names = [...projectNames, ...userNames].sort((a, b) => a.localeCompare(b));
-
-  return names.map((name) => {
-    const source: SlashCommandSource = projectNames.has(name) ? "project" : "user";
-    const dir = source === "project" ? projectCommandsDir(workspacePath) : userCommandsDir();
-    let description = name;
-    try {
-      const body = readFileSync(join(dir, `${name}.md`), "utf8");
-      description = extractSlashCommandDescription(body, name);
-    } catch {
-      // keep fallback description
+function addCommandsFromDir(
+  byName: Map<string, CommandEntry>,
+  commandsRoot: string,
+  source: SlashCommandSource,
+  overwrite: boolean,
+): void {
+  for (const command of walkCommandFiles(commandsRoot)) {
+    const entry = loadCommandEntry(command.name, command.absolutePath, source);
+    if (overwrite || !byName.has(entry.name)) {
+      byName.set(entry.name, entry);
     }
-    return { name, description, source };
-  });
+  }
 }
 
-export function listSlashCommands(workspacePath: string): SlashCommandSummary[] {
-  return getCachedCatalog(workspacePath, commandCatalogStore(), () =>
-    buildCommandCatalog(workspacePath),
+function buildCommandCatalog(workspacePath: string | null): CommandEntry[] {
+  const byName = new Map<string, CommandEntry>();
+
+  addCommandsFromDir(byName, userCommandsDir(), "user", true);
+
+  if (workspacePath) {
+    addCommandsFromDir(byName, projectCommandsDir(workspacePath), "project", true);
+  }
+
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function getCommandCatalog(workspacePath: string | null): Map<string, CommandEntry> {
+  const normalized = normalizeWorkspacePath(workspacePath);
+  const cacheKey = catalogCacheKey(normalized);
+  const entries = getCachedCatalog(cacheKey, normalized, commandCatalogStore(), () =>
+    buildCommandCatalog(normalized),
   );
+  return new Map(entries.map((entry) => [entry.name, entry]));
+}
+
+export function listSlashCommands(workspacePath: string | null): SlashCommandSummary[] {
+  return [...getCommandCatalog(workspacePath).values()].map(({ name, description, source }) => ({
+    name,
+    description,
+    source,
+  }));
 }
 
 export function formatSlashCommandPrompt(
@@ -94,15 +102,15 @@ export function formatSlashCommandPrompt(
 }
 
 export function resolveSlashCommand(
-  workspacePath: string,
+  workspacePath: string | null,
   token: string,
   remainder?: string,
 ): { expanded: string; commandName: string; warning?: string } | null {
-  const located = commandFilePath(workspacePath, token);
-  if (!located) return null;
+  const entry = getCommandCatalog(workspacePath).get(token);
+  if (!entry) return null;
 
   try {
-    const body = readFileSync(located.path, "utf8");
+    const body = readFileSync(entry.absolutePath, "utf8");
     return { expanded: formatSlashCommandPrompt(token, body, remainder), commandName: token };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
