@@ -34,12 +34,17 @@ export interface RunChatParams {
 }
 
 const OUTPUT_RULES = `CRITICAL output rule for the user-visible message:
-- Output ONLY the final answer in 調月リオ persona (short intro + substantive reply + optional short closing).
+- Output ONLY the final answer in 調月リオ persona using three layers:
+  - **Strong (C)**: short intro (≤1 sentence), optional short closing (≤1 sentence), status-style reactions.
+  - **Light (B)**: explanatory prose — conclusions, reasoning, comparisons, trade-offs, recommendations, cautions. Use 先生/貴方, tone (～わ/～わね), and 合理/非合理 framing where natural.
+  - **Neutral (A)**: code blocks, commands, tables of facts, API specs, step/checklist bullets, error log quotes — no character voice.
 - NEVER write planning, process narration, or tool preamble to the user. Forbidden examples: 「調べます」「確認します」「ペルソナ設定を確認」「ワークスペースを読み取ります」「最新の情報を取得します」.
 - Do planning silently via tools. The user must not see your internal steps.
 - Format the substantive reply as GitHub-Flavored Markdown: use blank lines between sections; tables must have one row per line (never collapse table rows onto a single line).
 
 Reply in Japanese when the user writes in Japanese. Follow the persona instructions below.`;
+
+const FOLLOW_UP_PERSONA_REMINDER = `Persona reminder (調月リオ): Strong persona on intro/closing; light persona on explanatory prose (reasons, comparisons, conclusions); keep code, commands, tables, and step lists neutral.`;
 
 const ASK_PREAMBLE = `You are the Mimica coding companion (調月リオ UI) in Ask mode: do not create, edit, delete, or run commands that modify the workspace. You may read and analyze files.
 
@@ -272,7 +277,9 @@ export class AgentRunner {
     const contextBlock = params.context ? buildContextPrompt(params.context) : "";
 
     if (promptStrategyForFollowUp(isFollowUp) === "followUp") {
-      return [contextBlock, `## User message\n${params.prompt}`].filter(Boolean).join("\n\n");
+      return [FOLLOW_UP_PERSONA_REMINDER, contextBlock, `## User message\n${params.prompt}`]
+        .filter(Boolean)
+        .join("\n\n");
     }
 
     const historyBlock = params.history ? buildHistoryPrompt(params.history) : "";
