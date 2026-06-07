@@ -122,15 +122,15 @@ function buildSkillCatalog(workspacePath: string | null): Map<string, SkillEntry
 }
 
 function getSkillCatalog(workspacePath: string | null): Map<string, SkillEntry> {
-  const cacheKey = catalogCacheKey(workspacePath);
-  return getCachedCatalog(cacheKey, workspacePath, skillCatalogStore(), () =>
-    buildSkillCatalog(workspacePath),
+  const normalized = normalizeWorkspacePath(workspacePath);
+  const cacheKey = catalogCacheKey(normalized);
+  return getCachedCatalog(cacheKey, normalized, skillCatalogStore(), () =>
+    buildSkillCatalog(normalized),
   );
 }
 
 export function listSlashSkills(workspacePath: string | null): SlashMenuItem[] {
-  const normalized = normalizeWorkspacePath(workspacePath);
-  return [...getSkillCatalog(normalized).values()]
+  return [...getSkillCatalog(workspacePath).values()]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((entry) => ({
       kind: "skill" as const,
@@ -145,8 +145,7 @@ export function resolveSlashSkill(
   skillName: string,
   remainder?: string,
 ): { expanded: string; skillName: string } | { warning: string; skillName: string } | null {
-  const normalized = normalizeWorkspacePath(workspacePath);
-  const entry = getSkillCatalog(normalized).get(skillName);
+  const entry = getSkillCatalog(workspacePath).get(skillName);
   if (!entry) return null;
 
   if (!existsSync(entry.absolutePath)) {

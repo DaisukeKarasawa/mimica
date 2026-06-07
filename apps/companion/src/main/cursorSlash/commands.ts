@@ -61,7 +61,7 @@ function addCommandsFromDir(
   }
 }
 
-function buildCommandCatalog(workspacePath: string | null): CommandEntry[] {
+function buildCommandCatalog(workspacePath: string | null): Map<string, CommandEntry> {
   const byName = new Map<string, CommandEntry>();
 
   addCommandsFromDir(byName, userCommandsDir(), "user", true);
@@ -70,24 +70,25 @@ function buildCommandCatalog(workspacePath: string | null): CommandEntry[] {
     addCommandsFromDir(byName, projectCommandsDir(workspacePath), "project", true);
   }
 
-  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return byName;
 }
 
 function getCommandCatalog(workspacePath: string | null): Map<string, CommandEntry> {
   const normalized = normalizeWorkspacePath(workspacePath);
   const cacheKey = catalogCacheKey(normalized);
-  const entries = getCachedCatalog(cacheKey, normalized, commandCatalogStore(), () =>
+  return getCachedCatalog(cacheKey, normalized, commandCatalogStore(), () =>
     buildCommandCatalog(normalized),
   );
-  return new Map(entries.map((entry) => [entry.name, entry]));
 }
 
 export function listSlashCommands(workspacePath: string | null): SlashCommandSummary[] {
-  return [...getCommandCatalog(workspacePath).values()].map(({ name, description, source }) => ({
-    name,
-    description,
-    source,
-  }));
+  return [...getCommandCatalog(workspacePath).values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(({ name, description, source }) => ({
+      name,
+      description,
+      source,
+    }));
 }
 
 export function formatSlashCommandPrompt(

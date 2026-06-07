@@ -1,4 +1,4 @@
-import { slashCatalogRootsMtime } from "./discovery.js";
+import { clearSlashCatalogRootsMtimeCaches, slashCatalogRootsMtime } from "./discovery.js";
 
 interface CatalogCache<T> {
   rootsMtime: number;
@@ -42,4 +42,5 @@ export function resetSlashCatalogCachesForTests(): void {
   commandCaches.clear();
   skillCaches.clear();
   subagentCaches.clear();
+  clearSlashCatalogRootsMtimeCaches();
 }

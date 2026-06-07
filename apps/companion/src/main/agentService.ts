@@ -13,6 +13,7 @@ import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
+import { resolveSlashWorkspaceOrNull } from "./cursorSlash/discovery.js";
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
 import { debugLogAtResolution, resolveAtInput } from "./cursorAt/index.js";
 import { MAX_IMAGE_ATTACHMENTS, readAttachmentBase64 } from "./imageAttachments.js";
@@ -84,16 +85,8 @@ export class AgentService {
     const rawWorkspace =
       editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "";
 
-    let slashWorkspace: string | null = null;
-    if (rawWorkspace.trim()) {
-      try {
-        slashWorkspace = resolveWorkspacePath(rawWorkspace);
-      } catch {
-        // Fall back to user-level slash commands and skills.
-      }
-    }
-
-    const cwd = resolveWorkspacePath(rawWorkspace);
+    const slashWorkspace = resolveSlashWorkspaceOrNull(rawWorkspace, resolveWorkspacePath);
+    const cwd = slashWorkspace ?? resolveWorkspacePath(rawWorkspace);
 
     const resolved = resolveSlashInput(slashWorkspace, payload.content, payload.mode);
     if (resolved.warning) {

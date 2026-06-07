@@ -8,6 +8,7 @@ import { listSlashCommands, resolveSlashCommand } from "./commands.js";
 import {
   bundledSkillsRoot,
   pluginSkillsCacheRoot,
+  resolveSlashWorkspaceOrNull,
   userAgentsSkillsRoot,
   userCommandsDir,
   userSkillsRoot,
@@ -178,5 +179,26 @@ describe("extended slash discovery", () => {
       assert.ok(found);
       assert.equal(found?.source, "user");
     });
+  });
+
+  it("resolveSlashWorkspaceOrNull returns null for missing or invalid paths", () => {
+    assert.equal(
+      resolveSlashWorkspaceOrNull("", (p) => p),
+      null,
+    );
+    assert.equal(
+      resolveSlashWorkspaceOrNull("   ", (p) => p),
+      null,
+    );
+    assert.equal(
+      resolveSlashWorkspaceOrNull("ok", () => {
+        throw new Error("bad");
+      }),
+      null,
+    );
+    assert.equal(
+      resolveSlashWorkspaceOrNull("ok", () => "/resolved"),
+      "/resolved",
+    );
   });
 });

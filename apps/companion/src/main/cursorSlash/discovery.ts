@@ -26,6 +26,30 @@ export function catalogCacheKey(workspacePath: string | null | undefined): strin
   return normalizeWorkspacePath(workspacePath) ?? NO_WORKSPACE_CACHE_KEY;
 }
 
+/** Resolve workspace for slash catalogs; null when missing or invalid (user-only fallback). */
+export function resolveSlashWorkspaceOrNull(
+  raw: string | null | undefined,
+  resolveWorkspacePath: (workspacePath: string) => string,
+): string | null {
+  const normalized = normalizeWorkspacePath(raw);
+  if (!normalized) return null;
+  try {
+    return resolveWorkspacePath(normalized);
+  } catch {
+    return null;
+  }
+}
+
+const MTIME_TTL_MS = 1000;
+let mtimeSyncMemo: { key: string; value: number } | null = null;
+const mtimeTtlCache = new Map<string, { value: number; at: number }>();
+
+/** Test-only: clear mtime memo/TTL between isolated fixtures. */
+export function clearSlashCatalogRootsMtimeCaches(): void {
+  mtimeSyncMemo = null;
+  mtimeTtlCache.clear();
+}
+
 function cursorHome(...segments: string[]): string {
   return join(homedir(), ".cursor", ...segments);
 }
@@ -221,7 +245,7 @@ function dirMtime(path: string): number {
   return fileMtime(path);
 }
 
-export function slashCatalogRootsMtime(workspacePath: string | null): number {
+function computeSlashCatalogRootsMtime(workspacePath: string | null): number {
   const mtimes = [
     commandsContentMtime(userCommandsDir()),
     dirMtime(userSkillsRoot()),
@@ -242,6 +266,23 @@ export function slashCatalogRootsMtime(workspacePath: string | null): number {
   }
 
   return Math.max(...mtimes, 0);
+}
+
+export function slashCatalogRootsMtime(workspacePath: string | null): number {
+  const key = catalogCacheKey(workspacePath);
+  if (mtimeSyncMemo?.key === key) return mtimeSyncMemo.value;
+
+  const now = Date.now();
+  const ttlEntry = mtimeTtlCache.get(key);
+  if (ttlEntry && now - ttlEntry.at < MTIME_TTL_MS) {
+    mtimeSyncMemo = { key, value: ttlEntry.value };
+    return ttlEntry.value;
+  }
+
+  const value = computeSlashCatalogRootsMtime(workspacePath);
+  mtimeSyncMemo = { key, value };
+  mtimeTtlCache.set(key, { value, at: now });
+  return value;
 }
 
 function workspaceSkillsContentMtime(workspacePath: string): number {
