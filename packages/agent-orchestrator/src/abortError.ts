@@ -20,8 +20,11 @@ export function unregisterIntentionalCancel(promise: Promise<unknown>): void {
 
 /** Track a promise for the lifetime of its settlement. */
 export function trackIntentionalCancelPromise<T>(promise: Promise<T>): Promise<T> {
-  registerIntentionalCancel(promise);
-  return promise.finally(() => unregisterIntentionalCancel(promise));
+  const tracked = promise.finally(() => {
+    unregisterIntentionalCancel(tracked);
+  });
+  registerIntentionalCancel(tracked);
+  return tracked;
 }
 
 /** Cancel a run without surfacing SDK AbortError from intentional cancellation. */

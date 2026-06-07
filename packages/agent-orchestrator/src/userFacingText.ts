@@ -39,9 +39,14 @@ function stripTrailingMetaSentences(block: string): string {
   if (removeCount === 0) return trimmed;
   if (removeCount === sentences.length) return "";
 
-  const firstRemoved = sentences[sentences.length - removeCount]!;
-  const cutAt = trimmed.indexOf(firstRemoved);
-  return cutAt === -1 ? trimmed : trimmed.slice(0, cutAt).trimEnd();
+  let cutAt = trimmed.length;
+  for (let i = sentences.length - 1; i >= sentences.length - removeCount; i--) {
+    const sentence = sentences[i]!;
+    const pos = trimmed.lastIndexOf(sentence, cutAt - 1);
+    if (pos === -1) return trimmed;
+    cutAt = pos;
+  }
+  return trimmed.slice(0, cutAt).trimEnd();
 }
 
 export function isMetaNarrationParagraph(paragraph: string): boolean {
