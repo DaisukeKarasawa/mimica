@@ -12,7 +12,7 @@ import {
   isRealDirectory,
   isRealFile,
   normalizeWorkspacePath,
-  projectAgentsDir,
+  projectDirIfContained,
   userAgentsDir,
 } from "./discovery.js";
 
@@ -120,13 +120,16 @@ function buildSubagentCatalog(workspacePath: string | null): Map<string, Subagen
   }
 
   if (workspacePath) {
-    for (const custom of readCustomAgentsFromDir(projectAgentsDir(workspacePath), "project")) {
-      byName.set(custom.name, {
-        name: custom.name,
-        description: custom.description,
-        source: custom.source,
-        custom,
-      });
+    const projectAgents = projectDirIfContained(workspacePath, ".cursor", "agents");
+    if (projectAgents) {
+      for (const custom of readCustomAgentsFromDir(projectAgents, "project")) {
+        byName.set(custom.name, {
+          name: custom.name,
+          description: custom.description,
+          source: custom.source,
+          custom,
+        });
+      }
     }
   }
 

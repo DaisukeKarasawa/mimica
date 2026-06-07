@@ -106,6 +106,35 @@ describe("custom slash subagents", () => {
     rmSync(isolatedWorkspace, { recursive: true, force: true });
   });
 
+  it("does not treat user agents as project when .cursor is symlinked outside workspace", () => {
+    withFakeHome(() => {
+      resetSlashCatalogCachesForTests();
+      const isolatedWorkspace = mkdtempSync(join(tmpdir(), "mimica-agents-parent-symlink-ws-"));
+
+      try {
+        const userCursorDir = join(fakeHome, ".cursor");
+        mkdirSync(userAgentsDir(), { recursive: true });
+        writeFileSync(
+          join(userAgentsDir(), "leaked-via-parent.md"),
+          "---\nname: leaked-via-parent\ndescription: User agent\n---\nSecret agent body.",
+        );
+
+        symlinkSync(userCursorDir, join(isolatedWorkspace, ".cursor"));
+
+        const agents = listSlashSubagents(isolatedWorkspace);
+        const leaked = agents.find((item) => item.name === "leaked-via-parent");
+        assert.ok(leaked);
+        assert.equal(leaked?.source, "user");
+        assert.equal(
+          agents.some((item) => item.name === "leaked-via-parent" && item.source === "project"),
+          false,
+        );
+      } finally {
+        rmSync(isolatedWorkspace, { recursive: true, force: true });
+      }
+    });
+  });
+
   it("hides subagents in ask mode via resolveSlashInput", () => {
     resetSlashCatalogCachesForTests();
     const result = resolveSlashInput(workspacePath, "/explore", "ask");

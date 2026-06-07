@@ -4,7 +4,7 @@ import { commandCatalogStore, getCachedCatalog, slashCommandsCatalogMtime } from
 import {
   catalogCacheKey,
   normalizeWorkspacePath,
-  projectCommandsDir,
+  projectDirIfContained,
   userCommandsDir,
   walkCommandFiles,
 } from "./discovery.js";
@@ -67,7 +67,10 @@ function buildCommandCatalog(workspacePath: string | null): Map<string, CommandE
   addCommandsFromDir(byName, userCommandsDir(), "user", true);
 
   if (workspacePath) {
-    addCommandsFromDir(byName, projectCommandsDir(workspacePath), "project", true);
+    const projectCommands = projectDirIfContained(workspacePath, ".cursor", "commands");
+    if (projectCommands) {
+      addCommandsFromDir(byName, projectCommands, "project", true);
+    }
   }
 
   return byName;

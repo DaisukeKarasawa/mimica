@@ -2,6 +2,7 @@ import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { extname, join, relative } from "node:path";
 import { SLASH_COMMAND_NAME_PATTERN } from "@mimica/shared";
+import { assertRealContained } from "../paths.js";
 
 export const SKILL_FILE = "SKILL.md";
 export const NO_WORKSPACE_CACHE_KEY = "";
@@ -105,6 +106,15 @@ export function projectAgentsSkillsRoot(workspacePath: string): string {
 
 export function projectCommandsDir(workspacePath: string): string {
   return join(workspacePath, ".cursor", "commands");
+}
+
+/** Project subpath only when it is a real path contained in the workspace (rejects symlink escapes). */
+export function projectDirIfContained(workspacePath: string, ...segments: string[]): string | null {
+  try {
+    return assertRealContained(join(workspacePath, ...segments), workspacePath);
+  } catch {
+    return null;
+  }
 }
 
 export function cursorWorktreesRoot(): string {

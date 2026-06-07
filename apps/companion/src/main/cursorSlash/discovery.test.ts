@@ -202,6 +202,39 @@ describe("extended slash discovery", () => {
     }
   });
 
+  it("does not treat user commands as project when .cursor is symlinked outside workspace", () => {
+    withFakeHome(() => {
+      resetSlashCatalogCachesForTests();
+      const isolatedWorkspace = mkdtempSync(join(tmpdir(), "mimica-discovery-parent-symlink-ws-"));
+
+      try {
+        const userCursorDir = join(fakeHome, ".cursor");
+        mkdirSync(userCommandsDir(), { recursive: true });
+        writeFileSync(
+          join(userCommandsDir(), "leaked-via-parent.md"),
+          "# Leaked\n\nSecret command body.",
+        );
+
+        symlinkSync(userCursorDir, join(isolatedWorkspace, ".cursor"));
+
+        const commands = listSlashCommands(isolatedWorkspace);
+        const leaked = commands.find((item) => item.name === "leaked-via-parent");
+        assert.ok(leaked);
+        assert.equal(leaked?.source, "user");
+        assert.equal(
+          commands.some((item) => item.name === "leaked-via-parent" && item.source === "project"),
+          false,
+        );
+        assert.equal(
+          resolveSlashCommand(isolatedWorkspace, "leaked-via-parent")?.commandName,
+          "leaked-via-parent",
+        );
+      } finally {
+        rmSync(isolatedWorkspace, { recursive: true, force: true });
+      }
+    });
+  });
+
   it("resolveSlashWorkspaceOrNull returns null for missing or invalid paths", () => {
     assert.equal(
       resolveSlashWorkspaceOrNull("", (p) => p),
