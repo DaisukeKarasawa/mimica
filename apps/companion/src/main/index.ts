@@ -24,6 +24,7 @@ import {
 } from "./attachmentProtocol.js";
 import { registerPrivilegedProtocols } from "./privilegedProtocols.js";
 import { registerSlashMenuIpc } from "./ipc/slashMenu.js";
+import { registerAtMenuIpc } from "./ipc/atMenu.js";
 import { registerAttachmentIpc, releaseDraftAttachments } from "./ipc/attachments.js";
 
 const electronApis = electron();
@@ -110,6 +111,10 @@ if (!gotLock) {
       return openAllowedExternalUrl(url);
     });
     registerSlashMenuIpc(ipcMain, resolveWorkspacePath);
+    registerAtMenuIpc(ipcMain, resolveWorkspacePath, {
+      sessionStore,
+      getBridge: () => bridgeServer,
+    });
     registerAttachmentIpc(ipcMain, dialog, getMainWindow);
 
     app.on("activate", () => {

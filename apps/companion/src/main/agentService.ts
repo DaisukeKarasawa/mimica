@@ -1,3 +1,4 @@
+import { relative } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
 import type { AgentMode, ChatAttachment, EditorContext } from "@mimica/shared";
@@ -13,6 +14,7 @@ import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
+import { debugLogAtResolution, resolveAtInput } from "./cursorAt/index.js";
 import { MAX_IMAGE_ATTACHMENTS, readAttachmentBase64 } from "./imageAttachments.js";
 
 export interface AgentSubmitPayload {
@@ -91,6 +93,24 @@ export class AgentService {
       debugLogSlashResolution(resolved.kind, resolved.name, resolved.expanded.length);
     }
 
+    const skipAtPaths: string[] = [];
+    if (editorContext?.currentFilePath) {
+      const rel = relative(cwd, editorContext.currentFilePath).replace(/\\/g, "/");
+      if (rel && !rel.startsWith("..")) {
+        skipAtPaths.push(rel);
+      }
+    }
+    const atResolved = resolveAtInput(cwd, resolved.expanded, {
+      skipPaths: skipAtPaths,
+      getSession: (id) => this.sessionStore.get(id),
+    });
+    if (atResolved.warning) {
+      emitter.warning(atResolved.warning);
+    }
+    if (atResolved.paths?.length) {
+      debugLogAtResolution(atResolved.paths, atResolved.expanded.length);
+    }
+
     const sdkImages: Array<{ data: string; mimeType: string }> = [];
     for (const attachment of payload.attachments ?? []) {
       if (!isChatAttachment(attachment)) {
@@ -105,7 +125,7 @@ export class AgentService {
       }
     }
 
-    let promptText = resolved.expanded;
+    let promptText = atResolved.expanded;
     if (!promptText.trim() && sdkImages.length > 0) {
       promptText = "Please analyze the attached image(s).";
     }

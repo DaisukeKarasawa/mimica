@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentEventMessage,
   AgentMode,
+  AtMenuItem,
+  AtMenuSection,
   CharacterAssetStatus,
   ChatAttachment,
   ChatSession,
@@ -34,6 +36,11 @@ export interface MimicaApi {
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
   onChatTabShortcut: (cb: (action: ChatTabShortcutAction) => void) => () => void;
   listSlashMenu: (workspacePath: string, mode: AgentMode) => Promise<SlashMenuSection[]>;
+  searchAtMenu: (
+    workspacePath: string,
+    query: string,
+    sessionId: string | null,
+  ) => Promise<AtMenuSection[]>;
   pickImageAttachments: (sessionId: string) => Promise<ChatAttachment[]>;
   pasteImageAttachment: (sessionId: string, payload: ImagePastePayload) => Promise<ChatAttachment>;
   discardImageAttachment: (sessionId: string, attachment: ChatAttachment) => Promise<void>;
@@ -66,6 +73,8 @@ const api: MimicaApi = {
     return () => ipcRenderer.removeListener("chat-tab-shortcut", handler);
   },
   listSlashMenu: (workspacePath, mode) => ipcRenderer.invoke("slashMenu:list", workspacePath, mode),
+  searchAtMenu: (workspacePath, query, sessionId) =>
+    ipcRenderer.invoke("atMenu:search", workspacePath, query, sessionId),
   pickImageAttachments: (sessionId) => ipcRenderer.invoke("attachments:pick", sessionId),
   pasteImageAttachment: (sessionId, payload) =>
     ipcRenderer.invoke("attachments:paste", sessionId, payload),
