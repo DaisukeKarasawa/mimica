@@ -60,9 +60,6 @@ export function CharacterStage({ avatarState, assets, layoutReady = true }: Char
         if (!cancelled) {
           setSpineReady(true);
           controller.setAvatarState(avatarState);
-          requestAnimationFrame(() => {
-            if (!cancelled) controller.refreshLayout();
-          });
         }
       })
       .catch((err) => {

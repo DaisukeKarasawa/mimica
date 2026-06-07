@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { electron } from "./electron.js";
@@ -10,6 +10,7 @@ const LOG_PREFIX = "[personaSetup]";
 let cachedTemplatePersonaDir: string | undefined;
 let cachedPersonaPrompt: string | undefined;
 let cachedPersonaSourcePath: string | undefined;
+let cachedPersonaSourceMtimeMs: number | undefined;
 
 function devTemplatePersonaDir(): string {
   const companionRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -85,16 +86,30 @@ export function ensurePersonaPackOnDisk(): void {
   }
 }
 
+function personaSourceMtimeMs(sourcePath: string): number | undefined {
+  try {
+    return statSync(sourcePath).mtimeMs;
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolvePersonaSystemPrompt(): string | undefined {
   ensurePersonaPackOnDisk();
   const settings = getActiveMimicaSettings();
   const sourcePath = resolveExpandedPath(settings.personaPackPath);
-  if (cachedPersonaPrompt && cachedPersonaSourcePath === sourcePath) {
+  const sourceMtimeMs = personaSourceMtimeMs(sourcePath);
+  if (
+    cachedPersonaPrompt &&
+    cachedPersonaSourcePath === sourcePath &&
+    cachedPersonaSourceMtimeMs === sourceMtimeMs
+  ) {
     return cachedPersonaPrompt;
   }
   const prompt = readPersonaPack(sourcePath);
   if (!prompt) return undefined;
   cachedPersonaSourcePath = sourcePath;
+  cachedPersonaSourceMtimeMs = sourceMtimeMs;
   cachedPersonaPrompt = prompt;
   return prompt;
 }
