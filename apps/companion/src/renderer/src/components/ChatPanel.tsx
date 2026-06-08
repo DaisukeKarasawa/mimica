@@ -174,9 +174,17 @@ export function ChatPanel({
             <div className="messages" ref={messagesRef}>
               {!activeSession && (
                 <p className="chat-empty">
-                  タブがありません。Cursor で「Mimica: Open
-                  Companion」を実行してから、⌘T（Ctrl+T）で New Chat
-                  を開くか、⌘Y（Ctrl+Y）で履歴を開いてください。
+                  {workspacePath ? (
+                    <>
+                      タブがありません。Mimica ウィンドウを選択した状態で ⌘T（Windows は Ctrl+T）で
+                      New Chat を開くか、⌘Y（Ctrl+Y）で履歴を開いてください。
+                    </>
+                  ) : (
+                    <>
+                      Cursor でフォルダを開き、コマンドパレットから「Mimica: Open
+                      Companion」を実行してください。接続後、最初のチャットが自動で開きます。
+                    </>
+                  )}
                 </p>
               )}
               {activeSession?.messages.map((msg) => {
@@ -231,7 +239,7 @@ export function ChatPanel({
                 workspacePath={workspacePath}
                 sessionId={activeSession?.id ?? null}
                 attachments={attachments}
-                disabled={!activeSession}
+                disabled={!workspacePath}
                 streaming={isStreaming}
                 onChange={setInput}
                 onAttachmentsChange={setAttachments}

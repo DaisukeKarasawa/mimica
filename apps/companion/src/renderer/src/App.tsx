@@ -67,6 +67,12 @@ export default function App() {
     };
   }, [handleAgentEvent]);
 
+  // First launch: auto-open a draft tab once Cursor links a workspace (⌘T is easy to miss).
+  useEffect(() => {
+    if (!linkedWorkspacePath || tabs.openTabIds.length > 0) return;
+    void tabs.handleNewSession(linkedWorkspacePath);
+  }, [linkedWorkspacePath, tabs.openTabIds.length, tabs.handleNewSession]);
+
   useEffect(() => {
     if (!linkedWorkspacePath) return;
     const sessionId = tabs.activeSession?.id;
