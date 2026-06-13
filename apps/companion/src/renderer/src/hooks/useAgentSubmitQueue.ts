@@ -90,8 +90,9 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
       if (!next) return;
 
       drainInFlightBySessionRef.current.add(sessionId);
+      let ok = false;
       try {
-        const ok = await submitToAgent({
+        ok = await submitToAgent({
           sessionId,
           content: next.content,
           workspacePath: next.workspacePath,
@@ -104,7 +105,7 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
         }
       } finally {
         drainInFlightBySessionRef.current.delete(sessionId);
-        if (messageQueue.peek(sessionId)) {
+        if (ok && messageQueue.peek(sessionId)) {
           void drainQueue(sessionId);
         }
       }
@@ -141,14 +142,25 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
         const titleSource = content.trim() || (attachments?.length ? "Image" : "");
         title = titleSource.slice(0, 24) + (titleSource.length > 24 ? "…" : "");
       }
+
+      const authoritative =
+        (await window.mimica.listSessions()).find((s) => s.id === session.id) ?? session;
       const updated = {
-        ...session,
+        ...authoritative,
         title,
         workspacePath,
-        messages: [...session.messages, userMsg],
+        messages: [...authoritative.messages, userMsg],
       };
-      const saved = await window.mimica.saveSession(updated);
-      setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+
+      let saved: ChatSession;
+      try {
+        saved = await window.mimica.saveSession(updated);
+        setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setSubmitError(`セッション保存失敗: ${message}`);
+        return;
+      }
 
       if (isSessionRunning(saved.id)) {
         messageQueue.enqueue(saved.id, {
@@ -192,11 +204,13 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
 
   const queuedCount = messageQueue.getQueueSize(activeSessionId);
 
+  const clearSubmitError = useCallback(() => setSubmitError(null), []);
+
   return {
     handleSend,
     clearQueueForSession,
     queuedCount,
     submitError,
-    clearSubmitError: () => setSubmitError(null),
+    clearSubmitError,
   };
 }

@@ -57,6 +57,10 @@ export class AgentService {
     return this.runnerReady;
   }
 
+  private isRunActive(sessionId: string, runId: string): boolean {
+    return this.activeRuns.get(sessionId)?.runId === runId;
+  }
+
   async submit(payload: AgentSubmitPayload): Promise<void> {
     if (this.activeRuns.has(payload.sessionId)) {
       throw new Error("Session already has an active agent run");
@@ -81,13 +85,11 @@ export class AgentService {
     session: NonNullable<ReturnType<SessionStore["get"]>>,
   ): Promise<void> {
     const wc = this.getWebContents();
-    const emitter = new AgentRunEmitter(
-      wc,
-      payload.sessionId,
-      runId,
-      () => this.activeRuns.get(payload.sessionId)?.runId === runId,
+    const emitter = new AgentRunEmitter(wc, payload.sessionId, runId, () =>
+      this.isRunActive(payload.sessionId, runId),
     );
     const runner = await this.getRunner();
+    if (!this.isRunActive(payload.sessionId, runId)) return;
 
     const editorContext = payload.editorContext;
     const context = editorContext
@@ -133,6 +135,7 @@ export class AgentService {
         emitter.warning(UNLINKED_AT_EXPANSION_WARNING);
       }
     }
+    if (!this.isRunActive(payload.sessionId, runId)) return;
     if (atResolved.warning) {
       emitter.warning(atResolved.warning);
     }
@@ -170,6 +173,8 @@ export class AgentService {
       emitter.perf(Date.now());
     }
 
+    if (!this.isRunActive(payload.sessionId, runId)) return;
+
     try {
       await runner.runChat({
         sessionId: payload.sessionId,
@@ -192,20 +197,20 @@ export class AgentService {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
             }
             emitter.complete(content);
-            if (this.activeRuns.get(payload.sessionId)?.runId === runId) {
+            if (this.isRunActive(payload.sessionId, runId)) {
               this.activeRuns.delete(payload.sessionId);
             }
           },
           onError: (message) => {
             emitter.error(message);
-            if (this.activeRuns.get(payload.sessionId)?.runId === runId) {
+            if (this.isRunActive(payload.sessionId, runId)) {
               this.activeRuns.delete(payload.sessionId);
             }
           },
         },
       });
     } catch (error) {
-      if (this.activeRuns.get(payload.sessionId)?.runId !== runId) return;
+      if (!this.isRunActive(payload.sessionId, runId)) return;
       const message = error instanceof Error ? error.message : String(error);
       emitAgentEvent(wc, {
         type: "agent_error",
@@ -214,7 +219,7 @@ export class AgentService {
         message,
       });
     } finally {
-      if (this.activeRuns.get(payload.sessionId)?.runId === runId) {
+      if (this.isRunActive(payload.sessionId, runId)) {
         this.activeRuns.delete(payload.sessionId);
       }
     }

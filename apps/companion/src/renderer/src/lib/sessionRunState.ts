@@ -14,7 +14,7 @@ export function isSessionRunActive(state: SessionRunState | undefined): boolean 
   return state?.status === "thinking" || state?.status === "streaming";
 }
 
-export function runStatusFromAgentState(state: AgentRunState): SessionRunStatus | null {
+export function runStatusFromAgentState(state: AgentRunState): SessionRunStatus {
   switch (state) {
     case "thinking":
       return "thinking";
@@ -29,7 +29,7 @@ export function runStatusFromAgentState(state: AgentRunState): SessionRunStatus 
       return "idle";
     default: {
       const _exhaustive: never = state;
-      return _exhaustive;
+      throw new Error(`Unhandled AgentRunState: ${_exhaustive}`);
     }
   }
 }

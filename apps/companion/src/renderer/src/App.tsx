@@ -39,9 +39,12 @@ export default function App() {
   const handleStopStreaming = useCallback(
     async (sessionId: string) => {
       const run = sessionRuns.getSessionRun(sessionId);
-      await window.mimica.cancelAgent({ sessionId, runId: run.runId });
-      sessionRuns.clearSessionRun(sessionId);
-      resetStreamRef.current(sessionId);
+      try {
+        await window.mimica.cancelAgent({ sessionId, runId: run.runId });
+      } finally {
+        sessionRuns.clearSessionRun(sessionId);
+        resetStreamRef.current(sessionId);
+      }
     },
     [sessionRuns],
   );

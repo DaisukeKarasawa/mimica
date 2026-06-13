@@ -11,6 +11,7 @@ import { logAgentPerfUi, type AgentPerfUiRecord } from "../lib/agentPerfUi";
 import { runStatusFromAgentState, type SessionRunState } from "../lib/sessionRunState";
 import type { PendingStreamComplete, StreamRevealContext } from "../lib/streamRevealController";
 import { StreamRevealController } from "../lib/streamRevealController";
+import { codePointCount } from "../lib/streamReveal";
 
 export type AvatarMomentKind = "success" | "error";
 
@@ -45,6 +46,15 @@ function findBackgroundStream(
   return null;
 }
 
+function clearBackgroundBuffersForSession(buffers: Map<string, string>, sessionId: string): void {
+  const prefix = `${sessionId}:`;
+  for (const key of [...buffers.keys()]) {
+    if (key.startsWith(prefix)) {
+      buffers.delete(key);
+    }
+  }
+}
+
 export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsResult {
   const {
     setAllSessions,
@@ -56,6 +66,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
   } = options;
 
   const activeStreamIdRef = useRef<string | null>(null);
+  const previousActiveSessionIdRef = useRef<string | null>(activeSessionId);
   const settledRunKeyRef = useRef<string | null>(null);
   const perfByRunIdRef = useRef(new Map<string, AgentPerfUiRecord>());
   const backgroundStreamTextRef = useRef(new Map<string, string>());
@@ -206,11 +217,24 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     [],
   );
 
+  const seedBackgroundFromReveal = useCallback(
+    (sessionId: string) => {
+      const ctx = reveal.getContext();
+      if (!ctx || ctx.sessionId !== sessionId) return;
+      const received = reveal.getReceivedContent();
+      if (!received) return;
+      backgroundStreamTextRef.current.set(backgroundBufferKey(ctx.sessionId, ctx.runId), received);
+    },
+    [reveal],
+  );
+
   const finalizeBackgroundComplete = useCallback(
     (event: AgentEventMessage & { runId: string; content: string }) => {
       const bufferKey = backgroundBufferKey(event.sessionId, event.runId);
       const streamId = streamMessageId(event.runId, null);
-      const content = backgroundStreamTextRef.current.get(bufferKey) ?? event.content;
+      const buffered = backgroundStreamTextRef.current.get(bufferKey) ?? "";
+      const content =
+        codePointCount(buffered) >= codePointCount(event.content) ? buffered : event.content;
       backgroundStreamTextRef.current.delete(bufferKey);
       setAllSessionsRef.current((prev) =>
         applyAgentComplete(prev, event.sessionId, event.runId, streamId, content),
@@ -224,7 +248,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
   const updateSessionRunFromAgentState = useCallback(
     (sessionId: string, state: AgentRunState, runId?: string) => {
       const status = runStatusFromAgentState(state);
-      if (!status || status === "idle") {
+      if (status === "idle") {
         clearSessionRunRef.current(sessionId);
         return;
       }
@@ -241,13 +265,25 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
   );
 
   useEffect(() => {
+    const previousActiveSessionId = previousActiveSessionIdRef.current;
+    if (previousActiveSessionId && previousActiveSessionId !== activeSessionId) {
+      seedBackgroundFromReveal(previousActiveSessionId);
+    }
+    previousActiveSessionIdRef.current = activeSessionId;
+
     applyPendingCompleteWithoutSuccess();
     reveal.reset();
     activeStreamIdRef.current = null;
     if (activeSessionId) {
       hydrateRevealFromBackground(activeSessionId);
     }
-  }, [activeSessionId, applyPendingCompleteWithoutSuccess, hydrateRevealFromBackground, reveal]);
+  }, [
+    activeSessionId,
+    applyPendingCompleteWithoutSuccess,
+    hydrateRevealFromBackground,
+    reveal,
+    seedBackgroundFromReveal,
+  ]);
 
   const handleAgentEvent = useCallback(
     (event: AgentEventMessage) => {
@@ -261,10 +297,12 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
               if (event.state === "failed") {
                 onAvatarMomentRef.current?.("error", 2000);
               }
-            } else {
+            } else if (event.runId) {
               backgroundStreamTextRef.current.delete(
-                backgroundBufferKey(event.sessionId, event.runId ?? ""),
+                backgroundBufferKey(event.sessionId, event.runId),
               );
+            } else {
+              clearBackgroundBuffersForSession(backgroundStreamTextRef.current, event.sessionId);
             }
             clearSessionRunRef.current(event.sessionId);
             if (event.runId) {

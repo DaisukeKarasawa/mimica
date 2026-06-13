@@ -9,5 +9,7 @@ describe("runStatusFromAgentState", () => {
     assert.equal(runStatusFromAgentState("failed"), "error");
     assert.equal(runStatusFromAgentState("completed"), "idle");
     assert.equal(runStatusFromAgentState("cancelled"), "idle");
+    assert.equal(runStatusFromAgentState("idle"), "idle");
+    assert.equal(runStatusFromAgentState("waiting"), "idle");
   });
 });
