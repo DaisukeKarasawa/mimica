@@ -39,7 +39,7 @@ async function loadAgentRunner(): Promise<AgentRunner> {
 export class AgentService {
   private runner: AgentRunner | null = null;
   private runnerReady: Promise<AgentRunner> | null = null;
-  private activeRun: { runId: string; sessionId: string } | null = null;
+  private readonly activeRuns = new Map<string, { runId: string }>();
 
   constructor(
     private readonly getWebContents: () => WebContents | undefined,
@@ -58,28 +58,9 @@ export class AgentService {
   }
 
   async submit(payload: AgentSubmitPayload): Promise<void> {
-    if (this.activeRun) {
-      if (this.activeRun.sessionId === payload.sessionId) {
-        throw new Error("Session already has an active agent run");
-      }
-      throw new Error("Another agent run is already in progress");
+    if (this.activeRuns.has(payload.sessionId)) {
+      throw new Error("Session already has an active agent run");
     }
-
-    const runId = uuidv4();
-    this.activeRun = { runId, sessionId: payload.sessionId };
-    const wc = this.getWebContents();
-    const emitter = new AgentRunEmitter(
-      wc,
-      payload.sessionId,
-      runId,
-      () => this.activeRun?.runId === runId,
-    );
-    const runner = await this.getRunner();
-
-    const editorContext = payload.editorContext;
-    const context = editorContext
-      ? toMessageContext(editorContext)
-      : { workspacePath: payload.workspacePath };
 
     const session = this.sessionStore.get(payload.sessionId);
     if (!session) {
@@ -88,6 +69,31 @@ export class AgentService {
     if ((payload.attachments?.length ?? 0) > MAX_IMAGE_ATTACHMENTS) {
       throw new Error(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
     }
+
+    const runId = uuidv4();
+    this.activeRuns.set(payload.sessionId, { runId });
+    void this.runSubmit(payload, runId, session);
+  }
+
+  private async runSubmit(
+    payload: AgentSubmitPayload,
+    runId: string,
+    session: NonNullable<ReturnType<SessionStore["get"]>>,
+  ): Promise<void> {
+    const wc = this.getWebContents();
+    const emitter = new AgentRunEmitter(
+      wc,
+      payload.sessionId,
+      runId,
+      () => this.activeRuns.get(payload.sessionId)?.runId === runId,
+    );
+    const runner = await this.getRunner();
+
+    const editorContext = payload.editorContext;
+    const context = editorContext
+      ? toMessageContext(editorContext)
+      : { workspacePath: payload.workspacePath };
+
     const allMessages = session.messages;
     const history = historyForAgentPrompt(allMessages, payload.content);
 
@@ -186,20 +192,20 @@ export class AgentService {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
             }
             emitter.complete(content);
-            if (this.activeRun?.runId === runId) {
-              this.activeRun = null;
+            if (this.activeRuns.get(payload.sessionId)?.runId === runId) {
+              this.activeRuns.delete(payload.sessionId);
             }
           },
           onError: (message) => {
             emitter.error(message);
-            if (this.activeRun?.runId === runId) {
-              this.activeRun = null;
+            if (this.activeRuns.get(payload.sessionId)?.runId === runId) {
+              this.activeRuns.delete(payload.sessionId);
             }
           },
         },
       });
     } catch (error) {
-      if (this.activeRun?.runId !== runId) return;
+      if (this.activeRuns.get(payload.sessionId)?.runId !== runId) return;
       const message = error instanceof Error ? error.message : String(error);
       emitAgentEvent(wc, {
         type: "agent_error",
@@ -208,19 +214,19 @@ export class AgentService {
         message,
       });
     } finally {
-      if (this.activeRun?.runId === runId) {
-        this.activeRun = null;
+      if (this.activeRuns.get(payload.sessionId)?.runId === runId) {
+        this.activeRuns.delete(payload.sessionId);
       }
     }
   }
 
   async cancel(payload: AgentCancelPayload): Promise<void> {
-    if (!this.activeRun) return;
-    if (this.activeRun.sessionId !== payload.sessionId) {
+    const active = this.activeRuns.get(payload.sessionId);
+    if (!active) {
       console.warn(`[agentService] cancel ignored: no active run for session ${payload.sessionId}`);
       return;
     }
-    if (payload.runId && this.activeRun.runId !== payload.runId) {
+    if (payload.runId && active.runId !== payload.runId) {
       console.warn("[agentService] cancel ignored: stale runId");
       return;
     }
@@ -231,19 +237,23 @@ export class AgentService {
     if (this.runner) {
       await this.runner.cancel(payload.sessionId);
     }
-    this.activeRun = null;
+    this.activeRuns.delete(payload.sessionId);
   }
 
   async closeSession(sessionId: string): Promise<void> {
-    if (!this.runner) return;
-    await this.runner.closeSession(sessionId);
+    if (this.activeRuns.has(sessionId)) {
+      await this.cancel({ sessionId });
+    }
+    if (this.runner) {
+      await this.runner.closeSession(sessionId);
+    }
   }
 
   async dispose(): Promise<void> {
     const runner = this.runner;
     this.runner = null;
     this.runnerReady = null;
-    this.activeRun = null;
+    this.activeRuns.clear();
     if (!runner) return;
     const results = await Promise.allSettled([
       runner.cancel(),

@@ -245,6 +245,12 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     [reveal],
   );
 
+  useEffect(() => {
+    applyPendingCompleteWithoutSuccess();
+    reveal.reset();
+    activeStreamIdRef.current = null;
+  }, [activeSessionId, applyPendingCompleteWithoutSuccess, reveal]);
+
   const handleAgentEvent = useCallback(
     (event: AgentEventMessage) => {
       switch (event.type) {

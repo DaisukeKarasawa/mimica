@@ -282,6 +282,7 @@ export default function App() {
             onDeleteSession={handleDeleteSession}
             onSend={(text, attachments) => void handleSend(text, attachments)}
             onCancel={() => void handleCancel()}
+            isSessionRunActive={sessionRuns.isSessionRunActiveById}
           />
         }
       />

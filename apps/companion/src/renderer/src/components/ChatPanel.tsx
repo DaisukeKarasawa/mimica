@@ -37,6 +37,7 @@ interface ChatPanelProps {
   onDeleteSession: (id: string) => void;
   onSend: (text: string, attachments?: ChatAttachment[]) => void;
   onCancel: () => void;
+  isSessionRunActive?: (sessionId: string) => boolean;
 }
 
 export function ChatPanel({
@@ -64,6 +65,7 @@ export function ChatPanel({
   onDeleteSession,
   onSend,
   onCancel,
+  isSessionRunActive,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -151,7 +153,9 @@ export function ChatPanel({
                 >
                   <button
                     type="button"
-                    className="tab"
+                    className={["tab", isSessionRunActive?.(session.id) ? "tab--running" : ""]
+                      .filter(Boolean)
+                      .join(" ")}
                     onPointerDown={(event) => tabPointerHandlers.onPointerDown(event, session.id)}
                     onPointerMove={tabPointerHandlers.onPointerMove}
                     onPointerUp={tabPointerHandlers.onPointerUp}
@@ -159,7 +163,10 @@ export function ChatPanel({
                     onClick={(event) => handleTabClick(event, session.id, onSelectSession)}
                     title={session.title}
                   >
-                    {session.title}
+                    <span className="tab-label">{session.title}</span>
+                    {isSessionRunActive?.(session.id) ? (
+                      <span className="tab-run-dot" aria-hidden="true" />
+                    ) : null}
                   </button>
                   {session.id === activeSessionId && showChat ? (
                     <button
