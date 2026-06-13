@@ -8,9 +8,3 @@ export {
   type AgentRunTimingMeta,
 } from "./agentRunTiming.js";
 export { loadPersonaPack, buildPersonaSystemPrompt, type PersonaPack } from "./loadPersona.js";
-export {
-  classifyAgentError,
-  buildPersonaErrorMessage,
-  type ErrorKind,
-  type PersonaReactions,
-} from "@mimica/shared";

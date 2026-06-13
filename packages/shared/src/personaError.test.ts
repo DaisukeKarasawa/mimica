@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import {
   buildPersonaErrorMessage,
   classifyAgentError,
+  agentRunError,
+  agentRunErrorFromUnknown,
   parsePersonaLinesJson,
   parsePersonaReactions,
   pickPersonaReactionLine,
@@ -105,6 +107,28 @@ describe("parsePersonaReactions", () => {
     assert.equal(parsePersonaLinesJson("not json"), null);
     assert.equal(parsePersonaReactions({}), null);
     assert.equal(parsePersonaReactions({ reactions: { error: [] } }), null);
+  });
+});
+
+describe("agentRunErrorFromUnknown", () => {
+  it("maps known auth errors from thrown Error", () => {
+    const err = new Error("CURSOR_API_KEY が設定されていません");
+    assert.deepEqual(agentRunErrorFromUnknown(err), {
+      kind: "auth_missing",
+      detail: err.message,
+    });
+  });
+
+  it("maps AbortError name to cancelled", () => {
+    const err = new Error("The operation was aborted");
+    err.name = "AbortError";
+    assert.equal(agentRunErrorFromUnknown(err).kind, "cancelled");
+  });
+});
+
+describe("agentRunError", () => {
+  it("omits detail when not provided", () => {
+    assert.deepEqual(agentRunError("auth_missing"), { kind: "auth_missing" });
   });
 });
 

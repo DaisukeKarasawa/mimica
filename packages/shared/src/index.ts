@@ -141,8 +141,11 @@ export {
 
 export {
   type ErrorKind,
+  type AgentRunError,
   type PersonaReactionState,
   type PersonaReactions,
+  agentRunError,
+  agentRunErrorFromUnknown,
   classifyAgentError,
   buildPersonaErrorMessage,
   parsePersonaReactions,

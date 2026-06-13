@@ -22,6 +22,17 @@ export interface PersonaReactions {
   error_by_kind?: Partial<Record<ErrorKind, string[]>>;
 }
 
+/** Typed agent run failure emitted by orchestrator; companion formats for display. */
+export interface AgentRunError {
+  kind: ErrorKind;
+  /** Technical detail for logs and optional user-facing fact line. */
+  detail?: string;
+}
+
+export function agentRunError(kind: ErrorKind, detail?: string): AgentRunError {
+  return detail ? { kind, detail } : { kind };
+}
+
 const ERROR_KINDS: ErrorKind[] = [
   "agent_failed",
   "agent_timeout",
@@ -163,6 +174,15 @@ export function classifyAgentError(raw: string, errorName?: string): ErrorKind {
   }
 
   return "generic";
+}
+
+/** Classify unknown thrown values; use only when the source cannot emit a known kind. */
+export function agentRunErrorFromUnknown(err: unknown): AgentRunError {
+  if (err instanceof Error) {
+    return { kind: classifyAgentError(err.message, err.name), detail: err.message };
+  }
+  const detail = String(err);
+  return { kind: classifyAgentError(detail), detail };
 }
 
 function pickPersonaIntro(kind: ErrorKind, reactions?: PersonaReactions): string | undefined {
