@@ -6,12 +6,12 @@ import { loadOpenTabIds, persistOpenTabIds } from "../lib/openTabs";
 import { reorderTabIds } from "../lib/reorderTabIds";
 
 export interface UseSessionTabsOptions {
-  isStreaming: boolean;
-  onStopStreaming: () => Promise<void>;
+  isSessionRunning: (sessionId: string) => boolean;
+  onStopStreaming: (sessionId: string) => Promise<void>;
 }
 
 export function useSessionTabs(options: UseSessionTabsOptions) {
-  const { isStreaming, onStopStreaming } = options;
+  const { isSessionRunning, onStopStreaming } = options;
 
   const [allSessions, setAllSessions] = useState<ChatSession[]>([]);
   const [openTabIds, setOpenTabIds] = useState<string[]>(() => loadOpenTabIds());
@@ -59,11 +59,11 @@ export function useSessionTabs(options: UseSessionTabsOptions) {
 
   const stopStreamingIfActive = useCallback(
     async (sessionId: string) => {
-      if (isStreaming && activeSessionId === sessionId) {
-        await onStopStreaming();
+      if (isSessionRunning(sessionId)) {
+        await onStopStreaming(sessionId);
       }
     },
-    [activeSessionId, isStreaming, onStopStreaming],
+    [isSessionRunning, onStopStreaming],
   );
 
   const openSessionTab = useCallback(

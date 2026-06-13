@@ -1,9 +1,14 @@
 import { relative } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
-import type { AgentMode, ChatAttachment, EditorContext, AgentRunError } from "@mimica/shared";
+import type {
+  AgentCancelPayload,
+  AgentMode,
+  AgentRunError,
+  ChatAttachment,
+  EditorContext,
+} from "@mimica/shared";
 import { agentRunErrorFromUnknown, isChatAttachment, toMessageContext } from "@mimica/shared";
-import { agentRunError, formatPersonaErrorForUser, PersonaFacingError } from "./personaErrors.js";
 import {
   AgentRunTimingTrace,
   isAgentPerfEnabled,
@@ -15,9 +20,10 @@ import {
   shouldWarnUnlinkedAtExpansion,
   UNLINKED_AT_EXPANSION_WARNING,
 } from "./agentSubmitWorkspace.js";
+import { agentRunError, formatPersonaErrorForUser, PersonaFacingError } from "./personaErrors.js";
 import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
-import { AgentRunEmitter } from "./agentRunEmitter.js";
+import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
 import { debugLogAtResolution, resolveAtInput } from "./cursorAt/index.js";
@@ -40,7 +46,7 @@ async function loadAgentRunner(): Promise<AgentRunner> {
 export class AgentService {
   private runner: AgentRunner | null = null;
   private runnerReady: Promise<AgentRunner> | null = null;
-  private activeRunId: string | null = null;
+  private readonly activeRuns = new Map<string, { runId: string }>();
 
   constructor(
     private readonly getWebContents: () => WebContents | undefined,
@@ -53,7 +59,7 @@ export class AgentService {
     error: AgentRunError,
     emitter: AgentRunEmitter,
   ): void {
-    if (runId !== this.activeRunId) return;
+    if (!this.isRunActive(sessionId, runId)) return;
 
     const userMessage = formatPersonaErrorForUser(error);
     console.error(`[agentService] run ${runId} error (${error.kind}):`, error.detail ?? error.kind);
@@ -81,24 +87,28 @@ export class AgentService {
     return this.runnerReady;
   }
 
-  async submit(payload: AgentSubmitPayload): Promise<void> {
-    await this.cancel();
+  private isRunActive(sessionId: string, runId: string): boolean {
+    return this.activeRuns.get(sessionId)?.runId === runId;
+  }
 
-    const runId = uuidv4();
-    this.activeRunId = runId;
-    const wc = this.getWebContents();
-    const emitter = new AgentRunEmitter(
-      wc,
-      payload.sessionId,
+  private emitCancelledWhenInactive(
+    wc: WebContents | undefined,
+    sessionId: string,
+    runId: string,
+  ): void {
+    if (this.isRunActive(sessionId, runId)) return;
+    emitAgentEvent(wc, {
+      type: "agent_state",
+      sessionId,
       runId,
-      () => runId === this.activeRunId,
-    );
-    const runner = await this.getRunner();
+      state: "cancelled",
+    });
+  }
 
-    const editorContext = payload.editorContext;
-    const context = editorContext
-      ? toMessageContext(editorContext)
-      : { workspacePath: payload.workspacePath };
+  async submit(payload: AgentSubmitPayload): Promise<void> {
+    if (this.activeRuns.has(payload.sessionId)) {
+      throw new Error("Session already has an active agent run");
+    }
 
     const session = this.sessionStore.get(payload.sessionId);
     if (!session) {
@@ -109,83 +119,119 @@ export class AgentService {
         agentRunError("attachment", `Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`),
       );
     }
-    const allMessages = session.messages;
-    const history = historyForAgentPrompt(allMessages, payload.content);
 
-    const rawWorkspace =
-      editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "";
+    const runId = uuidv4();
+    this.activeRuns.set(payload.sessionId, { runId });
+    void this.runSubmit(payload, runId, session);
+  }
 
-    const { slashWorkspace, cwd, canExpandAt } = resolveAgentSubmitWorkspace(
-      rawWorkspace,
-      resolveWorkspacePath,
+  private async runSubmit(
+    payload: AgentSubmitPayload,
+    runId: string,
+    session: NonNullable<ReturnType<SessionStore["get"]>>,
+  ): Promise<void> {
+    const wc = this.getWebContents();
+    const emitter = new AgentRunEmitter(wc, payload.sessionId, runId, () =>
+      this.isRunActive(payload.sessionId, runId),
     );
 
-    const resolved = resolveSlashInput(slashWorkspace, payload.content, payload.mode);
-    if (resolved.warning) {
-      emitter.warning(resolved.warning);
-    }
-    if (resolved.kind && resolved.name) {
-      debugLogSlashResolution(resolved.kind, resolved.name, resolved.expanded.length);
-    }
+    try {
+      const runner = await this.getRunner();
+      if (!this.isRunActive(payload.sessionId, runId)) {
+        this.emitCancelledWhenInactive(wc, payload.sessionId, runId);
+        return;
+      }
 
-    let atResolved: Awaited<ReturnType<typeof resolveAtInput>>;
-    if (canExpandAt) {
-      const skipAtPaths: string[] = [];
-      if (editorContext?.currentFilePath) {
-        const rel = relative(cwd, editorContext.currentFilePath).replace(/\\/g, "/");
-        if (rel && !rel.startsWith("..")) {
-          skipAtPaths.push(rel);
+      const editorContext = payload.editorContext;
+      const context = editorContext
+        ? toMessageContext(editorContext)
+        : { workspacePath: payload.workspacePath };
+
+      const allMessages = session.messages;
+      const history = historyForAgentPrompt(allMessages, payload.content);
+
+      const rawWorkspace =
+        editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "";
+
+      const { slashWorkspace, cwd, canExpandAt } = resolveAgentSubmitWorkspace(
+        rawWorkspace,
+        resolveWorkspacePath,
+      );
+
+      const resolved = resolveSlashInput(slashWorkspace, payload.content, payload.mode);
+      if (resolved.warning) {
+        emitter.warning(resolved.warning);
+      }
+      if (resolved.kind && resolved.name) {
+        debugLogSlashResolution(resolved.kind, resolved.name, resolved.expanded.length);
+      }
+
+      let atResolved: Awaited<ReturnType<typeof resolveAtInput>>;
+      if (canExpandAt) {
+        const skipAtPaths: string[] = [];
+        if (editorContext?.currentFilePath) {
+          const rel = relative(cwd, editorContext.currentFilePath).replace(/\\/g, "/");
+          if (rel && !rel.startsWith("..")) {
+            skipAtPaths.push(rel);
+          }
+        }
+        atResolved = await resolveAtInput(cwd, resolved.expanded, {
+          tokenSource: payload.content,
+          skipPaths: skipAtPaths,
+          getSession: (id) => this.sessionStore.get(id),
+        });
+      } else {
+        atResolved = { expanded: resolved.expanded };
+        if (shouldWarnUnlinkedAtExpansion(canExpandAt, payload.content)) {
+          emitter.warning(UNLINKED_AT_EXPANSION_WARNING);
         }
       }
-      atResolved = await resolveAtInput(cwd, resolved.expanded, {
-        tokenSource: payload.content,
-        skipPaths: skipAtPaths,
-        getSession: (id) => this.sessionStore.get(id),
-      });
-    } else {
-      atResolved = { expanded: resolved.expanded };
-      if (shouldWarnUnlinkedAtExpansion(canExpandAt, payload.content)) {
-        emitter.warning(UNLINKED_AT_EXPANSION_WARNING);
+      if (!this.isRunActive(payload.sessionId, runId)) {
+        this.emitCancelledWhenInactive(wc, payload.sessionId, runId);
+        return;
       }
-    }
-    if (atResolved.warning) {
-      emitter.warning(atResolved.warning);
-    }
-    if (atResolved.paths?.length) {
-      debugLogAtResolution(atResolved.paths, atResolved.expanded.length);
-    }
-
-    const sdkImages: Array<{ data: string; mimeType: string }> = [];
-    for (const attachment of payload.attachments ?? []) {
-      if (!isChatAttachment(attachment)) {
-        emitter.warning("Invalid attachment payload was skipped");
-        continue;
+      if (atResolved.warning) {
+        emitter.warning(atResolved.warning);
       }
-      try {
-        sdkImages.push(readAttachmentBase64(payload.sessionId, attachment));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        emitter.warning(`画像を読み取れませんでした (${attachment.fileName}): ${message}`);
+      if (atResolved.paths?.length) {
+        debugLogAtResolution(atResolved.paths, atResolved.expanded.length);
       }
-    }
 
-    let promptText = atResolved.expanded;
-    if (!promptText.trim() && sdkImages.length > 0) {
-      promptText = "Please analyze the attached image(s).";
-    }
+      const sdkImages: Array<{ data: string; mimeType: string }> = [];
+      for (const attachment of payload.attachments ?? []) {
+        if (!isChatAttachment(attachment)) {
+          emitter.warning("Invalid attachment payload was skipped");
+          continue;
+        }
+        try {
+          sdkImages.push(readAttachmentBase64(payload.sessionId, attachment));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          emitter.warning(`画像を読み取れませんでした (${attachment.fileName}): ${message}`);
+        }
+      }
 
-    const timing = isAgentPerfEnabled()
-      ? new AgentRunTimingTrace(runId, {
-          mode: payload.mode,
-          workspacePath: cwd,
-          promptChars: promptText.length,
-        })
-      : undefined;
-    if (timing) {
-      emitter.perf(Date.now());
-    }
+      let promptText = atResolved.expanded;
+      if (!promptText.trim() && sdkImages.length > 0) {
+        promptText = "Please analyze the attached image(s).";
+      }
 
-    try {
+      const timing = isAgentPerfEnabled()
+        ? new AgentRunTimingTrace(runId, {
+            mode: payload.mode,
+            workspacePath: cwd,
+            promptChars: promptText.length,
+          })
+        : undefined;
+      if (timing) {
+        emitter.perf(Date.now());
+      }
+
+      if (!this.isRunActive(payload.sessionId, runId)) {
+        this.emitCancelledWhenInactive(wc, payload.sessionId, runId);
+        return;
+      }
+
       await runner.runChat({
         sessionId: payload.sessionId,
         prompt: promptText,
@@ -202,7 +248,7 @@ export class AgentService {
           onTool: (name, detail) => emitter.tool(name, detail),
           onWarning: (message) => emitter.warning(message),
           onComplete: (content) => {
-            if (runId !== this.activeRunId) return;
+            if (!this.isRunActive(payload.sessionId, runId)) return;
             const current = this.sessionStore.get(payload.sessionId);
             if (current) {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
@@ -215,32 +261,52 @@ export class AgentService {
         },
       });
     } catch (error) {
-      if (runId !== this.activeRunId) return;
+      if (!this.isRunActive(payload.sessionId, runId)) {
+        this.emitCancelledWhenInactive(wc, payload.sessionId, runId);
+        return;
+      }
       this.persistAgentRunError(payload.sessionId, runId, agentRunErrorFromUnknown(error), emitter);
     } finally {
-      if (this.activeRunId === runId) {
-        this.activeRunId = null;
+      if (this.isRunActive(payload.sessionId, runId)) {
+        this.activeRuns.delete(payload.sessionId);
       }
     }
   }
 
-  async cancel(): Promise<void> {
-    if (this.runner) {
-      await this.runner.cancel();
+  async cancel(payload: AgentCancelPayload): Promise<void> {
+    const active = this.activeRuns.get(payload.sessionId);
+    if (!active) {
+      console.warn(`[agentService] cancel ignored: no active run for session ${payload.sessionId}`);
+      return;
     }
-    this.activeRunId = null;
+    if (payload.runId && active.runId !== payload.runId) {
+      console.warn("[agentService] cancel ignored: stale runId");
+      return;
+    }
+    if (!this.sessionStore.get(payload.sessionId)) {
+      console.warn(`[agentService] cancel ignored: unknown session ${payload.sessionId}`);
+      return;
+    }
+    if (this.runner) {
+      await this.runner.cancel(payload.sessionId);
+    }
+    this.activeRuns.delete(payload.sessionId);
   }
 
   async closeSession(sessionId: string): Promise<void> {
-    if (!this.runner) return;
-    await this.runner.closeSession(sessionId);
+    if (this.activeRuns.has(sessionId)) {
+      await this.cancel({ sessionId });
+    }
+    if (this.runner) {
+      await this.runner.closeSession(sessionId);
+    }
   }
 
   async dispose(): Promise<void> {
     const runner = this.runner;
     this.runner = null;
     this.runnerReady = null;
-    this.activeRunId = null;
+    this.activeRuns.clear();
     if (!runner) return;
     const results = await Promise.allSettled([
       runner.cancel(),

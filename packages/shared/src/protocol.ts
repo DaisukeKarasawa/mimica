@@ -38,6 +38,11 @@ export type CompanionMessage =
   | { type: "settings_get" }
   | { type: "settings_update"; settings: Partial<MimicaSettings> };
 
+export interface AgentCancelPayload {
+  sessionId: string;
+  runId?: string;
+}
+
 export type AgentEventMessage =
   | { type: "agent_state"; sessionId: string; state: AgentRunState; runId?: string }
   | { type: "agent_delta"; sessionId: string; runId: string; content: string }

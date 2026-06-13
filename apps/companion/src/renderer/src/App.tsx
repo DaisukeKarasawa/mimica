@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { v4 as uuidv4 } from "uuid";
-import type {
-  AgentMode,
-  AvatarState,
-  ChatAttachment,
-  ChatMessage,
-  EditorContext,
-} from "@mimica/shared";
-import { DEFAULT_SETTINGS, resolveCharacterShortNameEn } from "@mimica/shared";
+import type { AgentMode, AvatarState, EditorContext } from "@mimica/shared";
+import { DEFAULT_SETTINGS, mapAgentRunToAvatar, resolveCharacterShortNameEn } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
 import { BridgeStatusBanner } from "./components/BridgeStatusBanner";
@@ -15,23 +8,30 @@ import { CharacterStage } from "./components/CharacterStage";
 import { ChatPanel } from "./components/ChatPanel";
 import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
+import { useAgentSubmitQueue } from "./hooks/useAgentSubmitQueue";
 import { useBridgeStatus } from "./hooks/useBridgeStatus";
 import { useCharacterAssets } from "./hooks/useCharacterAssets";
+import { useSessionRunStates } from "./hooks/useSessionRunStates";
 import { useSessionTabs } from "./hooks/useSessionTabs";
+import { isSessionRunActive } from "./lib/sessionRunState";
 import { matchChatTabShortcut, type ChatTabShortcutAction } from "./lib/chatTabShortcuts";
 
 export default function App() {
   const [editorContext, setEditorContext] = useState<EditorContext | null>(null);
   const [avatarState, setAvatarState] = useState<AvatarState>("idle");
-  const [isStreaming, setIsStreaming] = useState(false);
   const characterAssets = useCharacterAssets();
   const [splitLayoutReady, setSplitLayoutReady] = useState(false);
   const [agentMode, setAgentMode] = useState<AgentMode>(DEFAULT_SETTINGS.defaultAgentMode);
   const [tabsBarVisible, setTabsBarVisible] = useState(true);
 
-  const resetStreamRef = useRef<() => void>(() => {});
+  const resetStreamRef = useRef<(sessionId?: string) => void>(() => {});
+  const onRunSettledRef = useRef<(sessionId: string) => void>(() => {});
+  const clearQueueForSessionRef = useRef<(sessionId: string) => void>(() => {});
+  const avatarMomentHoldRef = useRef(false);
+  const [avatarSyncTick, bumpAvatarSync] = useState(0);
   const workspaceSyncInFlight = useRef(new Set<string>());
 
+  const sessionRuns = useSessionRunStates();
   const director = useMemo(() => new CharacterDirector({ onStateChange: setAvatarState }), []);
 
   const characterShortName = useMemo(
@@ -40,24 +40,111 @@ export default function App() {
   );
   const bridgeBannerMessage = useBridgeStatus();
 
-  const handleStopStreaming = useCallback(async () => {
-    await window.mimica.cancelAgent();
-    setIsStreaming(false);
-    resetStreamRef.current();
-  }, []);
+  const handleStopStreaming = useCallback(
+    async (sessionId: string) => {
+      clearQueueForSessionRef.current(sessionId);
+      const run = sessionRuns.getSessionRun(sessionId);
+      try {
+        await window.mimica.cancelAgent({ sessionId, runId: run.runId });
+      } finally {
+        sessionRuns.clearSessionRun(sessionId);
+        resetStreamRef.current(sessionId);
+      }
+    },
+    [sessionRuns],
+  );
 
   const tabs = useSessionTabs({
-    isStreaming,
+    isSessionRunning: (sessionId) => sessionRuns.isSessionRunActiveById(sessionId),
     onStopStreaming: handleStopStreaming,
   });
 
+  const registerOnRunSettled = useCallback((handler: (sessionId: string) => void) => {
+    onRunSettledRef.current = handler;
+  }, []);
+
+  const handleAvatarMoment = useCallback(
+    (kind: "success" | "error", holdMs: number) => {
+      avatarMomentHoldRef.current = true;
+      director.setState(kind);
+      window.setTimeout(() => {
+        avatarMomentHoldRef.current = false;
+        bumpAvatarSync((tick) => tick + 1);
+      }, holdMs);
+    },
+    [director],
+  );
+
   const { handleAgentEvent, resetStream, beginStream } = useAgentEvents({
-    director,
     setAllSessions: tabs.setAllSessions,
-    setIsStreaming,
+    setSessionRun: sessionRuns.setSessionRun,
+    clearSessionRun: sessionRuns.clearSessionRun,
+    activeSessionId: tabs.activeSessionId,
+    onRunSettled: (sessionId) => onRunSettledRef.current(sessionId),
+    onAvatarMoment: handleAvatarMoment,
   });
 
   resetStreamRef.current = resetStream;
+
+  const resolveWorkspacePath = useCallback(
+    () => editorContext?.workspacePath ?? tabs.activeSession?.workspacePath ?? null,
+    [editorContext?.workspacePath, tabs.activeSession?.workspacePath],
+  );
+
+  const { handleSend, clearQueueForSession, queuedCount, submitError, clearSubmitError } =
+    useAgentSubmitQueue({
+      beginStream,
+      resetStream,
+      clearSessionRun: sessionRuns.clearSessionRun,
+      isSessionRunning: (sessionId) => sessionRuns.isSessionRunActiveById(sessionId),
+      onRunSettled: registerOnRunSettled,
+      activeSessionId: tabs.activeSessionId,
+      activeSession: tabs.activeSession,
+      agentMode,
+      editorContext,
+      resolveWorkspacePath,
+      setAllSessions: tabs.setAllSessions,
+      handleNewSession: tabs.handleNewSession,
+    });
+
+  clearQueueForSessionRef.current = clearQueueForSession;
+
+  const activeSessionRun = sessionRuns.getSessionRun(tabs.activeSessionId);
+  const isActiveSessionStreaming = isSessionRunActive(activeSessionRun);
+
+  useEffect(() => {
+    if (avatarMomentHoldRef.current) return;
+    if (!tabs.activeSessionId) {
+      director.setState("idle");
+      return;
+    }
+    const run = sessionRuns.getSessionRun(tabs.activeSessionId);
+    if (!isSessionRunActive(run)) {
+      director.setState("idle");
+      return;
+    }
+    director.setState(
+      run.status === "streaming"
+        ? mapAgentRunToAvatar("streaming")
+        : mapAgentRunToAvatar("thinking"),
+    );
+  }, [director, sessionRuns.runs, tabs.activeSessionId, sessionRuns.getSessionRun, avatarSyncTick]);
+
+  const handleCloseTab = useCallback(
+    (id: string) => {
+      clearQueueForSession(id);
+      void tabs.handleCloseTab(id);
+    },
+    [clearQueueForSession, tabs.handleCloseTab],
+  );
+
+  const handleDeleteSession = useCallback(
+    (id: string) => {
+      clearQueueForSession(id);
+      void tabs.handleDeleteSession(id);
+    },
+    [clearQueueForSession, tabs.handleDeleteSession],
+  );
 
   const linkedWorkspacePath = editorContext?.workspacePath ?? null;
 
@@ -70,7 +157,6 @@ export default function App() {
     };
   }, [handleAgentEvent]);
 
-  // First launch: auto-open a draft tab once Cursor links a workspace (⌘T is easy to miss).
   useEffect(() => {
     if (!linkedWorkspacePath || tabs.openTabIds.length > 0) return;
     void tabs.handleNewSession(linkedWorkspacePath);
@@ -105,11 +191,6 @@ export default function App() {
     tabs.setAllSessions,
   ]);
 
-  const resolveWorkspacePath = useCallback(
-    () => linkedWorkspacePath ?? tabs.activeSession?.workspacePath ?? null,
-    [linkedWorkspacePath, tabs.activeSession?.workspacePath],
-  );
-
   const applyChatTabShortcut = useCallback(
     (action: ChatTabShortcutAction) => {
       if (typeof action === "object" && action.type === "selectTab") {
@@ -130,7 +211,7 @@ export default function App() {
             tabs.activeSessionId && tabs.openTabIds.includes(tabs.activeSessionId)
               ? tabs.activeSessionId
               : tabs.openTabIds[tabs.openTabIds.length - 1];
-          if (target) void tabs.handleCloseTab(target);
+          if (target) handleCloseTab(target);
           break;
         }
         case "next":
@@ -148,11 +229,11 @@ export default function App() {
       }
     },
     [
+      handleCloseTab,
       resolveWorkspacePath,
       tabs.activeSessionId,
       tabs.openTabIds,
       tabs.handleNewSession,
-      tabs.handleCloseTab,
       tabs.cycleTab,
       tabs.selectTabByIndex,
       tabs.panelMode,
@@ -177,70 +258,9 @@ export default function App() {
     };
   }, [applyChatTabShortcut]);
 
-  const handleSend = async (content: string, attachments?: ChatAttachment[]) => {
-    const workspacePath = resolveWorkspacePath();
-    if (!workspacePath) return;
-
-    let session = tabs.activeSession;
-    if (!session) {
-      session = await tabs.handleNewSession(workspacePath);
-    }
-
-    const userMsg: ChatMessage = {
-      id: uuidv4(),
-      role: "user",
-      content,
-      createdAt: new Date().toISOString(),
-      context: editorContext ?? undefined,
-      attachments: attachments?.length ? attachments : undefined,
-    };
-    let title = session.title;
-    if (session.messages.length === 0) {
-      const titleSource = content.trim() || (attachments?.length ? "Image" : "");
-      title = titleSource.slice(0, 24) + (titleSource.length > 24 ? "…" : "");
-    }
-    const updated = {
-      ...session,
-      title,
-      workspacePath,
-      messages: [...session.messages, userMsg],
-    };
-    const saved = await window.mimica.saveSession(updated);
-    tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
-
-    beginStream();
-    setIsStreaming(true);
-    try {
-      await window.mimica.submitAgent({
-        sessionId: saved.id,
-        content,
-        workspacePath,
-        mode: agentMode,
-        editorContext,
-        attachments,
-      });
-    } catch (error) {
-      setIsStreaming(false);
-      resetStreamRef.current();
-      director.setState("idle");
-      try {
-        const rolledBack = {
-          ...saved,
-          title: session.title,
-          messages: saved.messages.filter((message) => message.id !== userMsg.id),
-        };
-        const restored = await window.mimica.saveSession(rolledBack);
-        tabs.setAllSessions((prev) => prev.map((s) => (s.id === restored.id ? restored : s)));
-      } catch (rollbackError) {
-        console.error("[App] failed to roll back user message after submit error:", rollbackError);
-      }
-      throw error;
-    }
-  };
-
   const handleCancel = async () => {
-    await handleStopStreaming();
-    director.setState("idle");
+    if (!tabs.activeSessionId) return;
+    await handleStopStreaming(tabs.activeSessionId);
   };
 
   return (
@@ -264,8 +284,11 @@ export default function App() {
             activeSession={tabs.activeSession}
             panelMode={tabs.panelMode}
             tabsBarVisible={tabsBarVisible}
-            isStreaming={isStreaming}
-            avatarState={avatarState}
+            isStreaming={isActiveSessionStreaming}
+            activeSessionRunStatus={activeSessionRun.status}
+            queuedCount={queuedCount}
+            submitError={submitError}
+            onClearSubmitError={clearSubmitError}
             agentMode={agentMode}
             characterShortName={characterShortName}
             workspacePath={resolveWorkspacePath()}
@@ -274,13 +297,15 @@ export default function App() {
             onSelectSession={(id) => {
               tabs.setActiveSessionId(id);
               tabs.setPanelMode("chat");
+              clearSubmitError();
             }}
-            onCloseTab={(id) => void tabs.handleCloseTab(id)}
+            onCloseTab={handleCloseTab}
             onReorderTab={tabs.reorderOpenTab}
             onSelectHistorySession={tabs.openSessionTab}
-            onDeleteSession={(id) => void tabs.handleDeleteSession(id)}
-            onSend={handleSend}
+            onDeleteSession={handleDeleteSession}
+            onSend={(text, attachments) => void handleSend(text, attachments)}
             onCancel={() => void handleCancel()}
+            isSessionRunActive={sessionRuns.isSessionRunActiveById}
           />
         }
       />

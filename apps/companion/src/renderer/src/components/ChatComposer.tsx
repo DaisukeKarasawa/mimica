@@ -46,10 +46,10 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sections = useSlashMenuSections(workspacePath, agentMode);
-  const controlsLocked = disabled || streaming;
-  const canSend = !controlsLocked && (value.trim().length > 0 || attachments.length > 0);
-  const slashMenu = useSlashMenuState(value, sections, controlsLocked);
-  const atMenu = useAtMenuState(value, workspacePath, sessionId, controlsLocked, slashMenu.open);
+  const inputLocked = Boolean(disabled);
+  const canSend = !inputLocked && (value.trim().length > 0 || attachments.length > 0);
+  const slashMenu = useSlashMenuState(value, sections, inputLocked);
+  const atMenu = useAtMenuState(value, workspacePath, sessionId, inputLocked, slashMenu.open);
 
   const syncInputHeight = useCallback(() => {
     const el = inputRef.current;
@@ -144,19 +144,7 @@ export function ChatComposer({
     [onChange, pickImages],
   );
 
-  const sendButton = streaming ? (
-    <button
-      type="button"
-      className="composer-send composer-stop"
-      title="停止"
-      aria-label="停止"
-      onClick={onCancel}
-    >
-      <svg className="composer-stop-icon" viewBox="0 0 16 16" aria-hidden>
-        <rect x="4" y="4" width="8" height="8" rx="1.25" fill="currentColor" />
-      </svg>
-    </button>
-  ) : (
+  const sendButton = (
     <button
       type="button"
       className="composer-send"
@@ -177,6 +165,20 @@ export function ChatComposer({
       </svg>
     </button>
   );
+
+  const stopButton = streaming ? (
+    <button
+      type="button"
+      className="composer-send composer-stop"
+      title="停止"
+      aria-label="停止"
+      onClick={onCancel}
+    >
+      <svg className="composer-stop-icon" viewBox="0 0 16 16" aria-hidden>
+        <rect x="4" y="4" width="8" height="8" rx="1.25" fill="currentColor" />
+      </svg>
+    </button>
+  ) : null;
 
   return (
     <div className={`composer-box mode-${agentMode} ${disabled ? "is-disabled" : ""}`}>
@@ -201,7 +203,7 @@ export function ChatComposer({
         <ComposerAttachments
           sessionId={sessionId}
           attachments={attachments}
-          disabled={controlsLocked}
+          disabled={inputLocked}
           onRemove={(attachmentId) => {
             const removed = attachments.find((item) => item.id === attachmentId);
             onAttachmentsChange((prev) => prev.filter((item) => item.id !== attachmentId));
@@ -221,7 +223,7 @@ export function ChatComposer({
           rows={1}
           onChange={(e) => onChange(e.target.value)}
           onPaste={(event) => {
-            if (controlsLocked) return;
+            if (inputLocked) return;
             const items = event.clipboardData?.items;
             if (!items) return;
             for (const item of items) {
@@ -261,7 +263,7 @@ export function ChatComposer({
             }
 
             if (e.key === "Tab" && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
-              if (!controlsLocked) {
+              if (!inputLocked) {
                 e.preventDefault();
                 onAgentModeChange(cycleAgentMode(agentMode, -1));
               }
@@ -273,7 +275,10 @@ export function ChatComposer({
             if (canSend) onSubmit();
           }}
         />
-        <div className="composer-actions">{sendButton}</div>
+        <div className="composer-actions">
+          {stopButton}
+          {sendButton}
+        </div>
       </div>
     </div>
   );

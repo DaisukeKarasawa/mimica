@@ -93,7 +93,9 @@ export function installUiLabStub(): void {
       console.info("[ui-lab] submitAgent ignored (browser preview only)");
     },
 
-    cancelAgent: async () => {},
+    cancelAgent: async (_payload) => {
+      void _payload;
+    },
 
     openExternal: async (url) => {
       console.info("[ui-lab] openExternal:", url);

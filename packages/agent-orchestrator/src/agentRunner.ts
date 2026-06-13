@@ -32,16 +32,29 @@ export interface RunChatParams {
   timing?: AgentRunTimingTrace;
 }
 
+interface SessionRunContext {
+  run: Run | null;
+  runGeneration: number;
+  /** Runs with generation <= this value were cancelled. */
+  cancelledThroughGeneration: number;
+}
+
 function sdkModeFor(mode: AgentMode): CursorSdkConversationMode {
   return mode === "plan" ? "plan" : "agent";
 }
 
 export class AgentRunner {
-  private activeRun: Run | null = null;
-  private activeSessionId: string | null = null;
-  private cancelled = false;
-  private runGeneration = 0;
+  private readonly sessionRuns = new Map<string, SessionRunContext>();
   private readonly sessionPool = new AgentSessionPool();
+
+  private contextFor(sessionId: string): SessionRunContext {
+    let ctx = this.sessionRuns.get(sessionId);
+    if (!ctx) {
+      ctx = { run: null, runGeneration: 0, cancelledThroughGeneration: 0 };
+      this.sessionRuns.set(sessionId, ctx);
+    }
+    return ctx;
+  }
 
   async runChat(params: RunChatParams): Promise<void> {
     const apiKey = params.apiKey ?? resolveCursorApiKey();
@@ -51,8 +64,9 @@ export class AgentRunner {
       return;
     }
 
-    const runGen = ++this.runGeneration;
-    this.cancelled = false;
+    const ctx = this.contextFor(params.sessionId);
+    const runGen = ++ctx.runGeneration;
+    const isRunCancelled = () => runGen <= ctx.cancelledThroughGeneration;
     const enforceReadOnly = params.mode === "ask";
     const sdkMode = sdkModeFor(params.mode);
 
@@ -63,6 +77,12 @@ export class AgentRunner {
       if (!hooksResult.ok) {
         params.callbacks.onWarning?.(`${READ_ONLY_HOOK_INSTALL_WARNING} (${hooksResult.message})`);
       }
+    }
+
+    if (isRunCancelled() || params.signal?.aborted) {
+      params.timing?.report("cancelled");
+      params.callbacks.onState("cancelled");
+      return;
     }
 
     const timing = params.timing;
@@ -84,6 +104,13 @@ export class AgentRunner {
       return;
     }
 
+    if (isRunCancelled() || params.signal?.aborted) {
+      this.sessionPool.invalidateSession(params.sessionId);
+      timing?.report("cancelled");
+      params.callbacks.onState("cancelled");
+      return;
+    }
+
     const { agent, isFollowUp } = sessionHandle;
     if (timing) {
       timing.meta.isFollowUp = isFollowUp;
@@ -94,7 +121,14 @@ export class AgentRunner {
     try {
       let readOnlyGuard: ReadOnlyRunGuard | undefined;
       if (enforceReadOnly) {
-        readOnlyGuard = new ReadOnlyRunGuard(() => this.activeRun, callbacks);
+        readOnlyGuard = new ReadOnlyRunGuard(() => ctx.run, callbacks);
+      }
+
+      if (isRunCancelled() || params.signal?.aborted) {
+        this.sessionPool.invalidateSession(params.sessionId);
+        timing?.report("cancelled");
+        callbacks.onState("cancelled");
+        return;
       }
 
       const message =
@@ -104,12 +138,11 @@ export class AgentRunner {
       const run = await agent.send(message, {
         mode: sdkMode,
         onDelta: async ({ update }) => {
-          await readOnlyGuard?.handleSendDelta(update, () => this.cancelled, params.signal);
+          await readOnlyGuard?.handleSendDelta(update, isRunCancelled, params.signal);
         },
       });
-      if (this.runGeneration === runGen) {
-        this.activeRun = run;
-        this.activeSessionId = params.sessionId;
+      if (ctx.runGeneration === runGen) {
+        ctx.run = run;
       }
       timing?.markOnce("T1_send_done");
 
@@ -117,7 +150,7 @@ export class AgentRunner {
         run,
         callbacks,
         signal: params.signal,
-        isCancelled: () => this.cancelled,
+        isCancelled: isRunCancelled,
         readOnlyGuard,
         timing,
       });
@@ -128,7 +161,7 @@ export class AgentRunner {
         return;
       }
 
-      if (this.cancelled || params.signal?.aborted) {
+      if (isRunCancelled() || params.signal?.aborted) {
         this.sessionPool.invalidateSession(params.sessionId);
         timing?.report("cancelled");
         callbacks.onState("cancelled");
@@ -139,7 +172,7 @@ export class AgentRunner {
       try {
         result = await run.wait();
       } catch (err) {
-        if (isAbortError(err) || this.cancelled) {
+        if (isAbortError(err) || isRunCancelled()) {
           this.sessionPool.invalidateSession(params.sessionId);
           timing?.report("cancelled");
           callbacks.onState("cancelled");
@@ -176,7 +209,7 @@ export class AgentRunner {
       callbacks.onState("completed");
       callbacks.onComplete(finalText);
     } catch (err) {
-      if (isAbortError(err) || this.cancelled) {
+      if (isAbortError(err) || isRunCancelled()) {
         this.sessionPool.invalidateSession(params.sessionId);
         timing?.report("cancelled");
         callbacks.onState("cancelled");
@@ -187,22 +220,28 @@ export class AgentRunner {
       callbacks.onState("failed");
       callbacks.onError(agentRunErrorFromUnknown(err));
     } finally {
-      if (this.runGeneration === runGen) {
-        this.activeRun = null;
-        this.activeSessionId = null;
+      if (ctx.runGeneration === runGen) {
+        ctx.run = null;
+        this.sessionRuns.delete(params.sessionId);
       }
     }
   }
 
-  async cancel(): Promise<void> {
-    this.cancelled = true;
-    await cancelRun(this.activeRun);
+  async cancel(sessionId?: string): Promise<void> {
+    if (sessionId === undefined) {
+      const ids = [...this.sessionRuns.keys()];
+      await Promise.all(ids.map((id) => this.cancel(id)));
+      return;
+    }
+    const ctx = this.sessionRuns.get(sessionId);
+    if (!ctx) return;
+    ctx.cancelledThroughGeneration = ctx.runGeneration;
+    await cancelRun(ctx.run);
   }
 
   async closeSession(sessionId: string): Promise<void> {
-    if (this.activeSessionId === sessionId) {
-      await this.cancel();
-    }
+    await this.cancel(sessionId);
+    this.sessionRuns.delete(sessionId);
     this.sessionPool.closeSession(sessionId);
   }
 
