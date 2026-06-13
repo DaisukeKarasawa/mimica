@@ -148,6 +148,7 @@ export {
   agentRunErrorFromUnknown,
   classifyAgentError,
   buildPersonaErrorMessage,
+  formatPersonaErrorMessage,
   parsePersonaReactions,
   parsePersonaLinesJson,
   pickPersonaReactionLine,

@@ -33,6 +33,17 @@ export function agentRunError(kind: ErrorKind, detail?: string): AgentRunError {
   return detail ? { kind, detail } : { kind };
 }
 
+/** Format a raw or typed error for user-visible composer / IPC copy. */
+export function formatPersonaErrorMessage(
+  input: string | AgentRunError,
+  reactions?: PersonaReactions,
+): string {
+  if (typeof input !== "string") {
+    return buildPersonaErrorMessage(input.kind, input.detail, reactions);
+  }
+  return buildPersonaErrorMessage(classifyAgentError(input), input, reactions);
+}
+
 const ERROR_KINDS: ErrorKind[] = [
   "agent_failed",
   "agent_timeout",
@@ -163,10 +174,19 @@ export function classifyAgentError(raw: string, errorName?: string): ErrorKind {
   if (/timeout|タイムアウト/i.test(message)) {
     return "agent_timeout";
   }
+  if (/Session is required/i.test(message)) {
+    return "session";
+  }
+  if (/Maximum \d+ images/i.test(message)) {
+    return "attachment";
+  }
   if (/session|セッション/i.test(message) && !/画像|添付|attachment|image/i.test(message)) {
     return "session";
   }
   if (/画像|添付|attachment|image/i.test(message)) {
+    return "attachment";
+  }
+  if (/Unsupported image|too large|exceeds.*\d+MB/i.test(message)) {
     return "attachment";
   }
   if (/Agent.*失敗|run failed|status.*error/i.test(message)) {

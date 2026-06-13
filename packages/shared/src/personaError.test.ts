@@ -5,6 +5,7 @@ import {
   classifyAgentError,
   agentRunError,
   agentRunErrorFromUnknown,
+  formatPersonaErrorMessage,
   parsePersonaLinesJson,
   parsePersonaReactions,
   pickPersonaReactionLine,
@@ -45,6 +46,11 @@ describe("classifyAgentError", () => {
       "attachment",
     );
     assert.equal(classifyAgentError("Session not found"), "session");
+    assert.equal(classifyAgentError("Session is required to attach images"), "session");
+    assert.equal(classifyAgentError("Maximum 4 images per message"), "attachment");
+    assert.equal(classifyAgentError("Unsupported image type: foo.png"), "attachment");
+    assert.equal(classifyAgentError("Image exceeds 10MB limit: big.png"), "attachment");
+    assert.equal(classifyAgentError("Pasted image is too large"), "attachment");
     assert.equal(classifyAgentError("run was cancelled"), "cancelled");
     assert.equal(classifyAgentError("something unexpected", "AbortError"), "cancelled");
     assert.equal(classifyAgentError("unknown failure"), "generic");
@@ -129,6 +135,19 @@ describe("agentRunErrorFromUnknown", () => {
 describe("agentRunError", () => {
   it("omits detail when not provided", () => {
     assert.deepEqual(agentRunError("auth_missing"), { kind: "auth_missing" });
+  });
+});
+
+describe("formatPersonaErrorMessage", () => {
+  it("formats typed agent errors with reactions", () => {
+    const message = formatPersonaErrorMessage(agentRunError("session"), SAMPLE_REACTIONS);
+    assert.match(message, /セッションが見つからない/);
+    assert.match(message, /\n\n/);
+  });
+
+  it("classifies raw attachment errors from strings", () => {
+    const message = formatPersonaErrorMessage("Maximum 4 images per message", SAMPLE_REACTIONS);
+    assert.match(message, /画像の処理に失敗/);
   });
 });
 
