@@ -6,7 +6,6 @@ export {
   type AgentQuestionPrompt,
   type AgentQuestionAnswerEntry,
   type AgentQuestionAnswerPayload,
-  type AgentQuestionClientMessage,
 } from "./agentQuestion.js";
 
 export {
@@ -59,6 +58,7 @@ export {
   type ServerMessage,
   type CompanionMessage,
   type AgentEventMessage,
+  type AgentQuestionClientMessage,
   mapAgentRunToAvatar,
 } from "./protocol.js";
 

@@ -51,18 +51,3 @@ export interface AgentQuestionAnswerPayload {
   questionPromptId: string;
   answers: AgentQuestionAnswerEntry[];
 }
-
-/** Renderer → main IPC (Phase 1 wiring). */
-export type AgentQuestionClientMessage =
-  | {
-      type: "agent_question_answer";
-      sessionId: string;
-      runId: string;
-      payload: AgentQuestionAnswerPayload;
-    }
-  | {
-      type: "agent_question_dismiss";
-      sessionId: string;
-      runId: string;
-      questionId: string;
-    };
