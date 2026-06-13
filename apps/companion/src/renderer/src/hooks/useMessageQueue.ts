@@ -1,5 +1,10 @@
 import { useCallback, useRef, useState } from "react";
-import { dequeueMessage, enqueueMessage, type QueuedAgentSubmit } from "../lib/messageQueue";
+import {
+  dequeueMessage,
+  enqueueMessage,
+  peekMessage,
+  type QueuedAgentSubmit,
+} from "../lib/messageQueue";
 
 export function useMessageQueue() {
   const queuesRef = useRef(new Map<string, QueuedAgentSubmit[]>());
@@ -30,6 +35,11 @@ export function useMessageQueue() {
     [bump],
   );
 
+  const peek = useCallback((sessionId: string): QueuedAgentSubmit | null => {
+    const current = queuesRef.current.get(sessionId) ?? [];
+    return peekMessage(current);
+  }, []);
+
   const getQueueSize = useCallback((sessionId: string | null): number => {
     if (!sessionId) return 0;
     return queuesRef.current.get(sessionId)?.length ?? 0;
@@ -44,5 +54,5 @@ export function useMessageQueue() {
     [bump],
   );
 
-  return { enqueue, dequeue, getQueueSize, clear };
+  return { enqueue, dequeue, peek, getQueueSize, clear };
 }

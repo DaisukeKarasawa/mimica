@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AgentMode, AvatarState, ChatAttachment, ChatSession } from "@mimica/shared";
 import { AGENT_DISPLAY_NAME } from "@mimica/shared";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
@@ -20,6 +20,8 @@ interface ChatPanelProps {
   tabsBarVisible: boolean;
   isStreaming: boolean;
   queuedCount?: number;
+  submitError?: string | null;
+  onClearSubmitError?: () => void;
   avatarState: AvatarState;
   agentMode: AgentMode;
   characterShortName: string;
@@ -44,6 +46,8 @@ export function ChatPanel({
   tabsBarVisible,
   isStreaming,
   queuedCount = 0,
+  submitError = null,
+  onClearSubmitError,
   avatarState,
   agentMode,
   characterShortName,
@@ -62,6 +66,10 @@ export function ChatPanel({
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const prevSessionIdRef = useRef(activeSessionId);
+
+  useEffect(() => {
+    onClearSubmitError?.();
+  }, [activeSessionId, onClearSubmitError]);
 
   useLayoutEffect(() => {
     const previousSessionId = prevSessionIdRef.current;
@@ -232,6 +240,11 @@ export function ChatPanel({
               {queuedCount > 0 ? (
                 <p className="composer-queue-badge" aria-live="polite">
                   キュー {queuedCount} 件
+                </p>
+              ) : null}
+              {submitError ? (
+                <p className="composer-submit-error" role="alert">
+                  {submitError}
                 </p>
               ) : null}
               {attachmentError ? (

@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { v4 as uuidv4 } from "uuid";
-import type {
-  AgentMode,
-  AvatarState,
-  ChatAttachment,
-  ChatMessage,
-  EditorContext,
-} from "@mimica/shared";
+import type { AgentMode, AvatarState, EditorContext } from "@mimica/shared";
 import { DEFAULT_SETTINGS, resolveCharacterShortNameEn } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
@@ -14,8 +7,8 @@ import { CharacterStage } from "./components/CharacterStage";
 import { ChatPanel } from "./components/ChatPanel";
 import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
+import { useAgentSubmitQueue } from "./hooks/useAgentSubmitQueue";
 import { useCharacterAssets } from "./hooks/useCharacterAssets";
-import { useMessageQueue } from "./hooks/useMessageQueue";
 import { useSessionTabs } from "./hooks/useSessionTabs";
 import { matchChatTabShortcut, type ChatTabShortcutAction } from "./lib/chatTabShortcuts";
 
@@ -29,10 +22,8 @@ export default function App() {
   const [tabsBarVisible, setTabsBarVisible] = useState(true);
 
   const resetStreamRef = useRef<() => void>(() => {});
-  const workspaceSyncInFlight = useRef(new Set<string>());
-  const drainInFlightRef = useRef(false);
   const onRunSettledRef = useRef<(sessionId: string) => void>(() => {});
-  const messageQueue = useMessageQueue();
+  const workspaceSyncInFlight = useRef(new Set<string>());
 
   const director = useMemo(() => new CharacterDirector({ onStateChange: setAvatarState }), []);
 
@@ -52,6 +43,10 @@ export default function App() {
     onStopStreaming: handleStopStreaming,
   });
 
+  const registerOnRunSettled = useCallback((handler: (sessionId: string) => void) => {
+    onRunSettledRef.current = handler;
+  }, []);
+
   const { handleAgentEvent, resetStream, beginStream } = useAgentEvents({
     director,
     setAllSessions: tabs.setAllSessions,
@@ -61,63 +56,42 @@ export default function App() {
 
   resetStreamRef.current = resetStream;
 
-  const submitToAgent = useCallback(
-    async (params: {
-      sessionId: string;
-      content: string;
-      workspacePath: string;
-      mode: AgentMode;
-      editorContext?: EditorContext | null;
-      attachments?: ChatAttachment[];
-    }) => {
-      beginStream();
-      setIsStreaming(true);
-      try {
-        await window.mimica.submitAgent({
-          sessionId: params.sessionId,
-          content: params.content,
-          workspacePath: params.workspacePath,
-          mode: params.mode,
-          editorContext: params.editorContext ?? undefined,
-          attachments: params.attachments,
-        });
-      } catch {
-        setIsStreaming(false);
-        resetStreamRef.current();
-        director.setState("idle");
-      }
-    },
-    [beginStream, director],
+  const resolveWorkspacePath = useCallback(
+    () => editorContext?.workspacePath ?? tabs.activeSession?.workspacePath ?? null,
+    [editorContext?.workspacePath, tabs.activeSession?.workspacePath],
   );
 
-  const drainQueue = useCallback(
-    async (sessionId: string) => {
-      if (drainInFlightRef.current) return;
-      const next = messageQueue.dequeue(sessionId);
-      if (!next) return;
+  const { handleSend, clearQueueForSession, queuedCount, submitError, clearSubmitError } =
+    useAgentSubmitQueue({
+      director,
+      beginStream,
+      resetStream,
+      setIsStreaming,
+      onRunSettled: registerOnRunSettled,
+      activeSessionId: tabs.activeSessionId,
+      activeSession: tabs.activeSession,
+      agentMode,
+      editorContext,
+      resolveWorkspacePath,
+      setAllSessions: tabs.setAllSessions,
+      handleNewSession: tabs.handleNewSession,
+    });
 
-      drainInFlightRef.current = true;
-      try {
-        await submitToAgent({
-          sessionId,
-          content: next.content,
-          workspacePath: next.workspacePath,
-          mode: next.agentMode,
-          editorContext: next.editorContext,
-          attachments: next.attachments,
-        });
-      } finally {
-        drainInFlightRef.current = false;
-      }
+  const handleCloseTab = useCallback(
+    (id: string) => {
+      clearQueueForSession(id);
+      void tabs.handleCloseTab(id);
     },
-    [messageQueue, submitToAgent],
+    [clearQueueForSession, tabs.handleCloseTab],
   );
 
-  useEffect(() => {
-    onRunSettledRef.current = (sessionId) => {
-      void drainQueue(sessionId);
-    };
-  }, [drainQueue]);
+  const handleDeleteSession = useCallback(
+    (id: string) => {
+      clearQueueForSession(id);
+      void tabs.handleDeleteSession(id);
+    },
+    [clearQueueForSession, tabs.handleDeleteSession],
+  );
 
   const linkedWorkspacePath = editorContext?.workspacePath ?? null;
 
@@ -130,7 +104,6 @@ export default function App() {
     };
   }, [handleAgentEvent]);
 
-  // First launch: auto-open a draft tab once Cursor links a workspace (⌘T is easy to miss).
   useEffect(() => {
     if (!linkedWorkspacePath || tabs.openTabIds.length > 0) return;
     void tabs.handleNewSession(linkedWorkspacePath);
@@ -165,11 +138,6 @@ export default function App() {
     tabs.setAllSessions,
   ]);
 
-  const resolveWorkspacePath = useCallback(
-    () => linkedWorkspacePath ?? tabs.activeSession?.workspacePath ?? null,
-    [linkedWorkspacePath, tabs.activeSession?.workspacePath],
-  );
-
   const applyChatTabShortcut = useCallback(
     (action: ChatTabShortcutAction) => {
       if (typeof action === "object" && action.type === "selectTab") {
@@ -190,7 +158,7 @@ export default function App() {
             tabs.activeSessionId && tabs.openTabIds.includes(tabs.activeSessionId)
               ? tabs.activeSessionId
               : tabs.openTabIds[tabs.openTabIds.length - 1];
-          if (target) void tabs.handleCloseTab(target);
+          if (target) handleCloseTab(target);
           break;
         }
         case "next":
@@ -208,11 +176,11 @@ export default function App() {
       }
     },
     [
+      handleCloseTab,
       resolveWorkspacePath,
       tabs.activeSessionId,
       tabs.openTabIds,
       tabs.handleNewSession,
-      tabs.handleCloseTab,
       tabs.cycleTab,
       tabs.selectTabByIndex,
       tabs.panelMode,
@@ -237,75 +205,9 @@ export default function App() {
     };
   }, [applyChatTabShortcut]);
 
-  const handleSend = async (content: string, attachments?: ChatAttachment[]) => {
-    const workspacePath = resolveWorkspacePath();
-    if (!workspacePath) return;
-
-    let session = tabs.activeSession;
-    if (!session) {
-      session = await tabs.handleNewSession(workspacePath);
-    }
-
-    const userMsg: ChatMessage = {
-      id: uuidv4(),
-      role: "user",
-      content,
-      createdAt: new Date().toISOString(),
-      context: editorContext ?? undefined,
-      attachments: attachments?.length ? attachments : undefined,
-    };
-    let title = session.title;
-    if (session.messages.length === 0) {
-      const titleSource = content.trim() || (attachments?.length ? "Image" : "");
-      title = titleSource.slice(0, 24) + (titleSource.length > 24 ? "…" : "");
-    }
-    const updated = {
-      ...session,
-      title,
-      workspacePath,
-      messages: [...session.messages, userMsg],
-    };
-    const saved = await window.mimica.saveSession(updated);
-    tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
-
-    const shouldQueue = isStreaming && tabs.activeSessionId === saved.id;
-    if (shouldQueue) {
-      messageQueue.enqueue(saved.id, {
-        content,
-        attachments,
-        editorContext,
-        agentMode,
-        workspacePath,
-      });
-      return;
-    }
-
-    await submitToAgent({
-      sessionId: saved.id,
-      content,
-      workspacePath,
-      mode: agentMode,
-      editorContext,
-      attachments,
-    });
-  };
-
   const handleCancel = async () => {
     await handleStopStreaming();
-    director.setState("idle");
   };
-
-  const handleCloseTab = (id: string) => {
-    messageQueue.clear(id);
-    void tabs.handleCloseTab(id);
-  };
-
-  const handleDeleteSession = (id: string) => {
-    messageQueue.clear(id);
-    void tabs.handleDeleteSession(id);
-  };
-
-  const queuedCount = messageQueue.getQueueSize(tabs.activeSessionId);
 
   return (
     <div className="app">
@@ -329,6 +231,8 @@ export default function App() {
             tabsBarVisible={tabsBarVisible}
             isStreaming={isStreaming}
             queuedCount={queuedCount}
+            submitError={submitError}
+            onClearSubmitError={clearSubmitError}
             avatarState={avatarState}
             agentMode={agentMode}
             characterShortName={characterShortName}
@@ -338,6 +242,7 @@ export default function App() {
             onSelectSession={(id) => {
               tabs.setActiveSessionId(id);
               tabs.setPanelMode("chat");
+              clearSubmitError();
             }}
             onCloseTab={handleCloseTab}
             onReorderTab={tabs.reorderOpenTab}

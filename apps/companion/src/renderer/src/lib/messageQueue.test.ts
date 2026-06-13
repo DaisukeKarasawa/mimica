@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { QueuedAgentSubmit } from "./messageQueue";
-import { dequeueMessage, enqueueMessage, queueSize } from "./messageQueue";
+import { dequeueMessage, enqueueMessage, peekMessage, queueSize } from "./messageQueue";
 
 const sample = (content: string): QueuedAgentSubmit => ({
   content,
@@ -28,5 +28,11 @@ describe("messageQueue", () => {
     assert.equal(queueSize(second.rest), 0);
     const empty = dequeueMessage(second.rest);
     assert.equal(empty.head, null);
+  });
+
+  it("peek returns head without mutating queue", () => {
+    const q = enqueueMessage([], sample("only"));
+    assert.equal(peekMessage(q)?.content, "only");
+    assert.equal(queueSize(q), 1);
   });
 });

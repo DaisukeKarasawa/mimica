@@ -29,3 +29,7 @@ export function dequeueMessage(queue: QueuedAgentSubmit[]): {
 export function queueSize(queue: QueuedAgentSubmit[]): number {
   return queue.length;
 }
+
+export function peekMessage(queue: QueuedAgentSubmit[]): QueuedAgentSubmit | null {
+  return queue[0] ?? null;
+}

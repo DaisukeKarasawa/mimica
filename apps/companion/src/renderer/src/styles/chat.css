@@ -645,6 +645,17 @@
   letter-spacing: 0.02em;
 }
 
+.composer-submit-error {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: #f0d4d0;
+  background: rgba(196, 116, 110, 0.14);
+  border: 1px solid rgba(196, 116, 110, 0.32);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .composer-actions {
   display: flex;
   flex-shrink: 0;
