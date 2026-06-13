@@ -13,6 +13,5 @@ export {
   type AgentQuestionAnswerContext,
   type AgentQuestionDismissContext,
   StubAgentQuestionAdapter,
-  stubAgentQuestionAdapter,
 } from "./agentQuestionAdapter.js";
 export { buildAskQuestionFollowUpText, isAskQuestionToolName } from "./agentQuestionFollowUp.js";
