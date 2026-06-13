@@ -235,12 +235,10 @@ export function ChatPanel({
                           <QuestionCard
                             key={msg.agentQuestion.id}
                             question={msg.agentQuestion}
-                            disabled={false}
-                            onSubmit={(payload) =>
-                              void onQuestionAnswer(msg.agentRunId ?? "", payload)
-                            }
+                            disabled={!msg.agentRunId}
+                            onSubmit={(payload) => void onQuestionAnswer(msg.agentRunId!, payload)}
                             onDismiss={() =>
-                              void onQuestionDismiss(msg.agentRunId ?? "", msg.agentQuestion!.id)
+                              void onQuestionDismiss(msg.agentRunId!, msg.agentQuestion!.id)
                             }
                           />
                         ) : null}

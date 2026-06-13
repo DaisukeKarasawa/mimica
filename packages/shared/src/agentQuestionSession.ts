@@ -47,6 +47,7 @@ export function updateAgentQuestionStatus(
   return { ...session, updatedAt: new Date().toISOString(), messages };
 }
 
+/** Returns the question prompt by ID (questionPromptId is a UUID unique per session). */
 export function findAgentQuestionPrompt(
   session: ChatSession,
   questionPromptId: string,

@@ -232,6 +232,8 @@ export default function App() {
   const handleQuestionAnswer = async (runId: string, payload: AgentQuestionAnswerPayload) => {
     const session = tabs.activeSession;
     if (!session || !runId) return;
+    beginStream();
+    setIsStreaming(true);
     try {
       const saved = await window.mimica.answerAgentQuestion({
         sessionId: session.id,
@@ -240,9 +242,9 @@ export default function App() {
         payload,
       });
       tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
-      beginStream();
-      setIsStreaming(true);
     } catch {
+      setIsStreaming(false);
+      resetStreamRef.current();
       director.setState("idle");
     }
   };

@@ -212,11 +212,14 @@ export class AgentService {
           onTool: (name, detail) => emitter.tool(name, detail),
           onWarning: (message) => emitter.warning(message),
           onQuestion: (question) => {
+            const correlated = { ...question, runId };
             const current = this.sessionStore.get(payload.sessionId);
             if (current) {
-              this.sessionStore.save(upsertAssistantQuestion(current, { runId, question }));
+              this.sessionStore.save(
+                upsertAssistantQuestion(current, { runId, question: correlated }),
+              );
             }
-            emitter.question(question);
+            emitter.question(correlated);
           },
           onComplete: (content) => {
             const current = this.sessionStore.get(payload.sessionId);

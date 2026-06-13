@@ -9,6 +9,7 @@ import type { AgentMode } from "./chat.js";
  * waiting + user answers → agent_question_resolved(answered) → follow-up submitAgent
  * waiting + dismiss → agent_question_resolved(dismissed)
  * run completes while pending → question stays pending until user acts (v1 default)
+ * expired → reserved for v2 (timeout / run-abandon); no v1 transition emits this status
  * ```
  */
 

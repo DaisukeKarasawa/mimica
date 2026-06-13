@@ -243,6 +243,8 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           );
           if (event.status === "answered") {
             directorRef.current.setState("thinking");
+          } else {
+            directorRef.current.setState("idle");
           }
           break;
         }
