@@ -93,11 +93,12 @@ export class AgentService {
     return this.runnerReady;
   }
 
-  async submit(payload: AgentSubmitPayload): Promise<void> {
+  async submit(payload: AgentSubmitPayload): Promise<boolean> {
     await this.cancel();
 
     const runId = uuidv4();
     this.activeRunId = runId;
+    let runSucceeded = false;
     const wc = this.getWebContents();
     const emitter = new AgentRunEmitter(
       wc,
@@ -222,6 +223,7 @@ export class AgentService {
             emitter.question(correlated);
           },
           onComplete: (content) => {
+            runSucceeded = true;
             const current = this.sessionStore.get(payload.sessionId);
             if (current) {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
@@ -236,7 +238,7 @@ export class AgentService {
         },
       });
     } catch (error) {
-      if (runId !== this.activeRunId) return;
+      if (runId !== this.activeRunId) return false;
       const message = error instanceof Error ? error.message : String(error);
       emitAgentEvent(wc, {
         type: "agent_error",
@@ -244,11 +246,14 @@ export class AgentService {
         runId,
         message,
       });
+      return false;
     } finally {
       if (this.activeRunId === runId) {
         this.activeRunId = null;
       }
     }
+
+    return runSucceeded;
   }
 
   async cancel(): Promise<void> {
@@ -278,13 +283,17 @@ export class AgentService {
     this.sessionStore.save(withUserMessage);
 
     try {
-      await this.submit({
+      const followUpSucceeded = await this.submit({
         sessionId: input.sessionId,
         content: followUp,
         workspacePath: session.workspacePath,
         mode: input.mode,
       });
+      if (!followUpSucceeded) {
+        throw new Error("Follow-up agent run failed");
+      }
     } catch (error) {
+      // Follow-up run failed; rollback to pre-answer session so the question stays pending.
       this.sessionStore.save(session);
       throw error;
     }
