@@ -33,8 +33,9 @@ export interface RunChatParams {
 
 interface SessionRunContext {
   run: Run | null;
-  cancelled: boolean;
   runGeneration: number;
+  /** Runs with generation <= this value were cancelled. */
+  cancelledThroughGeneration: number;
 }
 
 function sdkModeFor(mode: AgentMode): CursorSdkConversationMode {
@@ -48,7 +49,7 @@ export class AgentRunner {
   private contextFor(sessionId: string): SessionRunContext {
     let ctx = this.sessionRuns.get(sessionId);
     if (!ctx) {
-      ctx = { run: null, cancelled: false, runGeneration: 0 };
+      ctx = { run: null, runGeneration: 0, cancelledThroughGeneration: 0 };
       this.sessionRuns.set(sessionId, ctx);
     }
     return ctx;
@@ -64,7 +65,7 @@ export class AgentRunner {
 
     const ctx = this.contextFor(params.sessionId);
     const runGen = ++ctx.runGeneration;
-    ctx.cancelled = false;
+    const isRunCancelled = () => runGen <= ctx.cancelledThroughGeneration;
     const enforceReadOnly = params.mode === "ask";
     const sdkMode = sdkModeFor(params.mode);
 
@@ -116,7 +117,7 @@ export class AgentRunner {
       const run = await agent.send(message, {
         mode: sdkMode,
         onDelta: async ({ update }) => {
-          await readOnlyGuard?.handleSendDelta(update, () => ctx.cancelled, params.signal);
+          await readOnlyGuard?.handleSendDelta(update, isRunCancelled, params.signal);
         },
       });
       if (ctx.runGeneration === runGen) {
@@ -128,7 +129,7 @@ export class AgentRunner {
         run,
         callbacks,
         signal: params.signal,
-        isCancelled: () => ctx.cancelled,
+        isCancelled: isRunCancelled,
         readOnlyGuard,
         timing,
       });
@@ -139,7 +140,7 @@ export class AgentRunner {
         return;
       }
 
-      if (ctx.cancelled || params.signal?.aborted) {
+      if (isRunCancelled() || params.signal?.aborted) {
         this.sessionPool.invalidateSession(params.sessionId);
         timing?.report("cancelled");
         callbacks.onState("cancelled");
@@ -150,7 +151,7 @@ export class AgentRunner {
       try {
         result = await run.wait();
       } catch (err) {
-        if (isAbortError(err) || ctx.cancelled) {
+        if (isAbortError(err) || isRunCancelled()) {
           this.sessionPool.invalidateSession(params.sessionId);
           timing?.report("cancelled");
           callbacks.onState("cancelled");
@@ -187,7 +188,7 @@ export class AgentRunner {
       callbacks.onState("completed");
       callbacks.onComplete(finalText);
     } catch (err) {
-      if (isAbortError(err) || ctx.cancelled) {
+      if (isAbortError(err) || isRunCancelled()) {
         this.sessionPool.invalidateSession(params.sessionId);
         timing?.report("cancelled");
         callbacks.onState("cancelled");
@@ -213,7 +214,7 @@ export class AgentRunner {
     }
     const ctx = this.sessionRuns.get(sessionId);
     if (!ctx) return;
-    ctx.cancelled = true;
+    ctx.cancelledThroughGeneration = ctx.runGeneration;
     await cancelRun(ctx.run);
   }
 
