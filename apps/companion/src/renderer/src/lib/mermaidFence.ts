@@ -49,7 +49,6 @@ export function isMermaidBlockComplete(content: string, blockIndex: number): boo
 /** Count ```mermaid opening fences in content (ignoring nested plain fences). */
 export function countMermaidBlocks(content: string): number {
   let inFence = false;
-  let fenceLanguage: string | null = null;
   let count = 0;
 
   for (const line of content.split("\n")) {
@@ -60,14 +59,12 @@ export function countMermaidBlocks(content: string): number {
         count += 1;
       } else if (trimmed.startsWith("```")) {
         inFence = true;
-        fenceLanguage = trimmed.slice(3).trim() || "plain";
       }
       continue;
     }
 
     if (FENCE_CLOSE.test(trimmed)) {
       inFence = false;
-      fenceLanguage = null;
     }
   }
 
