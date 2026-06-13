@@ -19,6 +19,7 @@
     "test": "tsx --test 'src/**/*.test.ts'"
   },
   "dependencies": {
+    "@connectrpc/connect": "^1.7.0",
     "@cursor/sdk": "^1.0.16",
     "@mimica/shared": "workspace:*"
   },

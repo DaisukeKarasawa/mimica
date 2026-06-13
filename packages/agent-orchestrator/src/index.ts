@@ -14,3 +14,8 @@ export {
 } from "./toolCallStreamQuestionAdapter.js";
 export { parseAskQuestionToolCall } from "./parseAskQuestionToolCall.js";
 export { buildAskQuestionFollowUpText, isAskQuestionToolName } from "./agentQuestionFollowUp.js";
+export {
+  classifySdkTransportError,
+  mapSdkTransportToAgentRunError,
+  type SdkTransportClassification,
+} from "./sdkTransportError.js";

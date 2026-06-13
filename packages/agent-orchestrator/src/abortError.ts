@@ -1,4 +1,9 @@
 import type { Run } from "@cursor/sdk";
+import {
+  formatSdkRejection,
+  isConnectCanceledError,
+  isSdkConnectError,
+} from "./sdkTransportError.js";
 
 export function isAbortError(err: unknown): boolean {
   if (err instanceof DOMException && err.name === "AbortError") return true;
@@ -7,6 +12,11 @@ export function isAbortError(err: unknown): boolean {
     return true;
   }
   return false;
+}
+
+/** Intentional cancellation: AbortError or SDK Connect [canceled]. */
+export function isIntentionalCancellationError(err: unknown): boolean {
+  return isAbortError(err) || isConnectCanceledError(err);
 }
 
 const trackedCanceledPromises = new WeakSet<Promise<unknown>>();
@@ -37,21 +47,32 @@ export async function cancelRun(run: Run | null | undefined): Promise<void> {
     if (typeof run.supports === "function" && !run.supports("cancel")) return;
     await trackIntentionalCancelPromise(run.cancel());
   } catch (err) {
-    if (!isAbortError(err)) throw err;
+    if (!isIntentionalCancellationError(err)) throw err;
   }
 }
 
 let abortRejectionHandlerInstalled = false;
 
-/** Suppress orphan AbortError rejections from SDK cancel/close (internal promises). */
+/** Suppress orphan SDK cancel/transport rejections; never fatalize the main process. */
 export function installAbortRejectionHandler(): void {
   if (abortRejectionHandlerInstalled) return;
   abortRejectionHandlerInstalled = true;
   process.on("unhandledRejection", (reason, promise) => {
     if (isAbortError(reason) && trackedCanceledPromises.has(promise)) return;
-    console.error("Unhandled rejection:", promise, reason);
-    setImmediate(() => {
-      throw reason instanceof Error ? reason : new Error(String(reason));
-    });
+    if (isConnectCanceledError(reason)) {
+      console.debug(
+        "[agent-orchestrator] suppressed Connect canceled rejection:",
+        formatSdkRejection(reason),
+      );
+      return;
+    }
+    if (isSdkConnectError(reason)) {
+      console.error(
+        "[agent-orchestrator] SDK Connect rejection (non-fatal):",
+        formatSdkRejection(reason),
+      );
+      return;
+    }
+    console.error("[agent-orchestrator] unhandled rejection (non-fatal):", promise, reason);
   });
 }
