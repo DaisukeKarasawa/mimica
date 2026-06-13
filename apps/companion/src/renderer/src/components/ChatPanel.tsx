@@ -1,12 +1,12 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   AgentMode,
   AgentQuestionAnswerPayload,
-  AvatarState,
   ChatAttachment,
   ChatSession,
 } from "@mimica/shared";
 import { AGENT_DISPLAY_NAME, sessionHasPendingQuestion } from "@mimica/shared";
+import type { SessionRunStatus } from "../lib/sessionRunState";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
 import { ipcErrorMessage } from "../lib/composerError";
@@ -27,7 +27,10 @@ interface ChatPanelProps {
   panelMode: ChatPanelMode;
   tabsBarVisible: boolean;
   isStreaming: boolean;
-  avatarState: AvatarState;
+  activeSessionRunStatus?: SessionRunStatus;
+  queuedCount?: number;
+  submitError?: string | null;
+  onClearSubmitError?: () => void;
   agentMode: AgentMode;
   characterShortName: string;
   workspacePath: string | null;
@@ -42,6 +45,7 @@ interface ChatPanelProps {
   onCancel: () => void;
   onQuestionAnswer: (runId: string, payload: AgentQuestionAnswerPayload) => Promise<void>;
   onQuestionDismiss: (runId: string, questionPromptId: string) => Promise<void>;
+  isSessionRunActive?: (sessionId: string) => boolean;
 }
 
 export function ChatPanel({
@@ -52,7 +56,10 @@ export function ChatPanel({
   panelMode,
   tabsBarVisible,
   isStreaming,
-  avatarState,
+  activeSessionRunStatus = "idle",
+  queuedCount = 0,
+  submitError = null,
+  onClearSubmitError,
   agentMode,
   characterShortName,
   workspacePath,
@@ -67,6 +74,7 @@ export function ChatPanel({
   onCancel,
   onQuestionAnswer,
   onQuestionDismiss,
+  isSessionRunActive,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -74,6 +82,10 @@ export function ChatPanel({
   const prevSessionIdRef = useRef(activeSessionId);
   const hasPendingQuestion =
     activeSession != null ? sessionHasPendingQuestion(activeSession) : false;
+
+  useEffect(() => {
+    onClearSubmitError?.();
+  }, [activeSessionId, onClearSubmitError]);
 
   useLayoutEffect(() => {
     const previousSessionId = prevSessionIdRef.current;
@@ -107,7 +119,7 @@ export function ChatPanel({
     (lastMessage?.role === "assistant" &&
       !lastMessage.content.trim() &&
       !lastMessage.agentQuestion);
-  const showThinkingIndicator = avatarState === "thinking" && awaitingAssistantReply;
+  const showThinkingIndicator = activeSessionRunStatus === "thinking" && awaitingAssistantReply;
   const { containerRef: messagesRef, scrollToBottom } = useStickToBottomScroll({
     enabled: showChat,
     resetKey: activeSessionId,
@@ -121,7 +133,7 @@ export function ChatPanel({
 
   const handleSubmit = async () => {
     const text = input.trim();
-    if ((!text && attachments.length === 0) || isStreaming) return;
+    if ((!text && attachments.length === 0) || !workspacePath) return;
     const outgoing = attachments;
     scrollToBottom({ force: true });
     try {
@@ -158,7 +170,9 @@ export function ChatPanel({
                 >
                   <button
                     type="button"
-                    className="tab"
+                    className={["tab", isSessionRunActive?.(session.id) ? "tab--running" : ""]
+                      .filter(Boolean)
+                      .join(" ")}
                     onPointerDown={(event) => tabPointerHandlers.onPointerDown(event, session.id)}
                     onPointerMove={tabPointerHandlers.onPointerMove}
                     onPointerUp={tabPointerHandlers.onPointerUp}
@@ -166,7 +180,10 @@ export function ChatPanel({
                     onClick={(event) => handleTabClick(event, session.id, onSelectSession)}
                     title={session.title}
                   >
-                    {session.title}
+                    <span className="tab-label">{session.title}</span>
+                    {isSessionRunActive?.(session.id) ? (
+                      <span className="tab-run-dot" aria-hidden="true" />
+                    ) : null}
                   </button>
                   {session.id === activeSessionId && showChat ? (
                     <button
@@ -262,6 +279,16 @@ export function ChatPanel({
             </div>
 
             <div className="composer">
+              {queuedCount > 0 ? (
+                <p className="composer-queue-badge" aria-live="polite">
+                  キュー {queuedCount} 件
+                </p>
+              ) : null}
+              {submitError ? (
+                <p className="composer-submit-error" role="alert">
+                  {submitError}
+                </p>
+              ) : null}
               {composerBannerError ? (
                 <p className="composer-banner-error" role="alert">
                   {composerBannerError}

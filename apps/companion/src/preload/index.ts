@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
+  AgentCancelPayload,
   AgentEventMessage,
   AgentMode,
   AgentQuestionAnswerInput,
@@ -33,7 +34,7 @@ export interface MimicaApi {
   getCharacterAssets: () => Promise<CharacterAssetStatus>;
   formatPersonaError: (kind: ErrorKind, detail?: string) => Promise<string>;
   submitAgent: (payload: AgentSubmitPayload) => Promise<void>;
-  cancelAgent: () => Promise<void>;
+  cancelAgent: (payload: AgentCancelPayload) => Promise<void>;
   answerAgentQuestion: (input: AgentQuestionAnswerInput) => Promise<ChatSession>;
   dismissAgentQuestion: (input: AgentQuestionDismissInput) => Promise<ChatSession>;
   openExternal: (url: string) => Promise<boolean>;
@@ -62,7 +63,7 @@ const api: MimicaApi = {
   getCharacterAssets: () => ipcRenderer.invoke("character:assets"),
   formatPersonaError: (kind, detail) => ipcRenderer.invoke("persona:formatError", kind, detail),
   submitAgent: (payload) => ipcRenderer.invoke("agent:submit", payload),
-  cancelAgent: () => ipcRenderer.invoke("agent:cancel"),
+  cancelAgent: (payload) => ipcRenderer.invoke("agent:cancel", payload),
   answerAgentQuestion: (input) => ipcRenderer.invoke("agent:questionAnswer", input),
   dismissAgentQuestion: (input) => ipcRenderer.invoke("agent:questionDismiss", input),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),

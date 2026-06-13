@@ -72,6 +72,7 @@ export {
   type ServerMessage,
   type CompanionMessage,
   type AgentEventMessage,
+  type AgentCancelPayload,
   mapAgentRunToAvatar,
 } from "./protocol.js";
 
