@@ -1,5 +1,4 @@
 import type { AgentQuestionPrompt } from "@mimica/shared";
-import type { AgentQuestionAdapter } from "./agentQuestionAdapter.js";
 import { isAskQuestionToolName } from "./agentQuestionFollowUp.js";
 import { parseAskQuestionToolCall } from "./parseAskQuestionToolCall.js";
 
@@ -22,35 +21,24 @@ function isToolCallStreamEvent(event: unknown): event is ToolCallStreamEvent {
   );
 }
 
+const pendingRunIds = new Set<string>();
+
 /** Phase 1 fallback: parse AskQuestion from tool_call stream events. */
-export class ToolCallStreamQuestionAdapter implements AgentQuestionAdapter {
-  private readonly pendingRunIds = new Set<string>();
+export function tryParseAskQuestionStreamEvent(event: unknown): AgentQuestionPrompt | null {
+  if (!isToolCallStreamEvent(event)) return null;
+  if (event.status !== "running" || !isAskQuestionToolName(event.name)) return null;
+  if (!event.runId) return null;
+  if (pendingRunIds.has(event.runId)) return null;
+  if (event.args == null) return null;
 
-  tryParseQuestion(event: unknown): AgentQuestionPrompt | null {
-    if (!isToolCallStreamEvent(event)) return null;
-    if (event.status !== "running" || !isAskQuestionToolName(event.name)) return null;
-    if (!event.runId) return null;
-    if (this.pendingRunIds.has(event.runId)) return null;
-    if (event.args == null) return null;
+  const prompt = parseAskQuestionToolCall(event.args, event.runId, event.toolCallId);
+  if (!prompt) return null;
 
-    const prompt = parseAskQuestionToolCall(event.args, event.runId, event.toolCallId);
-    if (!prompt) return null;
-
-    this.pendingRunIds.add(event.runId);
-    return prompt;
-  }
-
-  releaseRun(runId: string): void {
-    this.pendingRunIds.delete(runId);
-  }
-
-  async submitAnswer(_ctx: Parameters<AgentQuestionAdapter["submitAnswer"]>[0]): Promise<void> {}
-
-  async dismissQuestion(
-    _ctx: Parameters<AgentQuestionAdapter["dismissQuestion"]>[0],
-  ): Promise<void> {}
+  pendingRunIds.add(event.runId);
+  return prompt;
 }
 
-const defaultQuestionAdapter = new ToolCallStreamQuestionAdapter();
-
-export { defaultQuestionAdapter };
+/** Clear per-run dedup state when the SDK run finishes or the question is resolved. */
+export function releaseAskQuestionStreamRun(runId: string): void {
+  pendingRunIds.delete(runId);
+}

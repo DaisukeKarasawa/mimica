@@ -7,6 +7,7 @@ import { type CursorSdkConversationMode } from "./createCursorAgent.js";
 import { ensureReadOnlyHooks } from "./ensureReadOnlyHooks.js";
 import { buildAgentFullPrompt } from "./buildAgentPrompt.js";
 import { processAgentStream, resolveFinalAssistantText } from "./processAgentStream.js";
+import { releaseAskQuestionStreamRun } from "./toolCallStreamQuestionAdapter.js";
 import { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { READ_ONLY_HOOK_INSTALL_WARNING } from "./readOnlyPolicy.js";
 import { AgentRunTimingTrace } from "./agentRunTiming.js";
@@ -89,6 +90,7 @@ export class AgentRunner {
     }
     const fullPrompt = this.buildFullPrompt(params, isFollowUp);
     const callbacks = this.wrapCallbacksForTiming(params.callbacks, timing);
+    let streamRunId: string | undefined;
 
     try {
       let readOnlyGuard: ReadOnlyRunGuard | undefined;
@@ -110,6 +112,7 @@ export class AgentRunner {
         this.activeRun = run;
         this.activeSessionId = params.sessionId;
       }
+      streamRunId = run.id;
       timing?.markOnce("T1_send_done");
 
       const streamResult = await processAgentStream({
@@ -186,6 +189,9 @@ export class AgentRunner {
       callbacks.onState("failed");
       callbacks.onError(err instanceof Error ? err.message : String(err));
     } finally {
+      if (streamRunId) {
+        releaseAskQuestionStreamRun(streamRunId);
+      }
       if (this.runGeneration === runGen) {
         this.activeRun = null;
         this.activeSessionId = null;

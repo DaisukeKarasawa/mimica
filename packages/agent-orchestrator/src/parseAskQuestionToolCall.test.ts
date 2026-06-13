@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseAskQuestionToolCall } from "./parseAskQuestionToolCall.js";
-import { ToolCallStreamQuestionAdapter } from "./toolCallStreamQuestionAdapter.js";
+import {
+  releaseAskQuestionStreamRun,
+  tryParseAskQuestionStreamEvent,
+} from "./toolCallStreamQuestionAdapter.js";
 
 describe("parseAskQuestionToolCall", () => {
   it("parses SDK-shaped args", () => {
@@ -44,9 +47,8 @@ describe("parseAskQuestionToolCall", () => {
   });
 });
 
-describe("ToolCallStreamQuestionAdapter", () => {
+describe("tryParseAskQuestionStreamEvent", () => {
   it("suppresses duplicate pending emits for the same runId", () => {
-    const adapter = new ToolCallStreamQuestionAdapter();
     const event = {
       type: "tool_call" as const,
       name: "AskQuestion",
@@ -63,9 +65,9 @@ describe("ToolCallStreamQuestionAdapter", () => {
       },
     };
 
-    assert.ok(adapter.tryParseQuestion(event));
-    assert.equal(adapter.tryParseQuestion(event), null);
-    adapter.releaseRun("run-dup");
-    assert.ok(adapter.tryParseQuestion(event));
+    assert.ok(tryParseAskQuestionStreamEvent(event));
+    assert.equal(tryParseAskQuestionStreamEvent(event), null);
+    releaseAskQuestionStreamRun("run-dup");
+    assert.ok(tryParseAskQuestionStreamEvent(event));
   });
 });

@@ -4,7 +4,7 @@ import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import type { AgentRunTimingTrace } from "./agentRunTiming.js";
 import type { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { streamVisibleText } from "./streamVisibleText.js";
-import { defaultQuestionAdapter } from "./toolCallStreamQuestionAdapter.js";
+import { tryParseAskQuestionStreamEvent } from "./toolCallStreamQuestionAdapter.js";
 import { stripMetaNarration } from "./userFacingText.js";
 
 export interface ProcessAgentStreamResult {
@@ -50,7 +50,6 @@ export async function processAgentStream(params: {
     if (event.status === "running") {
       sawToolCall = true;
       timing?.markOnce("T2_first_tool");
-      setThinking();
       const toolEvent = {
         type: "tool_call" as const,
         name: event.name,
@@ -60,10 +59,12 @@ export async function processAgentStream(params: {
         toolCallId:
           "callId" in event && typeof event.callId === "string" ? event.callId : undefined,
       };
-      const prompt = defaultQuestionAdapter.tryParseQuestion(toolEvent);
+      const prompt = tryParseAskQuestionStreamEvent(toolEvent);
       if (prompt) {
         callbacks.onQuestion?.(prompt);
         callbacks.onState("waiting");
+      } else {
+        setThinking();
       }
       callbacks.onTool?.(event.name, event.status);
     }
