@@ -200,6 +200,7 @@ export class AgentRunner {
     } finally {
       if (ctx.runGeneration === runGen) {
         ctx.run = null;
+        this.sessionRuns.delete(params.sessionId);
       }
     }
   }

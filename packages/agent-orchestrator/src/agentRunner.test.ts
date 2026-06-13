@@ -17,4 +17,16 @@ describe("AgentRunner concurrent sessions", () => {
     const runner = new AgentRunner();
     await assert.doesNotReject(() => runner.closeSession("missing-session"));
   });
+
+  it("cancel on one session does not throw when another session id is unknown", async () => {
+    const runner = new AgentRunner();
+    await runner.cancel("session-a");
+    await assert.doesNotReject(() => runner.cancel("session-b"));
+  });
+
+  it("closeSession on one session leaves cancel on another as no-op", async () => {
+    const runner = new AgentRunner();
+    await runner.closeSession("session-a");
+    await assert.doesNotReject(() => runner.cancel("session-b"));
+  });
 });
