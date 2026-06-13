@@ -10,6 +10,22 @@ export function emitAgentEvent(wc: WebContents | undefined, event: AgentEventMes
   wc?.send("agent-event", event);
 }
 
+export function emitQuestionResolved(
+  wc: WebContents | undefined,
+  sessionId: string,
+  runId: string,
+  questionPromptId: string,
+  status: AgentQuestionStatus,
+): void {
+  emitAgentEvent(wc, {
+    type: "agent_question_resolved",
+    sessionId,
+    runId,
+    questionPromptId,
+    status,
+  });
+}
+
 export class AgentRunEmitter {
   constructor(
     private readonly wc: WebContents | undefined,
@@ -98,12 +114,6 @@ export class AgentRunEmitter {
   }
 
   questionResolved(questionPromptId: string, status: AgentQuestionStatus): void {
-    emitAgentEvent(this.wc, {
-      type: "agent_question_resolved",
-      sessionId: this.sessionId,
-      runId: this.runId,
-      questionPromptId,
-      status,
-    });
+    emitQuestionResolved(this.wc, this.sessionId, this.runId, questionPromptId, status);
   }
 }

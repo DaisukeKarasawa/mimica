@@ -70,10 +70,6 @@ export function applyAgentQuestionResolved(
   );
 }
 
-export function sessionHasPendingQuestion(session: ChatSession): boolean {
-  return session.messages.some((message) => message.agentQuestion?.status === "pending");
-}
-
 export function applyAgentTool(
   sessions: ChatSession[],
   sessionId: string,

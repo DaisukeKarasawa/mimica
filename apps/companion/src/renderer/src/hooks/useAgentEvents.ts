@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { AgentEventMessage, ChatSession } from "@mimica/shared";
-import { mapAgentRunToAvatar } from "@mimica/shared";
+import { mapAgentRunToAvatar, sessionHasPendingQuestion } from "@mimica/shared";
 import type { CharacterDirector } from "@mimica/character-runtime";
 import {
   applyAgentComplete,
@@ -9,7 +9,6 @@ import {
   applyAgentQuestion,
   applyAgentQuestionResolved,
   applyAgentTool,
-  sessionHasPendingQuestion,
   streamMessageId,
 } from "../lib/agentSessionUpdate";
 import { logAgentPerfUi, type AgentPerfUiRecord } from "../lib/agentPerfUi";

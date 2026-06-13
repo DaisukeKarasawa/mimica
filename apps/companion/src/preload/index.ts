@@ -2,7 +2,8 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentEventMessage,
   AgentMode,
-  AgentQuestionAnswerPayload,
+  AgentQuestionAnswerInput,
+  AgentQuestionDismissInput,
   AtMenuSection,
   CharacterAssetStatus,
   ChatAttachment,
@@ -20,19 +21,6 @@ export interface AgentSubmitPayload {
   mode: AgentMode;
   editorContext?: EditorContext | null;
   attachments?: ChatAttachment[];
-}
-
-export interface AgentQuestionAnswerInput {
-  sessionId: string;
-  runId: string;
-  mode: AgentMode;
-  payload: AgentQuestionAnswerPayload;
-}
-
-export interface AgentQuestionDismissInput {
-  sessionId: string;
-  runId: string;
-  questionPromptId: string;
 }
 
 export interface MimicaApi {
