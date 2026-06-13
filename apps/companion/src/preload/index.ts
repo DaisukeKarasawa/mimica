@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentEventMessage,
   AgentMode,
+  AgentQuestionAnswerPayload,
   AtMenuSection,
   CharacterAssetStatus,
   ChatAttachment,
@@ -21,6 +22,19 @@ export interface AgentSubmitPayload {
   attachments?: ChatAttachment[];
 }
 
+export interface AgentQuestionAnswerInput {
+  sessionId: string;
+  runId: string;
+  mode: AgentMode;
+  payload: AgentQuestionAnswerPayload;
+}
+
+export interface AgentQuestionDismissInput {
+  sessionId: string;
+  runId: string;
+  questionPromptId: string;
+}
+
 export interface MimicaApi {
   listSessions: () => Promise<ChatSession[]>;
   createSession: (workspacePath: string) => Promise<ChatSession>;
@@ -30,6 +44,8 @@ export interface MimicaApi {
   getCharacterAssets: () => Promise<CharacterAssetStatus>;
   submitAgent: (payload: AgentSubmitPayload) => Promise<void>;
   cancelAgent: () => Promise<void>;
+  answerAgentQuestion: (input: AgentQuestionAnswerInput) => Promise<ChatSession>;
+  dismissAgentQuestion: (input: AgentQuestionDismissInput) => Promise<ChatSession>;
   openExternal: (url: string) => Promise<boolean>;
   onEditorContext: (cb: (context: EditorContext) => void) => () => void;
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
@@ -55,6 +71,8 @@ const api: MimicaApi = {
   getCharacterAssets: () => ipcRenderer.invoke("character:assets"),
   submitAgent: (payload) => ipcRenderer.invoke("agent:submit", payload),
   cancelAgent: () => ipcRenderer.invoke("agent:cancel"),
+  answerAgentQuestion: (input) => ipcRenderer.invoke("agent:questionAnswer", input),
+  dismissAgentQuestion: (input) => ipcRenderer.invoke("agent:questionDismiss", input),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
   onEditorContext: (cb) => {
     const handler = (_: unknown, context: EditorContext) => cb(context);

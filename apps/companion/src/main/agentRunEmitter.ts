@@ -1,5 +1,10 @@
 import type { WebContents } from "electron";
-import type { AgentEventMessage, AgentRunState } from "@mimica/shared";
+import type {
+  AgentEventMessage,
+  AgentQuestionPrompt,
+  AgentQuestionStatus,
+  AgentRunState,
+} from "@mimica/shared";
 
 export function emitAgentEvent(wc: WebContents | undefined, event: AgentEventMessage): void {
   wc?.send("agent-event", event);
@@ -79,6 +84,26 @@ export class AgentRunEmitter {
       sessionId: this.sessionId,
       runId: this.runId,
       t0EpochMs,
+    });
+  }
+
+  question(question: AgentQuestionPrompt): void {
+    if (!this.isActive()) return;
+    emitAgentEvent(this.wc, {
+      type: "agent_question",
+      sessionId: this.sessionId,
+      runId: this.runId,
+      question,
+    });
+  }
+
+  questionResolved(questionPromptId: string, status: AgentQuestionStatus): void {
+    emitAgentEvent(this.wc, {
+      type: "agent_question_resolved",
+      sessionId: this.sessionId,
+      runId: this.runId,
+      questionPromptId,
+      status,
     });
   }
 }

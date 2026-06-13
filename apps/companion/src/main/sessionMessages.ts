@@ -10,6 +10,20 @@ export function appendAssistantMessage(
   return upsertAssistantTurn(session, { runId, content });
 }
 
+export function appendUserMessage(session: ChatSession, content: string, id?: string): ChatSession {
+  const userMsg: ChatMessage = {
+    id: id ?? crypto.randomUUID(),
+    role: "user",
+    content,
+    createdAt: new Date().toISOString(),
+  };
+  return {
+    ...session,
+    updatedAt: new Date().toISOString(),
+    messages: [...session.messages, userMsg],
+  };
+}
+
 /**
  * History for the agent prompt: the current user turn is sent separately in
  * `## User message`, so omit it when it matches the submitted prompt.

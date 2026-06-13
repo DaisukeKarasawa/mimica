@@ -26,6 +26,7 @@ import { registerPrivilegedProtocols } from "./privilegedProtocols.js";
 import { registerSlashMenuIpc } from "./ipc/slashMenu.js";
 import { registerAtMenuIpc } from "./ipc/atMenu.js";
 import { registerAttachmentIpc, releaseDraftAttachments } from "./ipc/attachments.js";
+import { registerAgentQuestionIpc } from "./ipc/agentQuestion.js";
 
 const electronApis = electron();
 
@@ -116,6 +117,7 @@ if (!gotLock) {
       getBridge: () => bridgeServer,
     });
     registerAttachmentIpc(ipcMain, dialog, getMainWindow);
+    registerAgentQuestionIpc(ipcMain, () => agentService);
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
