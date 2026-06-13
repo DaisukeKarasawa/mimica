@@ -78,6 +78,12 @@ export class AgentRunner {
       }
     }
 
+    if (isRunCancelled() || params.signal?.aborted) {
+      params.timing?.report("cancelled");
+      params.callbacks.onState("cancelled");
+      return;
+    }
+
     const timing = params.timing;
     let sessionHandle: Awaited<ReturnType<AgentSessionPool["acquire"]>>;
     try {
@@ -97,6 +103,13 @@ export class AgentRunner {
       return;
     }
 
+    if (isRunCancelled() || params.signal?.aborted) {
+      this.sessionPool.invalidateSession(params.sessionId);
+      timing?.report("cancelled");
+      params.callbacks.onState("cancelled");
+      return;
+    }
+
     const { agent, isFollowUp } = sessionHandle;
     if (timing) {
       timing.meta.isFollowUp = isFollowUp;
@@ -108,6 +121,13 @@ export class AgentRunner {
       let readOnlyGuard: ReadOnlyRunGuard | undefined;
       if (enforceReadOnly) {
         readOnlyGuard = new ReadOnlyRunGuard(() => ctx.run, callbacks);
+      }
+
+      if (isRunCancelled() || params.signal?.aborted) {
+        this.sessionPool.invalidateSession(params.sessionId);
+        timing?.report("cancelled");
+        callbacks.onState("cancelled");
+        return;
       }
 
       const message =

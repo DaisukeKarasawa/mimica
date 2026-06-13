@@ -61,6 +61,20 @@ export class AgentService {
     return this.activeRuns.get(sessionId)?.runId === runId;
   }
 
+  private emitCancelledWhenInactive(
+    wc: WebContents | undefined,
+    sessionId: string,
+    runId: string,
+  ): void {
+    if (this.isRunActive(sessionId, runId)) return;
+    emitAgentEvent(wc, {
+      type: "agent_state",
+      sessionId,
+      runId,
+      state: "cancelled",
+    });
+  }
+
   async submit(payload: AgentSubmitPayload): Promise<void> {
     if (this.activeRuns.has(payload.sessionId)) {
       throw new Error("Session already has an active agent run");
@@ -91,7 +105,10 @@ export class AgentService {
 
     try {
       const runner = await this.getRunner();
-      if (!this.isRunActive(payload.sessionId, runId)) return;
+      if (!this.isRunActive(payload.sessionId, runId)) {
+        this.emitCancelledWhenInactive(wc, payload.sessionId, runId);
+        return;
+      }
 
       const editorContext = payload.editorContext;
       const context = editorContext
@@ -137,7 +154,10 @@ export class AgentService {
           emitter.warning(UNLINKED_AT_EXPANSION_WARNING);
         }
       }
-      if (!this.isRunActive(payload.sessionId, runId)) return;
+      if (!this.isRunActive(payload.sessionId, runId)) {
+        this.emitCancelledWhenInactive(wc, payload.sessionId, runId);
+        return;
+      }
       if (atResolved.warning) {
         emitter.warning(atResolved.warning);
       }
@@ -175,7 +195,10 @@ export class AgentService {
         emitter.perf(Date.now());
       }
 
-      if (!this.isRunActive(payload.sessionId, runId)) return;
+      if (!this.isRunActive(payload.sessionId, runId)) {
+        this.emitCancelledWhenInactive(wc, payload.sessionId, runId);
+        return;
+      }
 
       await runner.runChat({
         sessionId: payload.sessionId,
@@ -205,7 +228,10 @@ export class AgentService {
         },
       });
     } catch (error) {
-      if (!this.isRunActive(payload.sessionId, runId)) return;
+      if (!this.isRunActive(payload.sessionId, runId)) {
+        this.emitCancelledWhenInactive(wc, payload.sessionId, runId);
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       emitAgentEvent(wc, {
         type: "agent_error",

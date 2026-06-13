@@ -165,6 +165,19 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     return true;
   }, [notifyRunSettled, reveal]);
 
+  /** Tab switch: settle only if agent_complete was already queued, not in-progress deltas. */
+  const applyQueuedCompleteOnTabLeave = useCallback(() => {
+    const pending = reveal.drainPendingComplete();
+    if (!pending) return false;
+    activeStreamIdRef.current = null;
+    setAllSessionsRef.current((prev) =>
+      applyAgentComplete(prev, pending.sessionId, pending.runId, pending.streamId, pending.content),
+    );
+    clearSessionRunRef.current(pending.sessionId);
+    notifyRunSettled(pending.sessionId, pending.runId);
+    return true;
+  }, [notifyRunSettled, reveal]);
+
   const hydrateRevealFromBackground = useCallback(
     (sessionId: string) => {
       const background = findBackgroundStream(backgroundStreamTextRef.current, sessionId);
@@ -273,7 +286,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     }
     previousActiveSessionIdRef.current = activeSessionId;
 
-    applyPendingCompleteWithoutSuccess();
+    applyQueuedCompleteOnTabLeave();
     reveal.reset();
     activeStreamIdRef.current = null;
     if (activeSessionId) {
@@ -281,7 +294,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     }
   }, [
     activeSessionId,
-    applyPendingCompleteWithoutSuccess,
+    applyQueuedCompleteOnTabLeave,
     hydrateRevealFromBackground,
     reveal,
     seedBackgroundFromReveal,
