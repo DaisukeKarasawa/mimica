@@ -218,7 +218,7 @@ function pickPersonaIntro(kind: ErrorKind, reactions?: PersonaReactions): string
   return undefined;
 }
 
-function buildFactLine(kind: ErrorKind, _detail?: string): string {
+function buildFactLine(kind: ErrorKind): string {
   return ERROR_FACT_TEMPLATES[kind];
 }
 
@@ -231,8 +231,9 @@ export function buildPersonaErrorMessage(
   detail?: string,
   reactions?: PersonaReactions,
 ): string {
+  void detail;
   const intro = pickPersonaIntro(kind, reactions) ?? GENERIC_INTRO_FALLBACK;
-  const fact = buildFactLine(kind, detail);
+  const fact = buildFactLine(kind);
   return `${intro}\n\n${fact}`;
 }
 
