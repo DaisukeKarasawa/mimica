@@ -14,15 +14,11 @@ import type {
   ChatSession,
   EditorContext,
 } from "@mimica/shared";
-import type { CharacterDirector } from "@mimica/character-runtime";
-import type { SessionRunState } from "../lib/sessionRunState";
 import { useMessageQueue } from "./useMessageQueue";
 
 export interface UseAgentSubmitQueueOptions {
-  director: CharacterDirector;
   beginStream: (sessionId: string) => string;
   resetStream: (sessionId?: string) => void;
-  setSessionRun: (sessionId: string, patch: Partial<SessionRunState>) => void;
   clearSessionRun: (sessionId: string) => void;
   isSessionRunning: (sessionId: string) => boolean;
   onRunSettled: (handler: (sessionId: string) => void) => void;
@@ -37,10 +33,8 @@ export interface UseAgentSubmitQueueOptions {
 
 export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
   const {
-    director,
     beginStream,
     resetStream,
-    setSessionRun,
     clearSessionRun,
     isSessionRunning,
     onRunSettled,
@@ -54,7 +48,7 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
   } = options;
 
   const messageQueue = useMessageQueue();
-  const drainInFlightRef = useRef(false);
+  const drainInFlightBySessionRef = useRef(new Set<string>());
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const submitToAgent = useCallback(
@@ -82,21 +76,20 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
         const message = error instanceof Error ? error.message : String(error);
         clearSessionRun(params.sessionId);
         resetStream(params.sessionId);
-        director.setState("idle");
         setSubmitError(message);
         return false;
       }
     },
-    [beginStream, clearSessionRun, director, resetStream],
+    [beginStream, clearSessionRun, resetStream],
   );
 
   const drainQueue = useCallback(
     async (sessionId: string) => {
-      if (drainInFlightRef.current) return;
+      if (drainInFlightBySessionRef.current.has(sessionId)) return;
       const next = messageQueue.peek(sessionId);
       if (!next) return;
 
-      drainInFlightRef.current = true;
+      drainInFlightBySessionRef.current.add(sessionId);
       try {
         const ok = await submitToAgent({
           sessionId,
@@ -110,7 +103,10 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
           messageQueue.dequeue(sessionId);
         }
       } finally {
-        drainInFlightRef.current = false;
+        drainInFlightBySessionRef.current.delete(sessionId);
+        if (messageQueue.peek(sessionId)) {
+          void drainQueue(sessionId);
+        }
       }
     },
     [messageQueue, submitToAgent],

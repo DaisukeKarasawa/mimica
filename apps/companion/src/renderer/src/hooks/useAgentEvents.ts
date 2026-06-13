@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { AgentEventMessage, AgentRunState, ChatSession } from "@mimica/shared";
-import { mapAgentRunToAvatar } from "@mimica/shared";
-import type { CharacterDirector } from "@mimica/character-runtime";
 import {
   applyAgentComplete,
   applyAgentDelta,
@@ -10,17 +8,19 @@ import {
   streamMessageId,
 } from "../lib/agentSessionUpdate";
 import { logAgentPerfUi, type AgentPerfUiRecord } from "../lib/agentPerfUi";
-import type { SessionRunState } from "../lib/sessionRunState";
+import { runStatusFromAgentState, type SessionRunState } from "../lib/sessionRunState";
 import type { PendingStreamComplete, StreamRevealContext } from "../lib/streamRevealController";
 import { StreamRevealController } from "../lib/streamRevealController";
 
+export type AvatarMomentKind = "success" | "error";
+
 export interface UseAgentEventsOptions {
-  director: CharacterDirector;
   setAllSessions: React.Dispatch<React.SetStateAction<ChatSession[]>>;
   setSessionRun: (sessionId: string, patch: Partial<SessionRunState>) => void;
   clearSessionRun: (sessionId: string) => void;
   activeSessionId: string | null;
   onRunSettled?: (sessionId: string) => void;
+  onAvatarMoment?: (kind: AvatarMomentKind, holdMs: number) => void;
 }
 
 export interface UseAgentEventsResult {
@@ -29,51 +29,48 @@ export interface UseAgentEventsResult {
   beginStream: (sessionId: string) => string;
 }
 
-function runStatusFromAgentState(state: AgentRunState): SessionRunState["status"] | null {
-  switch (state) {
-    case "thinking":
-      return "thinking";
-    case "streaming":
-      return "streaming";
-    case "failed":
-      return "error";
-    case "cancelled":
-    case "completed":
-    case "idle":
-    case "waiting":
-      return "idle";
-    default:
-      return null;
+function backgroundBufferKey(sessionId: string, runId: string): string {
+  return `${sessionId}:${runId}`;
+}
+
+function findBackgroundStream(
+  buffers: Map<string, string>,
+  sessionId: string,
+): { runId: string; text: string } | null {
+  const prefix = `${sessionId}:`;
+  for (const [key, text] of buffers) {
+    if (!key.startsWith(prefix) || !text) continue;
+    return { runId: key.slice(prefix.length), text };
   }
+  return null;
 }
 
 export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsResult {
   const {
-    director,
     setAllSessions,
     setSessionRun,
     clearSessionRun,
     activeSessionId,
     onRunSettled,
+    onAvatarMoment,
   } = options;
 
   const activeStreamIdRef = useRef<string | null>(null);
   const settledRunKeyRef = useRef<string | null>(null);
   const perfByRunIdRef = useRef(new Map<string, AgentPerfUiRecord>());
   const backgroundStreamTextRef = useRef(new Map<string, string>());
-  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const directorRef = useRef(director);
   const setAllSessionsRef = useRef(setAllSessions);
   const setSessionRunRef = useRef(setSessionRun);
   const clearSessionRunRef = useRef(clearSessionRun);
   const activeSessionIdRef = useRef(activeSessionId);
   const onRunSettledRef = useRef(onRunSettled);
-  directorRef.current = director;
+  const onAvatarMomentRef = useRef(onAvatarMoment);
   setAllSessionsRef.current = setAllSessions;
   setSessionRunRef.current = setSessionRun;
   clearSessionRunRef.current = clearSessionRun;
   activeSessionIdRef.current = activeSessionId;
   onRunSettledRef.current = onRunSettled;
+  onAvatarMomentRef.current = onAvatarMoment;
 
   const isActiveSession = useCallback(
     (sessionId: string) => sessionId === activeSessionIdRef.current,
@@ -86,21 +83,6 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     settledRunKeyRef.current = key;
     onRunSettledRef.current?.(sessionId);
   }, []);
-
-  const clearCompletionTimeout = () => {
-    if (completionTimeoutRef.current !== null) {
-      clearTimeout(completionTimeoutRef.current);
-      completionTimeoutRef.current = null;
-    }
-  };
-
-  const scheduleReturnToIdleRef = useRef((delayMs: number) => {
-    clearCompletionTimeout();
-    completionTimeoutRef.current = setTimeout(() => {
-      completionTimeoutRef.current = null;
-      directorRef.current.setState("idle");
-    }, delayMs);
-  });
 
   const revealRef = useRef<StreamRevealController | null>(null);
   if (!revealRef.current) {
@@ -133,8 +115,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           ),
         );
         if (isActiveSession(pending.sessionId)) {
-          directorRef.current.setState("success");
-          scheduleReturnToIdleRef.current(1200);
+          onAvatarMomentRef.current?.("success", 1200);
         }
         clearSessionRunRef.current(pending.sessionId);
         notifyRunSettled(pending.sessionId, pending.runId);
@@ -171,6 +152,23 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     return true;
   }, [reveal]);
 
+  const hydrateRevealFromBackground = useCallback(
+    (sessionId: string) => {
+      const background = findBackgroundStream(backgroundStreamTextRef.current, sessionId);
+      if (!background) return;
+      const streamId = streamMessageId(background.runId, null);
+      activeStreamIdRef.current = streamId;
+      reveal.setContext({
+        sessionId,
+        runId: background.runId,
+        streamId,
+      });
+      reveal.setReceivedIfLonger(background.text);
+      reveal.start();
+    },
+    [reveal],
+  );
+
   const resetStream = useCallback(
     (sessionId?: string) => {
       if (sessionId && !isActiveSession(sessionId)) return;
@@ -183,11 +181,9 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
 
   const beginStream = useCallback(
     (sessionId: string) => {
-      clearCompletionTimeout();
       setSessionRunRef.current(sessionId, { status: "thinking" });
       if (isActiveSession(sessionId)) {
         resetStream(sessionId);
-        directorRef.current.setState("thinking");
         const id = uuidv4();
         activeStreamIdRef.current = id;
         return id;
@@ -199,7 +195,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
 
   const appendBackgroundDelta = useCallback(
     (event: AgentEventMessage & { runId: string; content: string }) => {
-      const bufferKey = `${event.sessionId}:${event.runId}`;
+      const bufferKey = backgroundBufferKey(event.sessionId, event.runId);
       const streamId = streamMessageId(event.runId, null);
       const nextText = (backgroundStreamTextRef.current.get(bufferKey) ?? "") + event.content;
       backgroundStreamTextRef.current.set(bufferKey, nextText);
@@ -212,7 +208,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
 
   const finalizeBackgroundComplete = useCallback(
     (event: AgentEventMessage & { runId: string; content: string }) => {
-      const bufferKey = `${event.sessionId}:${event.runId}`;
+      const bufferKey = backgroundBufferKey(event.sessionId, event.runId);
       const streamId = streamMessageId(event.runId, null);
       const content = backgroundStreamTextRef.current.get(bufferKey) ?? event.content;
       backgroundStreamTextRef.current.delete(bufferKey);
@@ -239,7 +235,6 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
 
   useEffect(
     () => () => {
-      clearCompletionTimeout();
       reveal.stop();
     },
     [reveal],
@@ -249,23 +244,27 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     applyPendingCompleteWithoutSuccess();
     reveal.reset();
     activeStreamIdRef.current = null;
-  }, [activeSessionId, applyPendingCompleteWithoutSuccess, reveal]);
+    if (activeSessionId) {
+      hydrateRevealFromBackground(activeSessionId);
+    }
+  }, [activeSessionId, applyPendingCompleteWithoutSuccess, hydrateRevealFromBackground, reveal]);
 
   const handleAgentEvent = useCallback(
     (event: AgentEventMessage) => {
       switch (event.type) {
         case "agent_state": {
           updateSessionRunFromAgentState(event.sessionId, event.state, event.runId);
-          if (isActiveSession(event.sessionId) && event.state !== "completed") {
-            directorRef.current.setState(mapAgentRunToAvatar(event.state));
-          }
           if (event.state === "failed" || event.state === "cancelled") {
             if (isActiveSession(event.sessionId)) {
               reveal.stop();
               resetStream(event.sessionId);
-              scheduleReturnToIdleRef.current(event.state === "failed" ? 2000 : 1200);
+              if (event.state === "failed") {
+                onAvatarMomentRef.current?.("error", 2000);
+              }
             } else {
-              backgroundStreamTextRef.current.delete(`${event.sessionId}:${event.runId ?? ""}`);
+              backgroundStreamTextRef.current.delete(
+                backgroundBufferKey(event.sessionId, event.runId ?? ""),
+              );
             }
             clearSessionRunRef.current(event.sessionId);
             if (event.runId) {
@@ -306,7 +305,9 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
                 event.sessionId,
                 event.runId,
                 streamId,
-                backgroundStreamTextRef.current.get(`${event.sessionId}:${event.runId}`) ?? "",
+                backgroundStreamTextRef.current.get(
+                  backgroundBufferKey(event.sessionId, event.runId),
+                ) ?? "",
                 event.name,
                 event.detail,
               ),
@@ -354,14 +355,11 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           if (isActiveSession(event.sessionId)) {
             reveal.stop();
             resetStream(event.sessionId);
-            directorRef.current.setState("error");
-            clearCompletionTimeout();
-            completionTimeoutRef.current = setTimeout(() => {
-              completionTimeoutRef.current = null;
-              directorRef.current.setState("idle");
-            }, 2000);
+            onAvatarMomentRef.current?.("error", 2000);
           } else {
-            backgroundStreamTextRef.current.delete(`${event.sessionId}:${event.runId}`);
+            backgroundStreamTextRef.current.delete(
+              backgroundBufferKey(event.sessionId, event.runId),
+            );
           }
           clearSessionRunRef.current(event.sessionId);
           notifyRunSettled(event.sessionId, event.runId);

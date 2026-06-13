@@ -24,6 +24,8 @@ export default function App() {
 
   const resetStreamRef = useRef<(sessionId?: string) => void>(() => {});
   const onRunSettledRef = useRef<(sessionId: string) => void>(() => {});
+  const avatarMomentHoldRef = useRef(false);
+  const [avatarSyncTick, bumpAvatarSync] = useState(0);
   const workspaceSyncInFlight = useRef(new Set<string>());
 
   const sessionRuns = useSessionRunStates();
@@ -53,13 +55,25 @@ export default function App() {
     onRunSettledRef.current = handler;
   }, []);
 
+  const handleAvatarMoment = useCallback(
+    (kind: "success" | "error", holdMs: number) => {
+      avatarMomentHoldRef.current = true;
+      director.setState(kind);
+      window.setTimeout(() => {
+        avatarMomentHoldRef.current = false;
+        bumpAvatarSync((tick) => tick + 1);
+      }, holdMs);
+    },
+    [director],
+  );
+
   const { handleAgentEvent, resetStream, beginStream } = useAgentEvents({
-    director,
     setAllSessions: tabs.setAllSessions,
     setSessionRun: sessionRuns.setSessionRun,
     clearSessionRun: sessionRuns.clearSessionRun,
     activeSessionId: tabs.activeSessionId,
     onRunSettled: (sessionId) => onRunSettledRef.current(sessionId),
+    onAvatarMoment: handleAvatarMoment,
   });
 
   resetStreamRef.current = resetStream;
@@ -71,10 +85,8 @@ export default function App() {
 
   const { handleSend, clearQueueForSession, queuedCount, submitError, clearSubmitError } =
     useAgentSubmitQueue({
-      director,
       beginStream,
       resetStream,
-      setSessionRun: sessionRuns.setSessionRun,
       clearSessionRun: sessionRuns.clearSessionRun,
       isSessionRunning: (sessionId) => sessionRuns.isSessionRunActiveById(sessionId),
       onRunSettled: registerOnRunSettled,
@@ -91,6 +103,7 @@ export default function App() {
   const isActiveSessionStreaming = isSessionRunActive(activeSessionRun);
 
   useEffect(() => {
+    if (avatarMomentHoldRef.current) return;
     if (!tabs.activeSessionId) {
       director.setState("idle");
       return;
@@ -105,7 +118,7 @@ export default function App() {
         ? mapAgentRunToAvatar("streaming")
         : mapAgentRunToAvatar("thinking"),
     );
-  }, [director, sessionRuns.runs, tabs.activeSessionId, sessionRuns.getSessionRun]);
+  }, [director, sessionRuns.runs, tabs.activeSessionId, sessionRuns.getSessionRun, avatarSyncTick]);
 
   const handleCloseTab = useCallback(
     (id: string) => {
