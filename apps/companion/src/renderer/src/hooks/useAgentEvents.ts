@@ -17,6 +17,7 @@ export interface UseAgentEventsOptions {
   director: CharacterDirector;
   setAllSessions: React.Dispatch<React.SetStateAction<ChatSession[]>>;
   setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
+  onRunSettled?: (sessionId: string) => void;
 }
 
 export interface UseAgentEventsResult {
@@ -26,17 +27,27 @@ export interface UseAgentEventsResult {
 }
 
 export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsResult {
-  const { director, setAllSessions, setIsStreaming } = options;
+  const { director, setAllSessions, setIsStreaming, onRunSettled } = options;
 
   const activeStreamIdRef = useRef<string | null>(null);
+  const settledRunKeyRef = useRef<string | null>(null);
   const perfByRunIdRef = useRef(new Map<string, AgentPerfUiRecord>());
   const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const directorRef = useRef(director);
   const setAllSessionsRef = useRef(setAllSessions);
   const setIsStreamingRef = useRef(setIsStreaming);
+  const onRunSettledRef = useRef(onRunSettled);
   directorRef.current = director;
   setAllSessionsRef.current = setAllSessions;
   setIsStreamingRef.current = setIsStreaming;
+  onRunSettledRef.current = onRunSettled;
+
+  const notifyRunSettled = useCallback((sessionId: string, runId: string) => {
+    const key = `${sessionId}:${runId}`;
+    if (settledRunKeyRef.current === key) return;
+    settledRunKeyRef.current = key;
+    onRunSettledRef.current?.(sessionId);
+  }, []);
 
   const clearCompletionTimeout = () => {
     if (completionTimeoutRef.current !== null) {
@@ -86,6 +97,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
         directorRef.current.setState("success");
         setIsStreamingRef.current(false);
         scheduleReturnToIdleRef.current(1200);
+        notifyRunSettled(pending.sessionId, pending.runId);
       },
     });
   }
@@ -156,6 +168,9 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             resetStream();
             setIsStreamingRef.current(false);
             scheduleReturnToIdleRef.current(event.state === "failed" ? 2000 : 1200);
+            if (event.runId) {
+              notifyRunSettled(event.sessionId, event.runId);
+            }
           }
           break;
         }
@@ -218,13 +233,14 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             completionTimeoutRef.current = null;
             directorRef.current.setState("idle");
           }, 2000);
+          notifyRunSettled(event.sessionId, event.runId);
           break;
         }
         default:
           break;
       }
     },
-    [resetStream, reveal, syncRevealContext],
+    [notifyRunSettled, resetStream, reveal, syncRevealContext],
   );
 
   return { handleAgentEvent, resetStream, beginStream };

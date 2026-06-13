@@ -15,6 +15,7 @@ import { ChatPanel } from "./components/ChatPanel";
 import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
 import { useCharacterAssets } from "./hooks/useCharacterAssets";
+import { useMessageQueue } from "./hooks/useMessageQueue";
 import { useSessionTabs } from "./hooks/useSessionTabs";
 import { matchChatTabShortcut, type ChatTabShortcutAction } from "./lib/chatTabShortcuts";
 
@@ -29,6 +30,9 @@ export default function App() {
 
   const resetStreamRef = useRef<() => void>(() => {});
   const workspaceSyncInFlight = useRef(new Set<string>());
+  const drainInFlightRef = useRef(false);
+  const onRunSettledRef = useRef<(sessionId: string) => void>(() => {});
+  const messageQueue = useMessageQueue();
 
   const director = useMemo(() => new CharacterDirector({ onStateChange: setAvatarState }), []);
 
@@ -52,9 +56,68 @@ export default function App() {
     director,
     setAllSessions: tabs.setAllSessions,
     setIsStreaming,
+    onRunSettled: (sessionId) => onRunSettledRef.current(sessionId),
   });
 
   resetStreamRef.current = resetStream;
+
+  const submitToAgent = useCallback(
+    async (params: {
+      sessionId: string;
+      content: string;
+      workspacePath: string;
+      mode: AgentMode;
+      editorContext?: EditorContext | null;
+      attachments?: ChatAttachment[];
+    }) => {
+      beginStream();
+      setIsStreaming(true);
+      try {
+        await window.mimica.submitAgent({
+          sessionId: params.sessionId,
+          content: params.content,
+          workspacePath: params.workspacePath,
+          mode: params.mode,
+          editorContext: params.editorContext ?? undefined,
+          attachments: params.attachments,
+        });
+      } catch {
+        setIsStreaming(false);
+        resetStreamRef.current();
+        director.setState("idle");
+      }
+    },
+    [beginStream, director],
+  );
+
+  const drainQueue = useCallback(
+    async (sessionId: string) => {
+      if (drainInFlightRef.current) return;
+      const next = messageQueue.dequeue(sessionId);
+      if (!next) return;
+
+      drainInFlightRef.current = true;
+      try {
+        await submitToAgent({
+          sessionId,
+          content: next.content,
+          workspacePath: next.workspacePath,
+          mode: next.agentMode,
+          editorContext: next.editorContext,
+          attachments: next.attachments,
+        });
+      } finally {
+        drainInFlightRef.current = false;
+      }
+    },
+    [messageQueue, submitToAgent],
+  );
+
+  useEffect(() => {
+    onRunSettledRef.current = (sessionId) => {
+      void drainQueue(sessionId);
+    };
+  }, [drainQueue]);
 
   const linkedWorkspacePath = editorContext?.workspacePath ?? null;
 
@@ -205,28 +268,44 @@ export default function App() {
     const saved = await window.mimica.saveSession(updated);
     tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
 
-    beginStream();
-    setIsStreaming(true);
-    try {
-      await window.mimica.submitAgent({
-        sessionId: saved.id,
+    const shouldQueue = isStreaming && tabs.activeSessionId === saved.id;
+    if (shouldQueue) {
+      messageQueue.enqueue(saved.id, {
         content,
-        workspacePath,
-        mode: agentMode,
-        editorContext,
         attachments,
+        editorContext,
+        agentMode,
+        workspacePath,
       });
-    } catch {
-      setIsStreaming(false);
-      resetStreamRef.current();
-      director.setState("idle");
+      return;
     }
+
+    await submitToAgent({
+      sessionId: saved.id,
+      content,
+      workspacePath,
+      mode: agentMode,
+      editorContext,
+      attachments,
+    });
   };
 
   const handleCancel = async () => {
     await handleStopStreaming();
     director.setState("idle");
   };
+
+  const handleCloseTab = (id: string) => {
+    messageQueue.clear(id);
+    void tabs.handleCloseTab(id);
+  };
+
+  const handleDeleteSession = (id: string) => {
+    messageQueue.clear(id);
+    void tabs.handleDeleteSession(id);
+  };
+
+  const queuedCount = messageQueue.getQueueSize(tabs.activeSessionId);
 
   return (
     <div className="app">
@@ -249,6 +328,7 @@ export default function App() {
             panelMode={tabs.panelMode}
             tabsBarVisible={tabsBarVisible}
             isStreaming={isStreaming}
+            queuedCount={queuedCount}
             avatarState={avatarState}
             agentMode={agentMode}
             characterShortName={characterShortName}
@@ -259,10 +339,10 @@ export default function App() {
               tabs.setActiveSessionId(id);
               tabs.setPanelMode("chat");
             }}
-            onCloseTab={(id) => void tabs.handleCloseTab(id)}
+            onCloseTab={handleCloseTab}
             onReorderTab={tabs.reorderOpenTab}
             onSelectHistorySession={tabs.openSessionTab}
-            onDeleteSession={(id) => void tabs.handleDeleteSession(id)}
+            onDeleteSession={handleDeleteSession}
             onSend={(text, attachments) => void handleSend(text, attachments)}
             onCancel={() => void handleCancel()}
           />

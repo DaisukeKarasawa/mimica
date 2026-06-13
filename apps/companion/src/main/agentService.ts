@@ -39,7 +39,7 @@ async function loadAgentRunner(): Promise<AgentRunner> {
 export class AgentService {
   private runner: AgentRunner | null = null;
   private runnerReady: Promise<AgentRunner> | null = null;
-  private activeRunId: string | null = null;
+  private activeRun: { runId: string; sessionId: string } | null = null;
 
   constructor(
     private readonly getWebContents: () => WebContents | undefined,
@@ -58,16 +58,21 @@ export class AgentService {
   }
 
   async submit(payload: AgentSubmitPayload): Promise<void> {
-    await this.cancel();
+    if (this.activeRun) {
+      if (this.activeRun.sessionId === payload.sessionId) {
+        throw new Error("Session already has an active agent run");
+      }
+      throw new Error("Another agent run is already in progress");
+    }
 
     const runId = uuidv4();
-    this.activeRunId = runId;
+    this.activeRun = { runId, sessionId: payload.sessionId };
     const wc = this.getWebContents();
     const emitter = new AgentRunEmitter(
       wc,
       payload.sessionId,
       runId,
-      () => runId === this.activeRunId,
+      () => this.activeRun?.runId === runId,
     );
     const runner = await this.getRunner();
 
@@ -181,16 +186,20 @@ export class AgentService {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
             }
             emitter.complete(content);
-            this.activeRunId = null;
+            if (this.activeRun?.runId === runId) {
+              this.activeRun = null;
+            }
           },
           onError: (message) => {
             emitter.error(message);
-            this.activeRunId = null;
+            if (this.activeRun?.runId === runId) {
+              this.activeRun = null;
+            }
           },
         },
       });
     } catch (error) {
-      if (runId !== this.activeRunId) return;
+      if (this.activeRun?.runId !== runId) return;
       const message = error instanceof Error ? error.message : String(error);
       emitAgentEvent(wc, {
         type: "agent_error",
@@ -199,8 +208,8 @@ export class AgentService {
         message,
       });
     } finally {
-      if (this.activeRunId === runId) {
-        this.activeRunId = null;
+      if (this.activeRun?.runId === runId) {
+        this.activeRun = null;
       }
     }
   }
@@ -209,7 +218,7 @@ export class AgentService {
     if (this.runner) {
       await this.runner.cancel();
     }
-    this.activeRunId = null;
+    this.activeRun = null;
   }
 
   async closeSession(sessionId: string): Promise<void> {
@@ -221,7 +230,7 @@ export class AgentService {
     const runner = this.runner;
     this.runner = null;
     this.runnerReady = null;
-    this.activeRunId = null;
+    this.activeRun = null;
     if (!runner) return;
     const results = await Promise.allSettled([
       runner.cancel(),

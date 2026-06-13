@@ -19,6 +19,7 @@ interface ChatPanelProps {
   panelMode: ChatPanelMode;
   tabsBarVisible: boolean;
   isStreaming: boolean;
+  queuedCount?: number;
   avatarState: AvatarState;
   agentMode: AgentMode;
   characterShortName: string;
@@ -42,6 +43,7 @@ export function ChatPanel({
   panelMode,
   tabsBarVisible,
   isStreaming,
+  queuedCount = 0,
   avatarState,
   agentMode,
   characterShortName,
@@ -105,7 +107,7 @@ export function ChatPanel({
 
   const handleSubmit = () => {
     const text = input.trim();
-    if ((!text && attachments.length === 0) || isStreaming) return;
+    if ((!text && attachments.length === 0) || !workspacePath) return;
     const outgoing = attachments;
     setInput("");
     setAttachments([]);
@@ -227,6 +229,11 @@ export function ChatPanel({
             </div>
 
             <div className="composer">
+              {queuedCount > 0 ? (
+                <p className="composer-queue-badge" aria-live="polite">
+                  キュー {queuedCount} 件
+                </p>
+              ) : null}
               {attachmentError ? (
                 <p className="composer-attachment-error" role="alert">
                   {attachmentError}
