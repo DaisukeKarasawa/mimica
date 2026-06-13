@@ -278,7 +278,6 @@ export default function App() {
             queuedCount={queuedCount}
             submitError={submitError}
             onClearSubmitError={clearSubmitError}
-            avatarState={avatarState}
             agentMode={agentMode}
             characterShortName={characterShortName}
             workspacePath={resolveWorkspacePath()}

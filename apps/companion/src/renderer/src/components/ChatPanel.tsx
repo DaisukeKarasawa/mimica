@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { AgentMode, AvatarState, ChatAttachment, ChatSession } from "@mimica/shared";
+import type { AgentMode, ChatAttachment, ChatSession } from "@mimica/shared";
 import { AGENT_DISPLAY_NAME } from "@mimica/shared";
 import type { SessionRunStatus } from "../lib/sessionRunState";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
@@ -24,7 +24,6 @@ interface ChatPanelProps {
   queuedCount?: number;
   submitError?: string | null;
   onClearSubmitError?: () => void;
-  avatarState: AvatarState;
   agentMode: AgentMode;
   characterShortName: string;
   workspacePath: string | null;
@@ -52,7 +51,6 @@ export function ChatPanel({
   queuedCount = 0,
   submitError = null,
   onClearSubmitError,
-  avatarState,
   agentMode,
   characterShortName,
   workspacePath,
