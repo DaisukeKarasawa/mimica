@@ -73,7 +73,7 @@ export function CodeBlockPre({ children, ...preProps }: CodeBlockPreProps) {
           disabled={isEmpty}
           aria-label={ariaLabel}
           title={ariaLabel}
-          aria-live={copyState === "failed" ? "polite" : undefined}
+          aria-live={copyState !== "idle" ? "polite" : undefined}
         >
           {buttonLabel}
         </button>

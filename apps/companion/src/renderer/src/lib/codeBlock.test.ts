@@ -11,6 +11,9 @@ describe("parseLanguageFromCodeClass", () => {
   it("extracts language id from highlight.js class", () => {
     assert.equal(parseLanguageFromCodeClass("language-typescript"), "typescript");
     assert.equal(parseLanguageFromCodeClass("hljs language-ts"), "ts");
+    assert.equal(parseLanguageFromCodeClass("language-c++"), "c++");
+    assert.equal(parseLanguageFromCodeClass("hljs language-c++"), "c++");
+    assert.equal(parseLanguageFromCodeClass("language-objective-c"), "objective-c");
   });
 
   it("returns null when no language class is present", () => {

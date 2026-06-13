@@ -6,7 +6,7 @@ export type CodeBlockElement = ReactElement<{ className?: string; children?: Rea
 /** Language id from react-markdown / highlight.js class, e.g. `language-ts` → `ts`. */
 export function parseLanguageFromCodeClass(className?: string): string | null {
   if (!className) return null;
-  const match = /\blanguage-([\w+-]+)\b/.exec(className);
+  const match = /\blanguage-([\w+#.-]+)/.exec(className);
   return match?.[1] ?? null;
 }
 
