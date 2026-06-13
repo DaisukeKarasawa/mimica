@@ -3,22 +3,22 @@ import {
   isValidElement,
   useCallback,
   useEffect,
-  useRef,
   useState,
   type HTMLAttributes,
-  type ReactElement,
   type ReactNode,
 } from "react";
-import { extractCodeBlockText, parseLanguageFromCodeClass } from "../lib/codeBlock";
+import {
+  extractCodeBlockText,
+  parseLanguageFromCodeClass,
+  type CodeBlockElement,
+} from "../lib/codeBlock";
 
 type CopyState = "idle" | "copied" | "failed";
 
 const COPIED_RESET_MS = 2000;
 const FAILED_RESET_MS = 3000;
 
-function isCodeElement(
-  child: ReactNode,
-): child is ReactElement<{ className?: string; children?: ReactNode }> {
+function isCodeElement(child: ReactNode): child is CodeBlockElement {
   return isValidElement(child) && child.type === "code";
 }
 
@@ -27,48 +27,30 @@ interface CodeBlockPreProps extends HTMLAttributes<HTMLPreElement> {
 }
 
 export function CodeBlockPre({ children, ...preProps }: CodeBlockPreProps) {
-  const preRef = useRef<HTMLPreElement>(null);
-  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [copyState, setCopyState] = useState<CopyState>("idle");
 
   const codeChild = Children.toArray(children).find(isCodeElement) ?? null;
   const language = parseLanguageFromCodeClass(codeChild?.props.className);
-  const initialText = codeChild ? extractCodeBlockText(codeChild) : "";
-  const isEmpty = initialText.length === 0;
+  const blockText = extractCodeBlockText(codeChild);
+  const isEmpty = blockText.length === 0;
 
-  const clearResetTimer = useCallback(() => {
-    if (resetTimerRef.current) {
-      clearTimeout(resetTimerRef.current);
-      resetTimerRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => clearResetTimer, [clearResetTimer]);
-
-  const scheduleReset = useCallback(
-    (ms: number) => {
-      clearResetTimer();
-      resetTimerRef.current = setTimeout(() => {
-        setCopyState("idle");
-        resetTimerRef.current = null;
-      }, ms);
-    },
-    [clearResetTimer],
-  );
+  useEffect(() => {
+    if (copyState === "idle") return;
+    const ms = copyState === "copied" ? COPIED_RESET_MS : FAILED_RESET_MS;
+    const id = setTimeout(() => setCopyState("idle"), ms);
+    return () => clearTimeout(id);
+  }, [copyState]);
 
   const handleCopy = useCallback(async () => {
-    const text = preRef.current?.querySelector("code")?.textContent ?? "";
-    if (!text) return;
+    if (!blockText) return;
 
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(blockText);
       setCopyState("copied");
-      scheduleReset(COPIED_RESET_MS);
     } catch {
       setCopyState("failed");
-      scheduleReset(FAILED_RESET_MS);
     }
-  }, [scheduleReset]);
+  }, [blockText]);
 
   const buttonLabel =
     copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy";
@@ -91,18 +73,12 @@ export function CodeBlockPre({ children, ...preProps }: CodeBlockPreProps) {
           disabled={isEmpty}
           aria-label={ariaLabel}
           title={ariaLabel}
+          aria-live={copyState === "failed" ? "polite" : undefined}
         >
           {buttonLabel}
         </button>
       </div>
-      <pre {...preProps} ref={preRef}>
-        {children}
-      </pre>
-      {copyState === "failed" ? (
-        <p className="code-block-copy-status" role="status">
-          クリップボードへのコピーに失敗しました
-        </p>
-      ) : null}
+      <pre {...preProps}>{children}</pre>
     </div>
   );
 }

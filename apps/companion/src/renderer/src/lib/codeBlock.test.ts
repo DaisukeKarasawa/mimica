@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { CodeBlockElement } from "./codeBlock.ts";
 import { extractCodeBlockText, parseLanguageFromCodeClass } from "./codeBlock.ts";
+
+function codeElement(children: unknown): CodeBlockElement {
+  return { props: { children } } as CodeBlockElement;
+}
 
 describe("parseLanguageFromCodeClass", () => {
   it("extracts language id from highlight.js class", () => {
@@ -16,20 +21,19 @@ describe("parseLanguageFromCodeClass", () => {
 
 describe("extractCodeBlockText", () => {
   it("reads plain string children", () => {
-    assert.equal(extractCodeBlockText("pnpm dev:ui-lab\n"), "pnpm dev:ui-lab\n");
+    assert.equal(extractCodeBlockText(codeElement("pnpm dev:ui-lab\n")), "pnpm dev:ui-lab\n");
   });
 
-  it("reads nested react-markdown code element shape", () => {
-    const code = {
-      props: {
-        children: ["line one\n", "line two"],
-      },
-    };
-    assert.equal(extractCodeBlockText(code), "line one\nline two");
+  it("reads string arrays from react-markdown code children", () => {
+    assert.equal(
+      extractCodeBlockText(codeElement(["line one\n", "line two"])),
+      "line one\nline two",
+    );
   });
 
-  it("returns empty string for missing children", () => {
+  it("returns empty string for missing code element or children", () => {
     assert.equal(extractCodeBlockText(null), "");
-    assert.equal(extractCodeBlockText({ props: {} }), "");
+    assert.equal(extractCodeBlockText(undefined), "");
+    assert.equal(extractCodeBlockText(codeElement(undefined)), "");
   });
 });

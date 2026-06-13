@@ -1,3 +1,8 @@
+import type { ReactElement, ReactNode } from "react";
+
+/** Inner `code` element from react-markdown fenced blocks. */
+export type CodeBlockElement = ReactElement<{ className?: string; children?: ReactNode }>;
+
 /** Language id from react-markdown / highlight.js class, e.g. `language-ts` → `ts`. */
 export function parseLanguageFromCodeClass(className?: string): string | null {
   if (!className) return null;
@@ -5,15 +10,16 @@ export function parseLanguageFromCodeClass(className?: string): string | null {
   return match?.[1] ?? null;
 }
 
-/** Plain text from a fenced code block's inner `code` element props. */
-export function extractCodeBlockText(children: unknown): string {
+/** Plain text from a fenced block's inner `code` element. */
+export function extractCodeBlockText(codeElement: CodeBlockElement | null | undefined): string {
+  if (!codeElement) return "";
+  return flattenMarkdownChildren(codeElement.props.children);
+}
+
+function flattenMarkdownChildren(children: ReactNode): string {
   if (typeof children === "string") return children;
   if (Array.isArray(children)) {
-    return children.map((child) => extractCodeBlockText(child)).join("");
-  }
-  if (children && typeof children === "object" && "props" in children) {
-    const props = (children as { props?: { children?: unknown } }).props;
-    return extractCodeBlockText(props?.children);
+    return children.map((child) => flattenMarkdownChildren(child)).join("");
   }
   return "";
 }
