@@ -155,7 +155,7 @@ export function classifyAgentError(raw: string, errorName?: string): ErrorKind {
   ) {
     return "cancelled";
   }
-  if (/CURSOR_API_KEY/i.test(message) || /api\s*key/i.test(message)) {
+  if (/CURSOR_API_KEY/i.test(message)) {
     return "auth_missing";
   }
   if (

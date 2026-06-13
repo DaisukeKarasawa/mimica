@@ -54,6 +54,7 @@ describe("classifyAgentError", () => {
     assert.equal(classifyAgentError("run was cancelled"), "cancelled");
     assert.equal(classifyAgentError("something unexpected", "AbortError"), "cancelled");
     assert.equal(classifyAgentError("unknown failure"), "generic");
+    assert.equal(classifyAgentError("Stripe API key is invalid"), "generic");
   });
 });
 
