@@ -210,8 +210,18 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
         }
         case "agent_error": {
           reveal.stop();
-          resetStream();
+          reveal.reset();
+          activeStreamIdRef.current = null;
           setIsStreamingRef.current(false);
+          setAllSessionsRef.current((prev) =>
+            applyAgentComplete(
+              prev,
+              event.sessionId,
+              event.runId,
+              streamMessageId(event.runId, null),
+              event.message,
+            ),
+          );
           directorRef.current.setState("error");
           clearCompletionTimeout();
           completionTimeoutRef.current = setTimeout(() => {

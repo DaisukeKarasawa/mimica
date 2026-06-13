@@ -2,7 +2,12 @@ import { relative } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
 import type { AgentMode, ChatAttachment, EditorContext } from "@mimica/shared";
-import { isChatAttachment, toMessageContext } from "@mimica/shared";
+import {
+  buildPersonaErrorMessage,
+  classifyAgentError,
+  isChatAttachment,
+  toMessageContext,
+} from "@mimica/shared";
 import {
   AgentRunTimingTrace,
   isAgentPerfEnabled,
@@ -14,9 +19,9 @@ import {
   shouldWarnUnlinkedAtExpansion,
   UNLINKED_AT_EXPANSION_WARNING,
 } from "./agentSubmitWorkspace.js";
-import { resolvePersonaSystemPrompt } from "./personaSetup.js";
+import { resolvePersonaReactions, resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
-import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
+import { AgentRunEmitter } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
 import { debugLogAtResolution, resolveAtInput } from "./cursorAt/index.js";
@@ -45,6 +50,34 @@ export class AgentService {
     private readonly getWebContents: () => WebContents | undefined,
     private readonly sessionStore: SessionStore,
   ) {}
+
+  private persistAgentRunError(
+    sessionId: string,
+    runId: string,
+    rawMessage: string,
+    emitter: AgentRunEmitter,
+  ): void {
+    const kind = classifyAgentError(rawMessage);
+    let userMessage: string;
+    try {
+      userMessage = buildPersonaErrorMessage(kind, rawMessage, resolvePersonaReactions());
+    } catch {
+      userMessage = rawMessage;
+    }
+    console.error(`[agentService] run ${runId} error (${kind}):`, rawMessage);
+
+    const current = this.sessionStore.get(sessionId);
+    if (current) {
+      try {
+        this.sessionStore.save(appendAssistantMessage(current, userMessage, runId));
+      } catch (err) {
+        console.error("[agentService] failed to persist error message:", err);
+      }
+    }
+
+    emitter.error(userMessage);
+    this.activeRunId = null;
+  }
 
   private async getRunner(): Promise<AgentRunner> {
     if (this.runner) return this.runner;
@@ -184,20 +217,14 @@ export class AgentService {
             this.activeRunId = null;
           },
           onError: (message) => {
-            emitter.error(message);
-            this.activeRunId = null;
+            this.persistAgentRunError(payload.sessionId, runId, message, emitter);
           },
         },
       });
     } catch (error) {
       if (runId !== this.activeRunId) return;
       const message = error instanceof Error ? error.message : String(error);
-      emitAgentEvent(wc, {
-        type: "agent_error",
-        sessionId: payload.sessionId,
-        runId,
-        message,
-      });
+      this.persistAgentRunError(payload.sessionId, runId, message, emitter);
     } finally {
       if (this.activeRunId === runId) {
         this.activeRunId = null;
