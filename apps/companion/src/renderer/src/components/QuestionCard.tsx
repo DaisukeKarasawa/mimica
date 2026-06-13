@@ -51,13 +51,18 @@ export function QuestionCard({
 
   const handleSubmit = () => {
     if (!canSubmit || !onSubmit) return;
-    onSubmit({
-      questionPromptId: question.id,
-      answers: question.questions.map((item) => ({
+    const answers = question.questions
+      .map((item) => ({
         questionId: item.id,
         selectedOptionIds: selectedByQuestion[item.id] ?? [],
         freeformText: freeformByQuestion[item.id]?.trim() || undefined,
-      })),
+      }))
+      .filter(
+        (entry) => entry.selectedOptionIds.length > 0 || (entry.freeformText?.length ?? 0) > 0,
+      );
+    onSubmit({
+      questionPromptId: question.id,
+      answers,
     });
   };
 

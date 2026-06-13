@@ -91,7 +91,9 @@ export function ChatPanel({
   const lastMessage = activeSession?.messages.at(-1);
   const awaitingAssistantReply =
     lastMessage?.role === "user" ||
-    (lastMessage?.role === "assistant" && !lastMessage.content.trim());
+    (lastMessage?.role === "assistant" &&
+      !lastMessage.content.trim() &&
+      !lastMessage.agentQuestion);
   const showThinkingIndicator = avatarState === "thinking" && awaitingAssistantReply;
   const { containerRef: messagesRef, scrollToBottom } = useStickToBottomScroll({
     enabled: showChat,
@@ -221,6 +223,7 @@ export function ChatPanel({
                         {msg.content.trim() ? <MarkdownMessage content={msg.content} /> : null}
                         {msg.agentQuestion ? (
                           <QuestionCard
+                            key={msg.agentQuestion.id}
                             question={msg.agentQuestion}
                             disabled={isStreaming}
                             onSubmit={(payload) => {
