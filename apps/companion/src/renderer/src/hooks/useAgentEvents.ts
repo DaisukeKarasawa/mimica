@@ -151,11 +151,16 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             directorRef.current.setState(mapAgentRunToAvatar(event.state));
           }
           if (event.state === "streaming") setIsStreamingRef.current(true);
-          if (event.state === "failed" || event.state === "cancelled") {
+          if (event.state === "cancelled") {
             reveal.stop();
             resetStream();
             setIsStreamingRef.current(false);
-            scheduleReturnToIdleRef.current(event.state === "failed" ? 2000 : 1200);
+            scheduleReturnToIdleRef.current(1200);
+          }
+          if (event.state === "failed") {
+            reveal.stop();
+            setIsStreamingRef.current(false);
+            scheduleReturnToIdleRef.current(2000);
           }
           break;
         }
@@ -210,17 +215,12 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
         }
         case "agent_error": {
           reveal.stop();
+          const streamId = activeStreamIdRef.current ?? streamMessageId(event.runId, null);
           reveal.reset();
           activeStreamIdRef.current = null;
           setIsStreamingRef.current(false);
           setAllSessionsRef.current((prev) =>
-            applyAgentComplete(
-              prev,
-              event.sessionId,
-              event.runId,
-              streamMessageId(event.runId, null),
-              event.message,
-            ),
+            applyAgentComplete(prev, event.sessionId, event.runId, streamId, event.message),
           );
           directorRef.current.setState("error");
           clearCompletionTimeout();

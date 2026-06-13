@@ -56,15 +56,21 @@ describe("syncPersonaPackFromTemplate", () => {
     );
   });
 
-  it("overwrites unchanged v1 seeded packs when pack version is older", () => {
-    writeFileSync(join(targetDir, "SKILL.md"), readV1Template("SKILL.md"), "utf8");
+  it("overwrites unchanged v1 seeded lines.json when pack version is older", () => {
+    writeFileSync(join(targetDir, "SKILL.md"), "user kept skill", "utf8");
+    writeFileSync(join(targetDir, "lines.json"), readV1Template("lines.json.example"), "utf8");
     writeFileSync(join(targetDir, ".pack-version"), "1\n", "utf8");
-    seedAllTemplates("three-layer persona v2");
+    seedAllTemplates("pack v3");
+    writeTemplate(
+      "lines.json.example",
+      JSON.stringify({ reactions: { error_by_kind: { generic: ["pack v3 lines"] } } }),
+    );
 
     const changed = syncPersonaPackFromTemplate(templateDir, targetDir);
 
     assert.equal(changed, true);
-    assert.match(readFileSync(join(targetDir, "SKILL.md"), "utf8"), /three-layer persona v2/);
+    assert.match(readFileSync(join(targetDir, "SKILL.md"), "utf8"), /user kept skill/);
+    assert.match(readFileSync(join(targetDir, "lines.json"), "utf8"), /error_by_kind/);
     assert.equal(
       Number.parseInt(readFileSync(join(targetDir, ".pack-version"), "utf8").trim(), 10),
       PERSONA_PACK_VERSION,
@@ -108,19 +114,43 @@ describe("syncPersonaPackFromTemplate", () => {
 
   it("does not bump pack version when upgrade copies fail", () => {
     const isolatedTarget = mkdtempSync(join(tmpdir(), "mimica-persona-fail-target-"));
-    seedAllTemplates("three-layer persona v2");
-    writeFileSync(join(isolatedTarget, "SKILL.md"), "legacy persona", "utf8");
-    writeFileSync(join(isolatedTarget, ".pack-version"), "1\n", "utf8");
-    writeFileSync(join(isolatedTarget, "style.md"), readV1Template("style.md"), { mode: 0o444 });
+    seedAllTemplates("pack v3");
+    writeTemplate(
+      "lines.json.example",
+      JSON.stringify({ reactions: { error_by_kind: { generic: ["pack v3 lines"] } } }),
+    );
+    writeFileSync(join(isolatedTarget, "lines.json"), readV1Template("lines.json.example"), {
+      mode: 0o444,
+    });
+    writeFileSync(join(isolatedTarget, ".pack-version"), "2\n", "utf8");
 
     const changed = syncPersonaPackFromTemplate(templateDir, isolatedTarget);
 
     assert.equal(changed, true);
     assert.equal(
       Number.parseInt(readFileSync(join(isolatedTarget, ".pack-version"), "utf8").trim(), 10),
-      1,
+      2,
     );
     rmSync(isolatedTarget, { recursive: true, force: true });
+  });
+
+  it("overwrites unchanged v2 seeded lines.json when pack version is older", () => {
+    writeFileSync(join(targetDir, "lines.json"), readV1Template("lines.json.example"), "utf8");
+    writeFileSync(join(targetDir, ".pack-version"), "2\n", "utf8");
+    seedAllTemplates("three-layer persona v3");
+    writeTemplate(
+      "lines.json.example",
+      JSON.stringify({ reactions: { error_by_kind: { generic: ["test"] } } }),
+    );
+
+    const changed = syncPersonaPackFromTemplate(templateDir, targetDir);
+
+    assert.equal(changed, true);
+    assert.match(readFileSync(join(targetDir, "lines.json"), "utf8"), /error_by_kind/);
+    assert.equal(
+      Number.parseInt(readFileSync(join(targetDir, ".pack-version"), "utf8").trim(), 10),
+      PERSONA_PACK_VERSION,
+    );
   });
 
   it("does not overwrite user files once pack version is current", () => {

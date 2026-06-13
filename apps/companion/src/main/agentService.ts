@@ -1,10 +1,10 @@
 import { relative } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
-import type { AgentMode, ChatAttachment, EditorContext } from "@mimica/shared";
+import type { AgentMode, ChatAttachment, EditorContext, AgentRunError } from "@mimica/shared";
 import {
+  agentRunErrorFromUnknown,
   buildPersonaErrorMessage,
-  classifyAgentError,
   isChatAttachment,
   toMessageContext,
 } from "@mimica/shared";
@@ -19,7 +19,7 @@ import {
   shouldWarnUnlinkedAtExpansion,
   UNLINKED_AT_EXPANSION_WARNING,
 } from "./agentSubmitWorkspace.js";
-import { resolvePersonaReactions, resolvePersonaSystemPrompt } from "./personaSetup.js";
+import { resolvePersonaPack, resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
@@ -54,17 +54,15 @@ export class AgentService {
   private persistAgentRunError(
     sessionId: string,
     runId: string,
-    rawMessage: string,
+    error: AgentRunError,
     emitter: AgentRunEmitter,
   ): void {
-    const kind = classifyAgentError(rawMessage);
-    let userMessage: string;
-    try {
-      userMessage = buildPersonaErrorMessage(kind, rawMessage, resolvePersonaReactions());
-    } catch {
-      userMessage = rawMessage;
-    }
-    console.error(`[agentService] run ${runId} error (${kind}):`, rawMessage);
+    const userMessage = buildPersonaErrorMessage(
+      error.kind,
+      error.detail,
+      resolvePersonaPack().reactions,
+    );
+    console.error(`[agentService] run ${runId} error (${error.kind}):`, error.detail ?? error.kind);
 
     const current = this.sessionStore.get(sessionId);
     if (current) {
@@ -216,15 +214,14 @@ export class AgentService {
             emitter.complete(content);
             this.activeRunId = null;
           },
-          onError: (message) => {
-            this.persistAgentRunError(payload.sessionId, runId, message, emitter);
+          onError: (error) => {
+            this.persistAgentRunError(payload.sessionId, runId, error, emitter);
           },
         },
       });
     } catch (error) {
       if (runId !== this.activeRunId) return;
-      const message = error instanceof Error ? error.message : String(error);
-      this.persistAgentRunError(payload.sessionId, runId, message, emitter);
+      this.persistAgentRunError(payload.sessionId, runId, agentRunErrorFromUnknown(error), emitter);
     } finally {
       if (this.activeRunId === runId) {
         this.activeRunId = null;
