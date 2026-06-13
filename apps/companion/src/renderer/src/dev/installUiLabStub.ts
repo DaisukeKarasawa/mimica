@@ -162,6 +162,7 @@ export function installUiLabStub(): void {
         UI_LAB_SESSION_IDS.impl,
         UI_LAB_SESSION_IDS.bug,
         UI_LAB_SESSION_IDS.review,
+        UI_LAB_SESSION_IDS.mermaid,
         UI_LAB_SESSION_IDS.askQuestions,
       ]),
     );
