@@ -1,5 +1,6 @@
 import type { Run, SDKImage } from "@cursor/sdk";
 import type { AgentMode, ChatMessage, MessageContext } from "@mimica/shared";
+import { agentRunError, agentRunErrorFromUnknown } from "@mimica/shared";
 import { cancelRun, isAbortError } from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import { AgentSessionPool } from "./agentSessionPool.js";
@@ -46,7 +47,7 @@ export class AgentRunner {
   async runChat(params: RunChatParams): Promise<void> {
     const apiKey = params.apiKey ?? resolveCursorApiKey();
     if (!apiKey) {
-      params.callbacks.onError("CURSOR_API_KEY が設定されていません");
+      params.callbacks.onError(agentRunError("auth_missing"));
       params.callbacks.onState("failed");
       return;
     }
@@ -80,7 +81,7 @@ export class AgentRunner {
     } catch (err) {
       timing?.report("failed");
       params.callbacks.onState("failed");
-      params.callbacks.onError(err instanceof Error ? err.message : String(err));
+      params.callbacks.onError(agentRunErrorFromUnknown(err));
       return;
     }
 
@@ -161,7 +162,7 @@ export class AgentRunner {
         this.sessionPool.invalidateSession(params.sessionId);
         timing?.report("failed");
         callbacks.onState("failed");
-        callbacks.onError(result.result ?? "Agent の実行に失敗しました");
+        callbacks.onError(agentRunError("agent_failed", result.result ?? undefined));
         return;
       }
 
@@ -187,7 +188,7 @@ export class AgentRunner {
       this.sessionPool.invalidateSession(params.sessionId);
       timing?.report("failed");
       callbacks.onState("failed");
-      callbacks.onError(err instanceof Error ? err.message : String(err));
+      callbacks.onError(agentRunErrorFromUnknown(err));
     } finally {
       if (streamRunId) {
         releaseAskQuestionStreamRun(streamRunId);

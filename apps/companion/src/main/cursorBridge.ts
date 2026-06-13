@@ -95,6 +95,7 @@ export class CursorBridgeServer {
     private readonly port: number,
     private readonly onContext: (context: EditorContext) => void,
     bridgeToken?: string,
+    private readonly onClientChange?: (connected: boolean) => void,
   ) {
     this.bridgeToken = bridgeToken ?? resolveBridgeToken();
   }
@@ -106,6 +107,7 @@ export class CursorBridgeServer {
         this.client.close(1000, "replaced");
       }
       this.client = ws;
+      this.onClientChange?.(true);
 
       const ack: ServerMessage = {
         type: "connection_ack",
@@ -127,7 +129,10 @@ export class CursorBridgeServer {
       });
 
       ws.on("close", () => {
-        if (this.client === ws) this.client = null;
+        if (this.client === ws) {
+          this.client = null;
+          this.onClientChange?.(false);
+        }
       });
     });
   }

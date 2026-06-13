@@ -6,17 +6,20 @@ import type {
   AgentQuestionAnswerInput,
   AgentQuestionDismissInput,
   AgentQuestionPrompt,
+  AgentRunError,
   ChatAttachment,
   ChatSession,
   EditorContext,
 } from "@mimica/shared";
 import {
+  agentRunErrorFromUnknown,
   findAgentQuestionPrompt,
   isChatAttachment,
   toMessageContext,
   updateAgentQuestionStatus,
   upsertAssistantQuestion,
 } from "@mimica/shared";
+import { agentRunError, formatPersonaErrorForUser, PersonaFacingError } from "./personaErrors.js";
 import {
   AgentRunTimingTrace,
   buildAskQuestionFollowUpText,
@@ -31,7 +34,7 @@ import {
 } from "./agentSubmitWorkspace.js";
 import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
-import { AgentRunEmitter, emitAgentEvent, emitQuestionResolved } from "./agentRunEmitter.js";
+import { AgentRunEmitter, emitQuestionResolved } from "./agentRunEmitter.js";
 import {
   appendAssistantMessage,
   appendUserMessage,
@@ -82,6 +85,29 @@ export class AgentService {
     private readonly sessionStore: SessionStore,
   ) {}
 
+  private persistAgentRunError(
+    sessionId: string,
+    runId: string,
+    error: AgentRunError,
+    emitter: AgentRunEmitter,
+  ): void {
+    if (runId !== this.activeRunId) return;
+
+    const userMessage = formatPersonaErrorForUser(error);
+    console.error(`[agentService] run ${runId} error (${error.kind}):`, error.detail ?? error.kind);
+
+    const current = this.sessionStore.get(sessionId);
+    if (current) {
+      try {
+        this.sessionStore.save(appendAssistantMessage(current, userMessage, runId));
+      } catch (err) {
+        console.error("[agentService] failed to persist error message:", err);
+      }
+    }
+
+    emitter.terminalError(userMessage);
+  }
+
   private async getRunner(): Promise<AgentRunner> {
     if (this.runner) return this.runner;
     if (!this.runnerReady) {
@@ -115,10 +141,12 @@ export class AgentService {
 
     const session = this.sessionStore.get(payload.sessionId);
     if (!session) {
-      throw new Error("Session not found");
+      throw new PersonaFacingError(agentRunError("session"));
     }
     if ((payload.attachments?.length ?? 0) > MAX_IMAGE_ATTACHMENTS) {
-      throw new Error(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
+      throw new PersonaFacingError(
+        agentRunError("attachment", `Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`),
+      );
     }
     const allMessages = session.messages;
     const history = historyForAgentPrompt(allMessages, payload.content);
@@ -223,29 +251,22 @@ export class AgentService {
             emitter.question(correlated);
           },
           onComplete: (content) => {
+            if (runId !== this.activeRunId) return;
             runSucceeded = true;
             const current = this.sessionStore.get(payload.sessionId);
             if (current) {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
             }
             emitter.complete(content);
-            this.activeRunId = null;
           },
-          onError: (message) => {
-            emitter.error(message);
-            this.activeRunId = null;
+          onError: (error) => {
+            this.persistAgentRunError(payload.sessionId, runId, error, emitter);
           },
         },
       });
     } catch (error) {
       if (runId !== this.activeRunId) return false;
-      const message = error instanceof Error ? error.message : String(error);
-      emitAgentEvent(wc, {
-        type: "agent_error",
-        sessionId: payload.sessionId,
-        runId,
-        message,
-      });
+      this.persistAgentRunError(payload.sessionId, runId, agentRunErrorFromUnknown(error), emitter);
       return false;
     } finally {
       if (this.activeRunId === runId) {

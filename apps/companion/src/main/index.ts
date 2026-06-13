@@ -27,6 +27,11 @@ import { registerSlashMenuIpc } from "./ipc/slashMenu.js";
 import { registerAtMenuIpc } from "./ipc/atMenu.js";
 import { registerAttachmentIpc, releaseDraftAttachments } from "./ipc/attachments.js";
 import { registerAgentQuestionIpc } from "./ipc/agentQuestion.js";
+import {
+  formatPersonaErrorKind,
+  parsePersonaFormatRequest,
+  rethrowPersonaIpcError,
+} from "./personaErrors.js";
 
 const electronApis = electron();
 
@@ -41,6 +46,10 @@ let mainWindow: BrowserWindowType | null = null;
 let bridgeServer: CursorBridgeServer | null = null;
 const sessionStore = new SessionStore();
 let agentService: AgentService | null = null;
+
+function sendBridgeStatus(connected: boolean): void {
+  mainWindow?.webContents.send("bridge-status", { connected });
+}
 
 function attachMainWindow(win: BrowserWindowType): void {
   mainWindow = win;
@@ -71,21 +80,37 @@ if (!gotLock) {
     sessionStore.load();
     bindAttachmentSessionGuard((id) => sessionStore.get(id) != null);
     seedWorkspaceAllowlist(sessionStore.list().map((s) => s.workspacePath));
-    bridgeServer = new CursorBridgeServer(DEFAULT_WS_PORT, (context) => {
-      mainWindow?.webContents.send("editor-context", context);
-    });
+    bridgeServer = new CursorBridgeServer(
+      DEFAULT_WS_PORT,
+      (context) => {
+        mainWindow?.webContents.send("editor-context", context);
+      },
+      undefined,
+      sendBridgeStatus,
+    );
     await bridgeServer.start();
 
     attachMainWindow(createMainWindow());
 
     ipcMain.handle("character:assets", () => getCharacterAssetStatus());
-    ipcMain.handle("agent:submit", (event, payload) => {
+    ipcMain.handle("persona:formatError", (_e, kind: unknown, detail?: unknown) => {
+      const runError = parsePersonaFormatRequest(kind, detail);
+      if (!runError) {
+        throw new Error(formatPersonaErrorKind("generic"));
+      }
+      return formatPersonaErrorKind(runError.kind, runError.detail);
+    });
+    ipcMain.handle("agent:submit", async (event, payload) => {
       if (!agentService) throw new Error("Agent service is unavailable");
       const attachmentCount = Array.isArray(payload?.attachments) ? payload.attachments.length : 0;
       if (attachmentCount > 0 && typeof payload?.sessionId === "string") {
         releaseDraftAttachments(event.sender.id, payload.sessionId, attachmentCount);
       }
-      return agentService.submit(payload);
+      try {
+        return await agentService.submit(payload);
+      } catch (error) {
+        rethrowPersonaIpcError(error);
+      }
     });
     ipcMain.handle("agent:cancel", () => {
       if (!agentService) throw new Error("Agent service is unavailable");

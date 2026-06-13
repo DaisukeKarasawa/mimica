@@ -67,6 +67,11 @@ export function installUiLabStub(): void {
 
     getBridgeStatus: async () => ({ connected: true, port: DEFAULT_WS_PORT }),
 
+    onBridgeStatusChange: (cb) => {
+      void cb;
+      return () => {};
+    },
+
     getCharacterAssets: async () => ({
       baseUrl: "",
       assetRoot: "~/MimicaAssets/characters/rio",
@@ -76,6 +81,12 @@ export function installUiLabStub(): void {
       motionMap: null,
       chatIconUrl: null,
     }),
+
+    formatPersonaError: async (kind, detail) => {
+      void kind;
+      void detail;
+      return "……想定外ね。\n\nエラーが発生しました。";
+    },
 
     submitAgent: async (payload: AgentSubmitPayload) => {
       void payload;

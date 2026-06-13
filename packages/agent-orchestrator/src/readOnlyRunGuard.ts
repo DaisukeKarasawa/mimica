@@ -2,6 +2,7 @@ import type { Run } from "@cursor/sdk";
 import { cancelRun } from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import { isAskDeniedTool, READ_ONLY_TOOL_ERROR } from "./readOnlyPolicy.js";
+import { agentRunError } from "@mimica/shared";
 import { isBlockedToolCallStatus, toolCallName } from "./toolCallName.js";
 
 /** Single enforcement point for Ask-mode write-tool blocking (onDelta + stream). */
@@ -24,7 +25,7 @@ export class ReadOnlyRunGuard {
       await cancelRun(this.getRun());
     } finally {
       this.callbacks.onState("failed");
-      this.callbacks.onError(READ_ONLY_TOOL_ERROR(name));
+      this.callbacks.onError(agentRunError("read_only_blocked", READ_ONLY_TOOL_ERROR(name)));
     }
   }
 

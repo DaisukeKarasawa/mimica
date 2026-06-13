@@ -9,6 +9,7 @@ import type {
   ChatAttachment,
   ChatSession,
   EditorContext,
+  ErrorKind,
   ImagePastePayload,
   SlashMenuSection,
 } from "@mimica/shared";
@@ -30,12 +31,14 @@ export interface MimicaApi {
   saveSession: (session: ChatSession) => Promise<ChatSession>;
   getBridgeStatus: () => Promise<{ connected: boolean; port: number }>;
   getCharacterAssets: () => Promise<CharacterAssetStatus>;
+  formatPersonaError: (kind: ErrorKind, detail?: string) => Promise<string>;
   submitAgent: (payload: AgentSubmitPayload) => Promise<void>;
   cancelAgent: () => Promise<void>;
   answerAgentQuestion: (input: AgentQuestionAnswerInput) => Promise<ChatSession>;
   dismissAgentQuestion: (input: AgentQuestionDismissInput) => Promise<ChatSession>;
   openExternal: (url: string) => Promise<boolean>;
   onEditorContext: (cb: (context: EditorContext) => void) => () => void;
+  onBridgeStatusChange: (cb: (status: { connected: boolean }) => void) => () => void;
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
   onChatTabShortcut: (cb: (action: ChatTabShortcutAction) => void) => () => void;
   listSlashMenu: (workspacePath: string, mode: AgentMode) => Promise<SlashMenuSection[]>;
@@ -57,6 +60,7 @@ const api: MimicaApi = {
   saveSession: (session) => ipcRenderer.invoke("sessions:save", session),
   getBridgeStatus: () => ipcRenderer.invoke("bridge:status"),
   getCharacterAssets: () => ipcRenderer.invoke("character:assets"),
+  formatPersonaError: (kind, detail) => ipcRenderer.invoke("persona:formatError", kind, detail),
   submitAgent: (payload) => ipcRenderer.invoke("agent:submit", payload),
   cancelAgent: () => ipcRenderer.invoke("agent:cancel"),
   answerAgentQuestion: (input) => ipcRenderer.invoke("agent:questionAnswer", input),
@@ -66,6 +70,11 @@ const api: MimicaApi = {
     const handler = (_: unknown, context: EditorContext) => cb(context);
     ipcRenderer.on("editor-context", handler);
     return () => ipcRenderer.removeListener("editor-context", handler);
+  },
+  onBridgeStatusChange: (cb) => {
+    const handler = (_: unknown, status: { connected: boolean }) => cb(status);
+    ipcRenderer.on("bridge-status", handler);
+    return () => ipcRenderer.removeListener("bridge-status", handler);
   },
   onAgentEvent: (cb) => {
     const handler = (_: unknown, event: AgentEventMessage) => cb(event);
