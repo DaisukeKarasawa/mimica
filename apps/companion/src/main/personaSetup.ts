@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parsePersonaLinesJson, type PersonaReactions } from "@mimica/shared";
 import { electron } from "./electron.js";
 import { getActiveMimicaSettings } from "./characterPack.js";
 import { resolveExpandedPath } from "./paths.js";
@@ -38,6 +39,8 @@ let cachedPersonaPrompt: string | undefined;
 let cachedPersonaSourcePath: string | undefined;
 let cachedPersonaSourceMtimeMs: number | undefined;
 let cachedPersonaStyleMtimeMs: number | undefined;
+let cachedPersonaReactions: PersonaReactions | undefined;
+let cachedPersonaReactionsKey: string | undefined;
 
 function devTemplatePersonaDir(): string {
   const companionRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -122,6 +125,8 @@ export function resetPersonaSetupCachesForTests(): void {
   cachedPersonaSourcePath = undefined;
   cachedPersonaSourceMtimeMs = undefined;
   cachedPersonaStyleMtimeMs = undefined;
+  cachedPersonaReactions = undefined;
+  cachedPersonaReactionsKey = undefined;
 }
 
 /** Seeds or upgrades persona pack files from bundled templates. */
@@ -171,6 +176,8 @@ export function ensurePersonaPackOnDisk(): void {
     cachedPersonaSourcePath = undefined;
     cachedPersonaSourceMtimeMs = undefined;
     cachedPersonaStyleMtimeMs = undefined;
+    cachedPersonaReactions = undefined;
+    cachedPersonaReactionsKey = undefined;
   }
 }
 
@@ -204,4 +211,41 @@ export function resolvePersonaSystemPrompt(): string | undefined {
   cachedPersonaStyleMtimeMs = styleMtimeMs;
   cachedPersonaPrompt = prompt;
   return prompt;
+}
+
+function readPersonaReactionsFromDir(personaDir: string): PersonaReactions | undefined {
+  const candidates = [join(personaDir, "lines.json"), join(personaDir, "lines.json.example")];
+  for (const linesPath of candidates) {
+    if (!existsSync(linesPath)) continue;
+    try {
+      const parsed = parsePersonaLinesJson(readFileSync(linesPath, "utf8"));
+      if (parsed) return parsed;
+    } catch (err) {
+      console.warn(`${LOG_PREFIX} failed to parse lines at ${linesPath}:`, err);
+    }
+  }
+  return undefined;
+}
+
+/** Cached persona reactions from the active persona pack (or bundled template fallback). */
+export function resolvePersonaReactions(): PersonaReactions | undefined {
+  ensurePersonaPackOnDisk();
+  const settings = getActiveMimicaSettings();
+  const sourcePath = resolveExpandedPath(settings.personaPackPath);
+  const personaDir = dirname(sourcePath);
+  const linesPath = join(personaDir, "lines.json");
+  const linesMtimeMs = personaSourceMtimeMs(linesPath);
+  const cacheKey = `${sourcePath}:${linesMtimeMs ?? "missing"}`;
+  if (cachedPersonaReactionsKey === cacheKey) {
+    return cachedPersonaReactions;
+  }
+
+  const templatePersonaDir = getTemplatePersonaDir();
+  const reactions =
+    readPersonaReactionsFromDir(personaDir) ?? readPersonaReactionsFromDir(templatePersonaDir);
+
+  cachedPersonaSourcePath = sourcePath;
+  cachedPersonaReactionsKey = cacheKey;
+  cachedPersonaReactions = reactions;
+  return reactions;
 }

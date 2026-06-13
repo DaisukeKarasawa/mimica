@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { parsePersonaLinesJson, type PersonaReactions } from "@mimica/shared";
 
 export function expandHomePath(path: string): string {
   if (path.startsWith("~/")) {
@@ -13,6 +14,7 @@ export interface PersonaPack {
   skillMarkdown: string;
   styleMarkdown?: string;
   linesJson?: string;
+  reactions?: PersonaReactions;
   sourcePath: string;
 }
 
@@ -32,11 +34,13 @@ export function loadPersonaPack(
   const dir = dirname(skillPath);
   const stylePath = join(dir, "style.md");
   const linesPath = join(dir, "lines.json");
+  const linesJson = existsSync(linesPath) ? readFileSync(linesPath, "utf8") : undefined;
 
   return {
     skillMarkdown: readFileSync(skillPath, "utf8"),
     styleMarkdown: existsSync(stylePath) ? readFileSync(stylePath, "utf8") : undefined,
-    linesJson: existsSync(linesPath) ? readFileSync(linesPath, "utf8") : undefined,
+    linesJson,
+    reactions: linesJson ? (parsePersonaLinesJson(linesJson) ?? undefined) : undefined,
     sourcePath: skillPath,
   };
 }

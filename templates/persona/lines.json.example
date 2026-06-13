@@ -24,6 +24,17 @@
     "success": ["結果で証明したわ。"],
     "error": ["……想定外ね。再計算するわ。"],
     "waiting": ["貴方の判断を待っているわ。"],
-    "cancelled": ["了解。中断するわ。"]
+    "cancelled": ["了解。中断するわ。"],
+    "error_by_kind": {
+      "agent_failed": ["……実行に失敗したわ。原因を特定する。"],
+      "agent_timeout": ["……応答が遅いわ。タイムアウトよ。"],
+      "auth_missing": ["……設定が足りないわね。API キーを確認して頂戴。"],
+      "connection": ["……接続が途切れたわ。Cursor から Companion を開き直して頂戴。"],
+      "attachment": ["……画像の処理に失敗したわ。"],
+      "session": ["……セッションが見つからないわ。"],
+      "read_only_blocked": ["……Ask モードでは書き込みは許可されないわ。"],
+      "cancelled": ["了解。中断するわ。"],
+      "generic": ["……想定外ね。再計算するわ。"]
+    }
   }
 }
