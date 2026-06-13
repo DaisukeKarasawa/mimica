@@ -16,17 +16,23 @@ export function useBridgeStatus(): string | null {
       return;
     }
 
-    const message = await window.mimica.formatPersonaError("connection");
-    if (generationRef.current !== signalGeneration) {
-      return;
-    }
+    try {
+      const message = await window.mimica.formatPersonaError("connection");
+      if (generationRef.current !== signalGeneration) {
+        return;
+      }
 
-    const status = await window.mimica.getBridgeStatus();
-    if (status.connected || generationRef.current !== signalGeneration) {
-      return;
-    }
+      const status = await window.mimica.getBridgeStatus();
+      if (status.connected || generationRef.current !== signalGeneration) {
+        return;
+      }
 
-    setBannerMessage(message);
+      setBannerMessage(message);
+    } catch {
+      if (generationRef.current === signalGeneration) {
+        setBannerMessage(null);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -38,9 +44,14 @@ export function useBridgeStatus(): string | null {
       void applyConnected(connected, generation);
     };
 
-    void window.mimica.getBridgeStatus().then((status) => {
-      if (!cancelled) handleStatus(status.connected);
-    });
+    void window.mimica
+      .getBridgeStatus()
+      .then((status) => {
+        if (!cancelled) handleStatus(status.connected);
+      })
+      .catch(() => {
+        if (!cancelled) setBannerMessage(null);
+      });
 
     const unsub = window.mimica.onBridgeStatusChange((status) => {
       if (!cancelled) handleStatus(status.connected);

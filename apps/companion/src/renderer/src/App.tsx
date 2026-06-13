@@ -223,6 +223,17 @@ export default function App() {
       setIsStreaming(false);
       resetStreamRef.current();
       director.setState("idle");
+      try {
+        const rolledBack = {
+          ...saved,
+          title: session.title,
+          messages: saved.messages.filter((message) => message.id !== userMsg.id),
+        };
+        const restored = await window.mimica.saveSession(rolledBack);
+        tabs.setAllSessions((prev) => prev.map((s) => (s.id === restored.id ? restored : s)));
+      } catch (rollbackError) {
+        console.error("[App] failed to roll back user message after submit error:", rollbackError);
+      }
       throw error;
     }
   };

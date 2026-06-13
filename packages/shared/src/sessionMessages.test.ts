@@ -9,6 +9,8 @@ function makeSession(messages: ChatSession["messages"] = []): ChatSession {
     title: "Test",
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
+    workspacePath: "/tmp/test-workspace",
+    characterId: "rio",
     messages,
   };
 }

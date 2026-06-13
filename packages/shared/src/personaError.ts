@@ -58,7 +58,6 @@ const ERROR_KINDS: ErrorKind[] = [
 
 const GENERIC_FACT_FALLBACK = "エラーが発生しました。";
 const GENERIC_INTRO_FALLBACK = "……想定外ね。";
-const GENERIC_DETAIL_MAX_LEN = 120;
 
 const ERROR_FACT_TEMPLATES: Record<ErrorKind, string> = {
   agent_failed: "Agent の実行に失敗しました。",
@@ -83,12 +82,6 @@ function isStringArray(value: unknown): value is string[] {
 function pickFirstLine(lines: string[] | undefined): string | undefined {
   if (!lines || lines.length === 0) return undefined;
   return lines[0]?.trim() || undefined;
-}
-
-function truncateDetail(detail: string, maxLen = GENERIC_DETAIL_MAX_LEN): string {
-  const trimmed = detail.trim();
-  if (trimmed.length <= maxLen) return trimmed;
-  return `${trimmed.slice(0, maxLen)}…`;
 }
 
 function isErrorKind(value: string): value is ErrorKind {
@@ -225,11 +218,7 @@ function pickPersonaIntro(kind: ErrorKind, reactions?: PersonaReactions): string
   return undefined;
 }
 
-function buildFactLine(kind: ErrorKind, detail?: string): string {
-  const trimmedDetail = detail?.trim();
-  if (trimmedDetail) {
-    return truncateDetail(trimmedDetail);
-  }
+function buildFactLine(kind: ErrorKind, _detail?: string): string {
   return ERROR_FACT_TEMPLATES[kind];
 }
 

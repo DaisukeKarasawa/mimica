@@ -53,6 +53,8 @@ export class AgentService {
     error: AgentRunError,
     emitter: AgentRunEmitter,
   ): void {
+    if (runId !== this.activeRunId) return;
+
     const userMessage = formatPersonaErrorForUser(error);
     console.error(`[agentService] run ${runId} error (${error.kind}):`, error.detail ?? error.kind);
 
@@ -66,7 +68,6 @@ export class AgentService {
     }
 
     emitter.terminalError(userMessage);
-    this.activeRunId = null;
   }
 
   private async getRunner(): Promise<AgentRunner> {
@@ -201,12 +202,12 @@ export class AgentService {
           onTool: (name, detail) => emitter.tool(name, detail),
           onWarning: (message) => emitter.warning(message),
           onComplete: (content) => {
+            if (runId !== this.activeRunId) return;
             const current = this.sessionStore.get(payload.sessionId);
             if (current) {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
             }
             emitter.complete(content);
-            this.activeRunId = null;
           },
           onError: (error) => {
             this.persistAgentRunError(payload.sessionId, runId, error, emitter);

@@ -9,6 +9,13 @@ export function ipcErrorMessage(error: unknown): string {
   return message || "エラーが発生しました。";
 }
 
+const CLIENT_PERSONA_ERROR_FALLBACK = "エラーが発生しました。";
+
 export async function formatClientPersonaError(kind: ErrorKind, detail?: string): Promise<string> {
-  return window.mimica.formatPersonaError(kind, detail);
+  try {
+    const message = await window.mimica.formatPersonaError(kind, detail);
+    return message?.trim() || CLIENT_PERSONA_ERROR_FALLBACK;
+  } catch {
+    return CLIENT_PERSONA_ERROR_FALLBACK;
+  }
 }
