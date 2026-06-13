@@ -16,6 +16,7 @@ interface PooledSession {
   personaFingerprint: string;
   turnsSent: number;
   lastActivityAt: number;
+  activeRuns: number;
 }
 
 /** Default idle eviction: 30 minutes without a completed turn. */
@@ -79,6 +80,7 @@ export class AgentSessionPool {
       personaFingerprint,
       turnsSent: 0,
       lastActivityAt: now,
+      activeRuns: 0,
     });
 
     this.logPoolDebug("acquire", params.sessionId);
@@ -91,6 +93,20 @@ export class AgentSessionPool {
     if (!session) return;
     session.turnsSent += 1;
     session.lastActivityAt = Date.now();
+  }
+
+  /** Marks an in-flight turn so idle eviction does not close the pooled agent. */
+  beginRun(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    session.activeRuns += 1;
+  }
+
+  /** Clears an in-flight turn marker after the turn settles. */
+  endRun(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    session.activeRuns = Math.max(0, session.activeRuns - 1);
   }
 
   /** Drop a pooled agent after a non-completed turn so the next send starts fresh. */
@@ -122,6 +138,7 @@ export class AgentSessionPool {
   evictIdleSessions(now = Date.now()): number {
     let evicted = 0;
     for (const [sessionId, session] of this.sessions) {
+      if (session.activeRuns > 0) continue;
       if (now - session.lastActivityAt < this.idleEvictMs) continue;
       session.agent.close();
       this.sessions.delete(sessionId);
@@ -136,7 +153,11 @@ export class AgentSessionPool {
   }
 
   /** Package test seam: seed idle metadata without a live SDK agent. */
-  seedIdleSessionForTests(sessionId: string, lastActivityAt: number): void {
+  seedIdleSessionForTests(
+    sessionId: string,
+    lastActivityAt: number,
+    options?: { activeRuns?: number },
+  ): void {
     this.sessions.set(sessionId, {
       agent: { close() {} } as SDKAgent,
       workspacePath: "/test",
@@ -145,6 +166,7 @@ export class AgentSessionPool {
       personaFingerprint: "",
       turnsSent: 0,
       lastActivityAt,
+      activeRuns: options?.activeRuns ?? 0,
     });
   }
 

@@ -124,9 +124,18 @@ export function classifySdkTransportError(err: unknown): SdkTransportClassificat
   return null;
 }
 
+export function shouldRetrySdkTransportError(
+  err: unknown,
+  transportRetried: boolean,
+  allowTransportRetry: boolean,
+): boolean {
+  const classified = classifySdkTransportError(err);
+  return classified?.retryOnce === true && !transportRetried && allowTransportRetry;
+}
+
 export function mapSdkTransportToAgentRunError(err: unknown): AgentRunError {
   const classified = classifySdkTransportError(err);
-  if (classified && classified.category !== "canceled") {
+  if (classified) {
     return agentRunError(classified.errorKind, classified.logDetail);
   }
   return agentRunErrorFromUnknown(err);

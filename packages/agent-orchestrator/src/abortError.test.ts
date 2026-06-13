@@ -5,6 +5,7 @@ import {
   isAbortError,
   isIntentionalCancellationError,
   shouldSuppressTrackedAbortRejection,
+  trackIntentionalCancelPromise,
 } from "./abortError.js";
 import {
   installAbortRejectionHandler,
@@ -43,6 +44,9 @@ describe("shouldSuppressTrackedAbortRejection", () => {
     const promise = Promise.resolve();
     const err = Object.assign(new Error("aborted"), { name: "AbortError" });
     assert.equal(shouldSuppressTrackedAbortRejection(err, promise), false);
+
+    const tracked = trackIntentionalCancelPromise(Promise.resolve());
+    assert.equal(shouldSuppressTrackedAbortRejection(err, tracked), true);
   });
 });
 
@@ -81,6 +85,100 @@ describe("installAbortRejectionHandler", () => {
           new ConnectError("Stream closed with error code NGHTTP2_REFUSED_STREAM", Code.Internal),
           Promise.resolve(),
         );
+        assert.equal(throwImmediate.mock.calls.length, 0);
+      } finally {
+        Object.defineProperty(globalThis, "setImmediate", {
+          configurable: true,
+          value: originalSetImmediate,
+        });
+      }
+    } finally {
+      Object.defineProperty(globalThis, "process", {
+        configurable: true,
+        value: originalProcess,
+      });
+    }
+  });
+
+  it("does not fatalize tracked AbortError rejections", () => {
+    const listeners = new Map<string, (...args: unknown[]) => void>();
+    const proc = {
+      on: (event: string, listener: (...args: unknown[]) => void) => {
+        listeners.set(event, listener);
+      },
+    };
+
+    const originalProcess = globalThis.process;
+    Object.defineProperty(globalThis, "process", {
+      configurable: true,
+      value: proc,
+    });
+
+    try {
+      resetSdkRejectionHandlerForTests();
+      installAbortRejectionHandler();
+      const handler = listeners.get("unhandledRejection");
+      assert.ok(handler);
+
+      const throwImmediate = mock.fn(() => {
+        throw new Error("should not fatalize");
+      });
+      const originalSetImmediate = globalThis.setImmediate;
+      Object.defineProperty(globalThis, "setImmediate", {
+        configurable: true,
+        value: throwImmediate,
+      });
+
+      try {
+        const tracked = trackIntentionalCancelPromise(Promise.resolve());
+        const err = Object.assign(new Error("aborted"), { name: "AbortError" });
+        handler(err, tracked);
+        assert.equal(throwImmediate.mock.calls.length, 0);
+      } finally {
+        Object.defineProperty(globalThis, "setImmediate", {
+          configurable: true,
+          value: originalSetImmediate,
+        });
+      }
+    } finally {
+      Object.defineProperty(globalThis, "process", {
+        configurable: true,
+        value: originalProcess,
+      });
+    }
+  });
+
+  it("does not fatalize ConnectError canceled rejections", () => {
+    const listeners = new Map<string, (...args: unknown[]) => void>();
+    const proc = {
+      on: (event: string, listener: (...args: unknown[]) => void) => {
+        listeners.set(event, listener);
+      },
+    };
+
+    const originalProcess = globalThis.process;
+    Object.defineProperty(globalThis, "process", {
+      configurable: true,
+      value: proc,
+    });
+
+    try {
+      resetSdkRejectionHandlerForTests();
+      installAbortRejectionHandler();
+      const handler = listeners.get("unhandledRejection");
+      assert.ok(handler);
+
+      const throwImmediate = mock.fn(() => {
+        throw new Error("should not fatalize");
+      });
+      const originalSetImmediate = globalThis.setImmediate;
+      Object.defineProperty(globalThis, "setImmediate", {
+        configurable: true,
+        value: throwImmediate,
+      });
+
+      try {
+        handler(new ConnectError("This operation was aborted", Code.Canceled), Promise.resolve());
         assert.equal(throwImmediate.mock.calls.length, 0);
       } finally {
         Object.defineProperty(globalThis, "setImmediate", {

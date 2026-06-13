@@ -13,4 +13,15 @@ describe("AgentSessionPool idle eviction", () => {
     assert.equal(evicted, 1);
     assert.equal(pool.getPoolSize(), 1);
   });
+
+  it("skips eviction for sessions with in-flight runs", () => {
+    const pool = new AgentSessionPool(1_000);
+    const staleAt = Date.now() - DEFAULT_IDLE_EVICT_MS - 1;
+    pool.seedIdleSessionForTests("running", staleAt, { activeRuns: 1 });
+    pool.seedIdleSessionForTests("idle", staleAt);
+
+    const evicted = pool.evictIdleSessions();
+    assert.equal(evicted, 1);
+    assert.equal(pool.getPoolSize(), 1);
+  });
 });

@@ -13,7 +13,11 @@ import { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { READ_ONLY_HOOK_INSTALL_WARNING } from "./readOnlyPolicy.js";
 import { AgentRunTimingTrace } from "./agentRunTiming.js";
 import { resolveCursorApiKey } from "./resolveApiKey.js";
-import { classifySdkTransportError, mapSdkTransportToAgentRunError } from "./sdkTransportError.js";
+import {
+  classifySdkTransportError,
+  mapSdkTransportToAgentRunError,
+  shouldRetrySdkTransportError,
+} from "./sdkTransportError.js";
 
 export type { AgentRunCallbacks } from "./agentCallbacks.js";
 
@@ -144,12 +148,13 @@ export class AgentRunner {
     sessionId: string,
     err: unknown,
     transportRetried: boolean,
+    allowTransportRetry: boolean,
   ): ChatTurnOutcome {
     const classified = classifySdkTransportError(err);
     if (classified?.invalidatePool) {
       this.sessionPool.invalidateSession(sessionId);
     }
-    if (classified?.retryOnce && !transportRetried) {
+    if (shouldRetrySdkTransportError(err, transportRetried, allowTransportRetry)) {
       return { status: "transport_retry" };
     }
     return { status: "failed", error: mapSdkTransportToAgentRunError(err) };
@@ -177,6 +182,8 @@ export class AgentRunner {
     } = args;
     const { sessionId, timing } = params;
     let streamRunId: string | undefined;
+    let runTrackedInPool = false;
+    let agentSendSucceeded = false;
 
     try {
       let sessionHandle: Awaited<ReturnType<AgentSessionPool["acquire"]>>;
@@ -191,8 +198,11 @@ export class AgentRunner {
         });
         timing?.markOnce("T1_agent_ready");
       } catch (err) {
-        return this.resolveTransportFailure(sessionId, err, transportRetried);
+        return this.resolveTransportFailure(sessionId, err, transportRetried, true);
       }
+
+      this.sessionPool.beginRun(sessionId);
+      runTrackedInPool = true;
 
       if (isRunCancelled() || params.signal?.aborted) {
         this.sessionPool.invalidateSession(sessionId);
@@ -226,6 +236,7 @@ export class AgentRunner {
           await readOnlyGuard?.handleSendDelta(update, isRunCancelled, params.signal);
         },
       });
+      agentSendSucceeded = true;
       if (ctx.runGeneration === runGen) {
         ctx.run = run;
       }
@@ -293,8 +304,11 @@ export class AgentRunner {
         this.sessionPool.invalidateSession(sessionId);
         return { status: "cancelled" };
       }
-      return this.resolveTransportFailure(sessionId, err, transportRetried);
+      return this.resolveTransportFailure(sessionId, err, transportRetried, !agentSendSucceeded);
     } finally {
+      if (runTrackedInPool) {
+        this.sessionPool.endRun(sessionId);
+      }
       if (streamRunId) {
         releaseAskQuestionStreamRun(streamRunId);
       }

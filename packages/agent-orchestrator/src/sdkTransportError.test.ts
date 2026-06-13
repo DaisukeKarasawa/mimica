@@ -6,6 +6,7 @@ import {
   classifySdkTransportError,
   isConnectCanceledError,
   mapSdkTransportToAgentRunError,
+  shouldRetrySdkTransportError,
 } from "./sdkTransportError.js";
 
 describe("isConnectCanceledError", () => {
@@ -63,11 +64,33 @@ describe("classifySdkTransportError", () => {
   });
 });
 
+describe("shouldRetrySdkTransportError", () => {
+  const retryableErr = new ConnectError("unavailable", Code.Unavailable);
+
+  it("retries once before agent.send when transport is retryable", () => {
+    assert.equal(shouldRetrySdkTransportError(retryableErr, false, true), true);
+  });
+
+  it("does not retry after agent.send even when transport is retryable", () => {
+    assert.equal(shouldRetrySdkTransportError(retryableErr, false, false), false);
+  });
+
+  it("does not retry a second time", () => {
+    assert.equal(shouldRetrySdkTransportError(retryableErr, true, true), false);
+  });
+});
+
 describe("mapSdkTransportToAgentRunError", () => {
   it("maps transport errors to sdk_transport kind", () => {
     const err = new ConnectError("unavailable", Code.Unavailable);
     const mapped = mapSdkTransportToAgentRunError(err);
     assert.equal(mapped.kind, "sdk_transport");
     assert.match(mapped.detail ?? "", /unavailable/i);
+  });
+
+  it("maps Connect canceled to cancelled kind", () => {
+    const err = new ConnectError("This operation was aborted", Code.Canceled);
+    const mapped = mapSdkTransportToAgentRunError(err);
+    assert.equal(mapped.kind, "cancelled");
   });
 });
