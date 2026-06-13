@@ -12,6 +12,10 @@ export {
   type AgentQuestionAdapter,
   type AgentQuestionAnswerContext,
   type AgentQuestionDismissContext,
-  StubAgentQuestionAdapter,
 } from "./agentQuestionAdapter.js";
+export {
+  ToolCallStreamQuestionAdapter,
+  defaultQuestionAdapter,
+} from "./toolCallStreamQuestionAdapter.js";
+export { parseAskQuestionToolCall } from "./parseAskQuestionToolCall.js";
 export { buildAskQuestionFollowUpText, isAskQuestionToolName } from "./agentQuestionFollowUp.js";

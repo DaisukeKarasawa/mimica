@@ -1,4 +1,4 @@
-import type { AgentRunState } from "@mimica/shared";
+import type { AgentQuestionPrompt, AgentRunState } from "@mimica/shared";
 
 export interface AgentRunCallbacks {
   onState: (state: AgentRunState) => void;
@@ -7,4 +7,5 @@ export interface AgentRunCallbacks {
   onError: (message: string) => void;
   onTool?: (name: string, detail?: string) => void;
   onWarning?: (message: string) => void;
+  onQuestion?: (question: AgentQuestionPrompt) => void;
 }

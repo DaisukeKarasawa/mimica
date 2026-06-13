@@ -18,8 +18,9 @@ export function buildAskQuestionFollowUpText(
   const heading = prompt.title?.trim() || prompt.questions[0]?.prompt || "Questions";
   const lines: string[] = ["[AskQuestion answers]", `## ${heading}`];
 
-  for (const item of prompt.questions) {
-    const answer = payload.answers.find((entry) => entry.questionId === item.id);
+  for (const answer of payload.answers) {
+    const item = prompt.questions.find((question) => question.id === answer.questionId);
+    if (!item) continue;
     const labels = (answer?.selectedOptionIds ?? [])
       .map((optionId) => item.options.find((option) => option.id === optionId)?.label)
       .filter((label): label is string => !!label && label.length > 0);

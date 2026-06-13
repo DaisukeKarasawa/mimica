@@ -63,6 +63,16 @@ describe("buildAskQuestionFollowUpText", () => {
 
     assert.match(text, /^## どの認証方式を使いますか？/m);
   });
+
+  it("includes only answered entries from payload", () => {
+    const text = buildAskQuestionFollowUpText(samplePrompt, {
+      questionPromptId: samplePrompt.id,
+      answers: [{ questionId: "q1", selectedOptionIds: ["jwt"] }],
+    });
+
+    assert.match(text, /JWT/);
+    assert.doesNotMatch(text, /追加要件/);
+  });
 });
 
 describe("isAskQuestionToolName", () => {
