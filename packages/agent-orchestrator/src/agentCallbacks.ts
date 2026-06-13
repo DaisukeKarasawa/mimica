@@ -1,4 +1,4 @@
-import type { AgentRunError, AgentRunState } from "@mimica/shared";
+import type { AgentQuestionPrompt, AgentRunError, AgentRunState } from "@mimica/shared";
 
 /**
  * Terminal failure contract: orchestrator emits `failed` state, then `onError` with
@@ -11,4 +11,5 @@ export interface AgentRunCallbacks {
   onError: (error: AgentRunError) => void;
   onTool?: (name: string, detail?: string) => void;
   onWarning?: (message: string) => void;
+  onQuestion?: (question: AgentQuestionPrompt) => void;
 }

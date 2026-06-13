@@ -8,3 +8,9 @@ export {
   type AgentRunTimingMeta,
 } from "./agentRunTiming.js";
 export { loadPersonaPack, buildPersonaSystemPrompt, type PersonaPack } from "./loadPersona.js";
+export {
+  tryParseAskQuestionStreamEvent,
+  releaseAskQuestionStreamRun,
+} from "./toolCallStreamQuestionAdapter.js";
+export { parseAskQuestionToolCall } from "./parseAskQuestionToolCall.js";
+export { buildAskQuestionFollowUpText, isAskQuestionToolName } from "./agentQuestionFollowUp.js";

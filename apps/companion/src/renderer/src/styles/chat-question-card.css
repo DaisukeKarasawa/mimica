@@ -1,0 +1,135 @@
+.question-card {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-strong);
+}
+
+.question-card.is-resolved {
+  opacity: 0.72;
+}
+
+.question-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.question-card-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.question-card-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  background: rgba(122, 131, 130, 0.14);
+  border: 1px solid var(--line);
+}
+
+.question-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.question-card-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.question-card-prompt {
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.question-card-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.question-card-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.question-card-option input {
+  margin: 0;
+}
+
+.question-card-freeform {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.question-card-freeform-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.question-card-freeform textarea {
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.question-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.question-card-dismiss,
+.question-card-submit {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.question-card-submit {
+  background: var(--accent, rgba(122, 131, 130, 0.22));
+  font-weight: 600;
+}
+
+.question-card-dismiss:disabled,
+.question-card-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.question-card-status {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}

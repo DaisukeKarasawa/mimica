@@ -1,6 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { AgentMode, ChatAttachment, ChatSession } from "@mimica/shared";
-import { AGENT_DISPLAY_NAME } from "@mimica/shared";
+import type {
+  AgentMode,
+  AgentQuestionAnswerPayload,
+  ChatAttachment,
+  ChatSession,
+} from "@mimica/shared";
+import { AGENT_DISPLAY_NAME, sessionHasPendingQuestion } from "@mimica/shared";
 import type { SessionRunStatus } from "../lib/sessionRunState";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
@@ -9,6 +14,7 @@ import { ChatComposer } from "./ChatComposer";
 import { MessageAttachments } from "./ComposerAttachments";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
 import { MarkdownMessage } from "./MarkdownMessage";
+import { QuestionCard } from "./QuestionCard";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 
 export type ChatPanelMode = "chat" | "history";
@@ -37,6 +43,8 @@ interface ChatPanelProps {
   onDeleteSession: (id: string) => void;
   onSend: (text: string, attachments?: ChatAttachment[]) => void | Promise<void>;
   onCancel: () => void;
+  onQuestionAnswer: (runId: string, payload: AgentQuestionAnswerPayload) => Promise<void>;
+  onQuestionDismiss: (runId: string, questionPromptId: string) => Promise<void>;
   isSessionRunActive?: (sessionId: string) => boolean;
 }
 
@@ -64,12 +72,16 @@ export function ChatPanel({
   onDeleteSession,
   onSend,
   onCancel,
+  onQuestionAnswer,
+  onQuestionDismiss,
   isSessionRunActive,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [composerBannerError, setComposerBannerError] = useState<string | null>(null);
   const prevSessionIdRef = useRef(activeSessionId);
+  const hasPendingQuestion =
+    activeSession != null ? sessionHasPendingQuestion(activeSession) : false;
 
   useEffect(() => {
     onClearSubmitError?.();
@@ -104,7 +116,9 @@ export function ChatPanel({
   const lastMessage = activeSession?.messages.at(-1);
   const awaitingAssistantReply =
     lastMessage?.role === "user" ||
-    (lastMessage?.role === "assistant" && !lastMessage.content.trim());
+    (lastMessage?.role === "assistant" &&
+      !lastMessage.content.trim() &&
+      !lastMessage.agentQuestion);
   const showThinkingIndicator = activeSessionRunStatus === "thinking" && awaitingAssistantReply;
   const { containerRef: messagesRef, scrollToBottom } = useStickToBottomScroll({
     enabled: showChat,
@@ -229,7 +243,7 @@ export function ChatPanel({
                   );
                 }
 
-                if (!msg.content.trim()) return null;
+                if (!msg.content.trim() && !msg.agentQuestion) return null;
 
                 return (
                   <div key={msg.id} className="msg agent">
@@ -240,7 +254,22 @@ export function ChatPanel({
                     )}
                     <div className="bubble-shell">
                       <div className="bubble">
-                        <MarkdownMessage content={msg.content} />
+                        {msg.content.trim() ? <MarkdownMessage content={msg.content} /> : null}
+                        {msg.agentQuestion ? (
+                          <QuestionCard
+                            key={msg.agentQuestion.id}
+                            question={msg.agentQuestion}
+                            disabled={
+                              !msg.agentRunId ||
+                              msg.agentQuestion.status !== "pending" ||
+                              isStreaming
+                            }
+                            onSubmit={(payload) => void onQuestionAnswer(msg.agentRunId!, payload)}
+                            onDismiss={() =>
+                              void onQuestionDismiss(msg.agentRunId!, msg.agentQuestion!.id)
+                            }
+                          />
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -272,7 +301,7 @@ export function ChatPanel({
                 workspacePath={workspacePath}
                 sessionId={activeSession?.id ?? null}
                 attachments={attachments}
-                disabled={!workspacePath}
+                disabled={!workspacePath || hasPendingQuestion}
                 streaming={isStreaming}
                 onChange={setInput}
                 onAttachmentsChange={setAttachments}

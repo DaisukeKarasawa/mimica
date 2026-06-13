@@ -4,13 +4,25 @@ import type { WebContents } from "electron";
 import type {
   AgentCancelPayload,
   AgentMode,
+  AgentQuestionAnswerInput,
+  AgentQuestionDismissInput,
+  AgentQuestionPrompt,
   AgentRunError,
   ChatAttachment,
+  ChatSession,
   EditorContext,
 } from "@mimica/shared";
-import { agentRunErrorFromUnknown, isChatAttachment, toMessageContext } from "@mimica/shared";
+import {
+  agentRunErrorFromUnknown,
+  findAgentQuestionPrompt,
+  isChatAttachment,
+  toMessageContext,
+  updateAgentQuestionStatus,
+  upsertAssistantQuestion,
+} from "@mimica/shared";
 import {
   AgentRunTimingTrace,
+  buildAskQuestionFollowUpText,
   isAgentPerfEnabled,
   type AgentRunner,
 } from "@mimica/agent-orchestrator";
@@ -23,11 +35,17 @@ import {
 import { agentRunError, formatPersonaErrorForUser, PersonaFacingError } from "./personaErrors.js";
 import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
-import { AgentRunEmitter, emitAgentEvent } from "./agentRunEmitter.js";
-import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
+import { AgentRunEmitter, emitAgentEvent, emitQuestionResolved } from "./agentRunEmitter.js";
+import {
+  appendAssistantMessage,
+  appendUserMessage,
+  historyForAgentPrompt,
+} from "./sessionMessages.js";
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
 import { debugLogAtResolution, resolveAtInput } from "./cursorAt/index.js";
 import { MAX_IMAGE_ATTACHMENTS, readAttachmentBase64 } from "./imageAttachments.js";
+
+export type { AgentQuestionAnswerInput, AgentQuestionDismissInput };
 
 export interface AgentSubmitPayload {
   sessionId: string;
@@ -38,9 +56,28 @@ export interface AgentSubmitPayload {
   attachments?: ChatAttachment[];
 }
 
+interface RunSubmitOptions {
+  onSettled?: (success: boolean) => void;
+}
+
 async function loadAgentRunner(): Promise<AgentRunner> {
   const { AgentRunner: Runner } = await import("@mimica/agent-orchestrator");
   return new Runner();
+}
+
+function resolvePendingQuestion(
+  session: ChatSession,
+  runId: string,
+  questionPromptId: string,
+): AgentQuestionPrompt | null {
+  const prompt = findAgentQuestionPrompt(session, questionPromptId);
+  if (!prompt || prompt.runId !== runId) {
+    throw new Error("Question not found");
+  }
+  if (prompt.status !== "pending") {
+    return null;
+  }
+  return prompt;
 }
 
 export class AgentService {
@@ -105,7 +142,9 @@ export class AgentService {
     });
   }
 
-  async submit(payload: AgentSubmitPayload): Promise<void> {
+  private assertSubmitAllowed(
+    payload: AgentSubmitPayload,
+  ): NonNullable<ReturnType<SessionStore["get"]>> {
     if (this.activeRuns.has(payload.sessionId)) {
       throw new Error("Session already has an active agent run");
     }
@@ -119,21 +158,38 @@ export class AgentService {
         agentRunError("attachment", `Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`),
       );
     }
+    return session;
+  }
 
+  async submit(payload: AgentSubmitPayload): Promise<void> {
+    const session = this.assertSubmitAllowed(payload);
     const runId = uuidv4();
     this.activeRuns.set(payload.sessionId, { runId });
     void this.runSubmit(payload, runId, session);
+  }
+
+  private async submitAndWaitForCompletion(payload: AgentSubmitPayload): Promise<boolean> {
+    const session = this.assertSubmitAllowed(payload);
+    const runId = uuidv4();
+    this.activeRuns.set(payload.sessionId, { runId });
+    return new Promise((resolve) => {
+      void this.runSubmit(payload, runId, session, {
+        onSettled: (success) => resolve(success),
+      });
+    });
   }
 
   private async runSubmit(
     payload: AgentSubmitPayload,
     runId: string,
     session: NonNullable<ReturnType<SessionStore["get"]>>,
+    options?: RunSubmitOptions,
   ): Promise<void> {
     const wc = this.getWebContents();
     const emitter = new AgentRunEmitter(wc, payload.sessionId, runId, () =>
       this.isRunActive(payload.sessionId, runId),
     );
+    let runSucceeded = false;
 
     try {
       const runner = await this.getRunner();
@@ -247,8 +303,19 @@ export class AgentService {
           onDelta: (chunk) => emitter.delta(chunk),
           onTool: (name, detail) => emitter.tool(name, detail),
           onWarning: (message) => emitter.warning(message),
+          onQuestion: (question) => {
+            const correlated = { ...question, runId };
+            const current = this.sessionStore.get(payload.sessionId);
+            if (current) {
+              this.sessionStore.save(
+                upsertAssistantQuestion(current, { runId, question: correlated }),
+              );
+            }
+            emitter.question(correlated);
+          },
           onComplete: (content) => {
             if (!this.isRunActive(payload.sessionId, runId)) return;
+            runSucceeded = true;
             const current = this.sessionStore.get(payload.sessionId);
             if (current) {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
@@ -270,6 +337,7 @@ export class AgentService {
       if (this.isRunActive(payload.sessionId, runId)) {
         this.activeRuns.delete(payload.sessionId);
       }
+      options?.onSettled?.(runSucceeded);
     }
   }
 
@@ -291,6 +359,81 @@ export class AgentService {
       await this.runner.cancel(payload.sessionId);
     }
     this.activeRuns.delete(payload.sessionId);
+  }
+
+  async answerQuestion(input: AgentQuestionAnswerInput): Promise<ChatSession> {
+    const session = this.sessionStore.get(input.sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    const prompt = resolvePendingQuestion(session, input.runId, input.payload.questionPromptId);
+    if (!prompt) {
+      return session;
+    }
+
+    if (this.activeRuns.has(input.sessionId)) {
+      throw new Error("Cannot answer while an agent run is in progress");
+    }
+
+    const followUp = buildAskQuestionFollowUpText(prompt, input.payload);
+    const withUserMessage = appendUserMessage(session, followUp);
+    this.sessionStore.save(withUserMessage);
+
+    try {
+      const followUpSucceeded = await this.submitAndWaitForCompletion({
+        sessionId: input.sessionId,
+        content: followUp,
+        workspacePath: session.workspacePath,
+        mode: input.mode,
+      });
+      if (!followUpSucceeded) {
+        throw new Error("Follow-up agent run failed");
+      }
+    } catch (error) {
+      // Follow-up run failed; rollback to pre-answer session so the question stays pending.
+      this.sessionStore.save(session);
+      throw error;
+    }
+
+    let updated = this.sessionStore.get(input.sessionId) ?? withUserMessage;
+    updated = updateAgentQuestionStatus(updated, input.payload.questionPromptId, "answered");
+    this.sessionStore.save(updated);
+
+    emitQuestionResolved(
+      this.getWebContents(),
+      input.sessionId,
+      input.runId,
+      input.payload.questionPromptId,
+      "answered",
+    );
+
+    return this.sessionStore.get(input.sessionId) ?? updated;
+  }
+
+  async dismissQuestion(input: AgentQuestionDismissInput): Promise<ChatSession> {
+    const session = this.sessionStore.get(input.sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    const prompt = resolvePendingQuestion(session, input.runId, input.questionPromptId);
+    if (!prompt) {
+      return session;
+    }
+
+    const updated = updateAgentQuestionStatus(session, input.questionPromptId, "dismissed");
+    this.sessionStore.save(updated);
+
+    emitQuestionResolved(
+      this.getWebContents(),
+      input.sessionId,
+      input.runId,
+      input.questionPromptId,
+      "dismissed",
+    );
+
+    return this.sessionStore.get(input.sessionId) ?? updated;
   }
 
   async closeSession(sessionId: string): Promise<void> {

@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { AgentEventMessage, AgentRunState, ChatSession } from "@mimica/shared";
+import { sessionHasPendingQuestion } from "@mimica/shared";
 import {
   applyAgentComplete,
   applyAgentDelta,
+  applyAgentQuestion,
+  applyAgentQuestionResolved,
   applyAgentTool,
   streamMessageId,
 } from "../lib/agentSessionUpdate";
@@ -116,18 +119,23 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           perfByRunIdRef.current.delete(pending.runId);
         }
         activeStreamIdRef.current = null;
-        setAllSessionsRef.current((prev) =>
-          applyAgentComplete(
+        setAllSessionsRef.current((prev) => {
+          const updated = applyAgentComplete(
             prev,
             pending.sessionId,
             pending.runId,
             pending.streamId,
             pending.content,
-          ),
-        );
-        if (isActiveSession(pending.sessionId)) {
-          onAvatarMomentRef.current?.("success", 1200);
-        }
+          );
+          const session = updated.find((s) => s.id === pending.sessionId);
+          if (
+            isActiveSession(pending.sessionId) &&
+            !(session != null && sessionHasPendingQuestion(session))
+          ) {
+            onAvatarMomentRef.current?.("success", 1200);
+          }
+          return updated;
+        });
         clearSessionRunRef.current(pending.sessionId);
         notifyRunSettled(pending.sessionId, pending.runId);
       },
@@ -424,6 +432,19 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           }
           clearSessionRunRef.current(event.sessionId);
           notifyRunSettled(event.sessionId, event.runId);
+          break;
+        }
+        case "agent_question": {
+          const streamId = activeStreamIdRef.current ?? streamMessageId(event.runId, null);
+          setAllSessionsRef.current((prev) =>
+            applyAgentQuestion(prev, event.sessionId, event.runId, event.question, streamId),
+          );
+          break;
+        }
+        case "agent_question_resolved": {
+          setAllSessionsRef.current((prev) =>
+            applyAgentQuestionResolved(prev, event.sessionId, event.questionPromptId, event.status),
+          );
           break;
         }
         default:

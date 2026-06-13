@@ -1,4 +1,16 @@
 export {
+  type AgentQuestionSource,
+  type AgentQuestionStatus,
+  type AgentQuestionOption,
+  type AgentQuestionItem,
+  type AgentQuestionPrompt,
+  type AgentQuestionAnswerEntry,
+  type AgentQuestionAnswerPayload,
+  type AgentQuestionAnswerInput,
+  type AgentQuestionDismissInput,
+} from "./agentQuestion.js";
+
+export {
   DEFAULT_WS_PORT,
   AGENT_DISPLAY_NAME,
   AGENT_SHORT_NAME,
@@ -24,7 +36,19 @@ export {
   type MimicaSettings,
 } from "./chat.js";
 
-export { upsertAssistantTurn, type UpsertAssistantTurnParams } from "./sessionMessages.js";
+export {
+  upsertAssistantQuestion,
+  updateAgentQuestionStatus,
+  findAgentQuestionPrompt,
+  sessionHasPendingQuestion,
+} from "./agentQuestionSession.js";
+
+export {
+  upsertAssistantTurn,
+  findAssistantTurnIndex,
+  type UpsertAssistantTurnParams,
+  type FindAssistantTurnParams,
+} from "./sessionMessages.js";
 
 export {
   type MotionMap,

@@ -270,6 +270,7 @@ failed                      → error → idle
 1. `pnpm dev:companion` → ステージに調月リオ表示、下部ボタンでアニメ切替
 2. チャット送信 → Cursor SDK ストリーミング（`CURSOR_API_KEY` 必須）
 3. `pnpm --filter @mimica/character-runtime extract-animations -- ~/MimicaAssets/characters/rio/CH0158_home.skel`
+4. **Ask Questions（Plan）**: 曖昧な依頼で構造化質問 UI → 回答後 follow-up 続行（Agent モードは stream に `AskQuestion` が載れば best-effort 表示）
 
 ### ローカル環境メモ（Git 管理外）
 

@@ -1,3 +1,5 @@
+import type { AgentQuestionPrompt } from "./agentQuestion.js";
+
 export type AvatarState =
   | "idle"
   | "thinking"
@@ -109,6 +111,8 @@ export interface ChatMessage {
   agentRunId?: string;
   toolCalls?: ToolCallInfo[];
   attachments?: ChatAttachment[];
+  /** Structured Ask Questions prompt snapshot (assistant turn). */
+  agentQuestion?: AgentQuestionPrompt;
 }
 
 export interface ToolCallInfo {

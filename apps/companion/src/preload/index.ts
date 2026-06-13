@@ -3,6 +3,8 @@ import type {
   AgentCancelPayload,
   AgentEventMessage,
   AgentMode,
+  AgentQuestionAnswerInput,
+  AgentQuestionDismissInput,
   AtMenuSection,
   CharacterAssetStatus,
   ChatAttachment,
@@ -33,6 +35,8 @@ export interface MimicaApi {
   formatPersonaError: (kind: ErrorKind, detail?: string) => Promise<string>;
   submitAgent: (payload: AgentSubmitPayload) => Promise<void>;
   cancelAgent: (payload: AgentCancelPayload) => Promise<void>;
+  answerAgentQuestion: (input: AgentQuestionAnswerInput) => Promise<ChatSession>;
+  dismissAgentQuestion: (input: AgentQuestionDismissInput) => Promise<ChatSession>;
   openExternal: (url: string) => Promise<boolean>;
   onEditorContext: (cb: (context: EditorContext) => void) => () => void;
   onBridgeStatusChange: (cb: (status: { connected: boolean }) => void) => () => void;
@@ -60,6 +64,8 @@ const api: MimicaApi = {
   formatPersonaError: (kind, detail) => ipcRenderer.invoke("persona:formatError", kind, detail),
   submitAgent: (payload) => ipcRenderer.invoke("agent:submit", payload),
   cancelAgent: (payload) => ipcRenderer.invoke("agent:cancel", payload),
+  answerAgentQuestion: (input) => ipcRenderer.invoke("agent:questionAnswer", input),
+  dismissAgentQuestion: (input) => ipcRenderer.invoke("agent:questionDismiss", input),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
   onEditorContext: (cb) => {
     const handler = (_: unknown, context: EditorContext) => cb(context);

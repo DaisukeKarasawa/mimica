@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentMode, AvatarState, EditorContext } from "@mimica/shared";
-import { DEFAULT_SETTINGS, mapAgentRunToAvatar, resolveCharacterShortNameEn } from "@mimica/shared";
+import type {
+  AgentMode,
+  AgentQuestionAnswerPayload,
+  AvatarState,
+  EditorContext,
+} from "@mimica/shared";
+import {
+  DEFAULT_SETTINGS,
+  mapAgentRunToAvatar,
+  resolveCharacterShortNameEn,
+  sessionHasPendingQuestion,
+} from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
 import { BridgeStatusBanner } from "./components/BridgeStatusBanner";
@@ -118,6 +128,10 @@ export default function App() {
       director.setState("idle");
       return;
     }
+    if (tabs.activeSession && sessionHasPendingQuestion(tabs.activeSession)) {
+      director.setState("waiting");
+      return;
+    }
     const run = sessionRuns.getSessionRun(tabs.activeSessionId);
     if (!isSessionRunActive(run)) {
       director.setState("idle");
@@ -128,7 +142,14 @@ export default function App() {
         ? mapAgentRunToAvatar("streaming")
         : mapAgentRunToAvatar("thinking"),
     );
-  }, [director, sessionRuns.runs, tabs.activeSessionId, sessionRuns.getSessionRun, avatarSyncTick]);
+  }, [
+    director,
+    sessionRuns.runs,
+    tabs.activeSessionId,
+    tabs.activeSession,
+    sessionRuns.getSessionRun,
+    avatarSyncTick,
+  ]);
 
   const handleCloseTab = useCallback(
     (id: string) => {
@@ -263,6 +284,41 @@ export default function App() {
     await handleStopStreaming(tabs.activeSessionId);
   };
 
+  const handleQuestionAnswer = async (runId: string, payload: AgentQuestionAnswerPayload) => {
+    const session = tabs.activeSession;
+    if (!session || !runId) return;
+    beginStream(session.id);
+    try {
+      const saved = await window.mimica.answerAgentQuestion({
+        sessionId: session.id,
+        runId,
+        mode: agentMode,
+        payload,
+      });
+      tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+    } catch {
+      sessionRuns.clearSessionRun(session.id);
+      resetStream(session.id);
+      bumpAvatarSync((tick) => tick + 1);
+    }
+  };
+
+  const handleQuestionDismiss = async (runId: string, questionPromptId: string) => {
+    const session = tabs.activeSession;
+    if (!session || !runId) return;
+    try {
+      const saved = await window.mimica.dismissAgentQuestion({
+        sessionId: session.id,
+        runId,
+        questionPromptId,
+      });
+      tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+      bumpAvatarSync((tick) => tick + 1);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <div className="app">
       <TopBar />
@@ -305,6 +361,8 @@ export default function App() {
             onDeleteSession={handleDeleteSession}
             onSend={(text, attachments) => void handleSend(text, attachments)}
             onCancel={() => void handleCancel()}
+            onQuestionAnswer={handleQuestionAnswer}
+            onQuestionDismiss={handleQuestionDismiss}
             isSessionRunActive={sessionRuns.isSessionRunActiveById}
           />
         }

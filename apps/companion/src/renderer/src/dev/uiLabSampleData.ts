@@ -7,6 +7,7 @@ export const UI_LAB_SESSION_IDS = {
   impl: "ui-lab-session-impl",
   bug: "ui-lab-session-bug",
   review: "ui-lab-session-review",
+  askQuestions: "ui-lab-session-ask-questions",
 } as const;
 
 export const UI_LAB_EDITOR_CONTEXT: EditorContext = {
@@ -115,6 +116,59 @@ export function createUiLabSampleSessions(): ChatSession[] {
               detail: "pattern: .pill",
             },
           ],
+        },
+      ],
+    },
+    {
+      id: UI_LAB_SESSION_IDS.askQuestions,
+      title: "Ask Questions",
+      createdAt: now,
+      updatedAt: now,
+      workspacePath: UI_LAB_EDITOR_CONTEXT.workspacePath,
+      characterId: "rio",
+      messages: [
+        {
+          id: "ui-lab-u4",
+          role: "user",
+          content: "認証を追加して",
+          createdAt: now,
+        },
+        {
+          id: "ui-lab-a4",
+          role: "assistant",
+          content: "",
+          createdAt: now,
+          agentRunId: "ui-lab-run-ask",
+          agentQuestion: {
+            id: "ui-lab-question-1",
+            runId: "ui-lab-run-ask",
+            toolCallId: "ui-lab-tool-ask",
+            title: "認証方式の確認",
+            source: "tool_call_stream",
+            status: "pending",
+            createdAt: now,
+            questions: [
+              {
+                id: "auth-method",
+                prompt: "どの認証方式を使いますか？",
+                allowMultiple: false,
+                options: [
+                  { id: "oauth", label: "OAuth 2.0" },
+                  { id: "jwt", label: "JWT + refresh token" },
+                  { id: "session", label: "Session cookie" },
+                ],
+              },
+              {
+                id: "extras",
+                prompt: "追加で必要な要件はありますか？",
+                allowMultiple: true,
+                options: [
+                  { id: "mfa", label: "MFA" },
+                  { id: "audit", label: "監査ログ" },
+                ],
+              },
+            ],
+          },
         },
       ],
     },
