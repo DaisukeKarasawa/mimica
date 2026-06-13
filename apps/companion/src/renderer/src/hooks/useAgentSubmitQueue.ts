@@ -15,13 +15,16 @@ import type {
   EditorContext,
 } from "@mimica/shared";
 import type { CharacterDirector } from "@mimica/character-runtime";
+import type { SessionRunState } from "../lib/sessionRunState";
 import { useMessageQueue } from "./useMessageQueue";
 
 export interface UseAgentSubmitQueueOptions {
   director: CharacterDirector;
-  beginStream: () => string;
-  resetStream: () => void;
-  setIsStreaming: Dispatch<SetStateAction<boolean>>;
+  beginStream: (sessionId: string) => string;
+  resetStream: (sessionId?: string) => void;
+  setSessionRun: (sessionId: string, patch: Partial<SessionRunState>) => void;
+  clearSessionRun: (sessionId: string) => void;
+  isSessionRunning: (sessionId: string) => boolean;
   onRunSettled: (handler: (sessionId: string) => void) => void;
   activeSessionId: string | null;
   activeSession: ChatSession | null;
@@ -37,7 +40,9 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
     director,
     beginStream,
     resetStream,
-    setIsStreaming,
+    setSessionRun,
+    clearSessionRun,
+    isSessionRunning,
     onRunSettled,
     activeSessionId,
     activeSession,
@@ -50,7 +55,6 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
 
   const messageQueue = useMessageQueue();
   const drainInFlightRef = useRef(false);
-  const [streamingSessionId, setStreamingSessionId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const submitToAgent = useCallback(
@@ -62,9 +66,7 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
       editorContext?: EditorContext | null;
       attachments?: ChatAttachment[];
     }): Promise<boolean> => {
-      beginStream();
-      setStreamingSessionId(params.sessionId);
-      setIsStreaming(true);
+      beginStream(params.sessionId);
       setSubmitError(null);
       try {
         await window.mimica.submitAgent({
@@ -78,15 +80,14 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
         return true;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        setIsStreaming(false);
-        setStreamingSessionId(null);
-        resetStream();
+        clearSessionRun(params.sessionId);
+        resetStream(params.sessionId);
         director.setState("idle");
         setSubmitError(message);
         return false;
       }
     },
-    [beginStream, director, resetStream, setIsStreaming],
+    [beginStream, clearSessionRun, director, resetStream],
   );
 
   const drainQueue = useCallback(
@@ -117,7 +118,6 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
 
   useEffect(() => {
     onRunSettled((sessionId) => {
-      setStreamingSessionId(null);
       void drainQueue(sessionId);
     });
   }, [drainQueue, onRunSettled]);
@@ -154,8 +154,7 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
       const saved = await window.mimica.saveSession(updated);
       setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
 
-      const shouldQueue = streamingSessionId === saved.id;
-      if (shouldQueue) {
+      if (isSessionRunning(saved.id)) {
         messageQueue.enqueue(saved.id, {
           content,
           attachments,
@@ -180,10 +179,10 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
       agentMode,
       editorContext,
       handleNewSession,
+      isSessionRunning,
       messageQueue,
       resolveWorkspacePath,
       setAllSessions,
-      streamingSessionId,
       submitToAgent,
     ],
   );

@@ -193,7 +193,10 @@ export class AgentRunner {
     }
   }
 
-  async cancel(): Promise<void> {
+  async cancel(sessionId?: string): Promise<void> {
+    if (sessionId && this.activeSessionId !== sessionId) {
+      return;
+    }
     this.cancelled = true;
     await cancelRun(this.activeRun);
   }

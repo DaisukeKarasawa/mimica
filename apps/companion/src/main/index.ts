@@ -1,5 +1,5 @@
 import { installAbortRejectionHandler } from "@mimica/agent-orchestrator";
-import { DEFAULT_WS_PORT } from "@mimica/shared";
+import { DEFAULT_WS_PORT, type AgentCancelPayload } from "@mimica/shared";
 
 installAbortRejectionHandler();
 import { electron } from "./electron.js";
@@ -86,9 +86,12 @@ if (!gotLock) {
       }
       return agentService.submit(payload);
     });
-    ipcMain.handle("agent:cancel", () => {
+    ipcMain.handle("agent:cancel", (_event, payload: AgentCancelPayload) => {
       if (!agentService) throw new Error("Agent service is unavailable");
-      return agentService.cancel();
+      if (!payload?.sessionId || typeof payload.sessionId !== "string") {
+        throw new Error("sessionId is required");
+      }
+      return agentService.cancel(payload);
     });
 
     ipcMain.handle("sessions:list", () => sessionStore.list());

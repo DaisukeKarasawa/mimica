@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentMode, AvatarState, EditorContext } from "@mimica/shared";
-import { DEFAULT_SETTINGS, resolveCharacterShortNameEn } from "@mimica/shared";
+import { DEFAULT_SETTINGS, mapAgentRunToAvatar, resolveCharacterShortNameEn } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
 import { CharacterStage } from "./components/CharacterStage";
@@ -9,22 +9,24 @@ import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
 import { useAgentSubmitQueue } from "./hooks/useAgentSubmitQueue";
 import { useCharacterAssets } from "./hooks/useCharacterAssets";
+import { useSessionRunStates } from "./hooks/useSessionRunStates";
 import { useSessionTabs } from "./hooks/useSessionTabs";
+import { isSessionRunActive } from "./lib/sessionRunState";
 import { matchChatTabShortcut, type ChatTabShortcutAction } from "./lib/chatTabShortcuts";
 
 export default function App() {
   const [editorContext, setEditorContext] = useState<EditorContext | null>(null);
   const [avatarState, setAvatarState] = useState<AvatarState>("idle");
-  const [isStreaming, setIsStreaming] = useState(false);
   const characterAssets = useCharacterAssets();
   const [splitLayoutReady, setSplitLayoutReady] = useState(false);
   const [agentMode, setAgentMode] = useState<AgentMode>(DEFAULT_SETTINGS.defaultAgentMode);
   const [tabsBarVisible, setTabsBarVisible] = useState(true);
 
-  const resetStreamRef = useRef<() => void>(() => {});
+  const resetStreamRef = useRef<(sessionId?: string) => void>(() => {});
   const onRunSettledRef = useRef<(sessionId: string) => void>(() => {});
   const workspaceSyncInFlight = useRef(new Set<string>());
 
+  const sessionRuns = useSessionRunStates();
   const director = useMemo(() => new CharacterDirector({ onStateChange: setAvatarState }), []);
 
   const characterShortName = useMemo(
@@ -32,14 +34,18 @@ export default function App() {
     [characterAssets?.metadata],
   );
 
-  const handleStopStreaming = useCallback(async () => {
-    await window.mimica.cancelAgent();
-    setIsStreaming(false);
-    resetStreamRef.current();
-  }, []);
+  const handleStopStreaming = useCallback(
+    async (sessionId: string) => {
+      const run = sessionRuns.getSessionRun(sessionId);
+      await window.mimica.cancelAgent({ sessionId, runId: run.runId });
+      sessionRuns.clearSessionRun(sessionId);
+      resetStreamRef.current(sessionId);
+    },
+    [sessionRuns],
+  );
 
   const tabs = useSessionTabs({
-    isStreaming,
+    isSessionRunning: (sessionId) => sessionRuns.isSessionRunActiveById(sessionId),
     onStopStreaming: handleStopStreaming,
   });
 
@@ -50,7 +56,9 @@ export default function App() {
   const { handleAgentEvent, resetStream, beginStream } = useAgentEvents({
     director,
     setAllSessions: tabs.setAllSessions,
-    setIsStreaming,
+    setSessionRun: sessionRuns.setSessionRun,
+    clearSessionRun: sessionRuns.clearSessionRun,
+    activeSessionId: tabs.activeSessionId,
     onRunSettled: (sessionId) => onRunSettledRef.current(sessionId),
   });
 
@@ -66,7 +74,9 @@ export default function App() {
       director,
       beginStream,
       resetStream,
-      setIsStreaming,
+      setSessionRun: sessionRuns.setSessionRun,
+      clearSessionRun: sessionRuns.clearSessionRun,
+      isSessionRunning: (sessionId) => sessionRuns.isSessionRunActiveById(sessionId),
       onRunSettled: registerOnRunSettled,
       activeSessionId: tabs.activeSessionId,
       activeSession: tabs.activeSession,
@@ -76,6 +86,26 @@ export default function App() {
       setAllSessions: tabs.setAllSessions,
       handleNewSession: tabs.handleNewSession,
     });
+
+  const activeSessionRun = sessionRuns.getSessionRun(tabs.activeSessionId);
+  const isActiveSessionStreaming = isSessionRunActive(activeSessionRun);
+
+  useEffect(() => {
+    if (!tabs.activeSessionId) {
+      director.setState("idle");
+      return;
+    }
+    const run = sessionRuns.getSessionRun(tabs.activeSessionId);
+    if (!isSessionRunActive(run)) {
+      director.setState("idle");
+      return;
+    }
+    director.setState(
+      run.status === "streaming"
+        ? mapAgentRunToAvatar("streaming")
+        : mapAgentRunToAvatar("thinking"),
+    );
+  }, [director, sessionRuns.runs, tabs.activeSessionId, sessionRuns.getSessionRun]);
 
   const handleCloseTab = useCallback(
     (id: string) => {
@@ -206,7 +236,8 @@ export default function App() {
   }, [applyChatTabShortcut]);
 
   const handleCancel = async () => {
-    await handleStopStreaming();
+    if (!tabs.activeSessionId) return;
+    await handleStopStreaming(tabs.activeSessionId);
   };
 
   return (
@@ -229,7 +260,8 @@ export default function App() {
             activeSession={tabs.activeSession}
             panelMode={tabs.panelMode}
             tabsBarVisible={tabsBarVisible}
-            isStreaming={isStreaming}
+            isStreaming={isActiveSessionStreaming}
+            activeSessionRunStatus={activeSessionRun.status}
             queuedCount={queuedCount}
             submitError={submitError}
             onClearSubmitError={clearSubmitError}

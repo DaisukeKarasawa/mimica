@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
+  AgentCancelPayload,
   AgentEventMessage,
   AgentMode,
   AtMenuSection,
@@ -29,7 +30,7 @@ export interface MimicaApi {
   getBridgeStatus: () => Promise<{ connected: boolean; port: number }>;
   getCharacterAssets: () => Promise<CharacterAssetStatus>;
   submitAgent: (payload: AgentSubmitPayload) => Promise<void>;
-  cancelAgent: () => Promise<void>;
+  cancelAgent: (payload: AgentCancelPayload) => Promise<void>;
   openExternal: (url: string) => Promise<boolean>;
   onEditorContext: (cb: (context: EditorContext) => void) => () => void;
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
@@ -54,7 +55,7 @@ const api: MimicaApi = {
   getBridgeStatus: () => ipcRenderer.invoke("bridge:status"),
   getCharacterAssets: () => ipcRenderer.invoke("character:assets"),
   submitAgent: (payload) => ipcRenderer.invoke("agent:submit", payload),
-  cancelAgent: () => ipcRenderer.invoke("agent:cancel"),
+  cancelAgent: (payload) => ipcRenderer.invoke("agent:cancel", payload),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
   onEditorContext: (cb) => {
     const handler = (_: unknown, context: EditorContext) => cb(context);

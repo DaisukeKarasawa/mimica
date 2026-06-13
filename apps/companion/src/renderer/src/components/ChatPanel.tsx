@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AgentMode, AvatarState, ChatAttachment, ChatSession } from "@mimica/shared";
 import { AGENT_DISPLAY_NAME } from "@mimica/shared";
+import type { SessionRunStatus } from "../lib/sessionRunState";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
 import { ChatComposer } from "./ChatComposer";
@@ -19,6 +20,7 @@ interface ChatPanelProps {
   panelMode: ChatPanelMode;
   tabsBarVisible: boolean;
   isStreaming: boolean;
+  activeSessionRunStatus?: SessionRunStatus;
   queuedCount?: number;
   submitError?: string | null;
   onClearSubmitError?: () => void;
@@ -45,6 +47,7 @@ export function ChatPanel({
   panelMode,
   tabsBarVisible,
   isStreaming,
+  activeSessionRunStatus = "idle",
   queuedCount = 0,
   submitError = null,
   onClearSubmitError,
@@ -101,7 +104,7 @@ export function ChatPanel({
   const awaitingAssistantReply =
     lastMessage?.role === "user" ||
     (lastMessage?.role === "assistant" && !lastMessage.content.trim());
-  const showThinkingIndicator = avatarState === "thinking" && awaitingAssistantReply;
+  const showThinkingIndicator = activeSessionRunStatus === "thinking" && awaitingAssistantReply;
   const { containerRef: messagesRef, scrollToBottom } = useStickToBottomScroll({
     enabled: showChat,
     resetKey: activeSessionId,

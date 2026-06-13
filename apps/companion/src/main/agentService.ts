@@ -1,7 +1,7 @@
 import { relative } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
-import type { AgentMode, ChatAttachment, EditorContext } from "@mimica/shared";
+import type { AgentMode, ChatAttachment, EditorContext, AgentCancelPayload } from "@mimica/shared";
 import { isChatAttachment, toMessageContext } from "@mimica/shared";
 import {
   AgentRunTimingTrace,
@@ -214,9 +214,22 @@ export class AgentService {
     }
   }
 
-  async cancel(): Promise<void> {
+  async cancel(payload: AgentCancelPayload): Promise<void> {
+    if (!this.activeRun) return;
+    if (this.activeRun.sessionId !== payload.sessionId) {
+      console.warn(`[agentService] cancel ignored: no active run for session ${payload.sessionId}`);
+      return;
+    }
+    if (payload.runId && this.activeRun.runId !== payload.runId) {
+      console.warn("[agentService] cancel ignored: stale runId");
+      return;
+    }
+    if (!this.sessionStore.get(payload.sessionId)) {
+      console.warn(`[agentService] cancel ignored: unknown session ${payload.sessionId}`);
+      return;
+    }
     if (this.runner) {
-      await this.runner.cancel();
+      await this.runner.cancel(payload.sessionId);
     }
     this.activeRun = null;
   }
