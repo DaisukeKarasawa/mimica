@@ -8,6 +8,7 @@ import {
   isChatAttachment,
   toMessageContext,
 } from "@mimica/shared";
+import { formatPersonaErrorKind, personaAttachmentLimitError } from "./personaErrors.js";
 import {
   AgentRunTimingTrace,
   isAgentPerfEnabled,
@@ -109,10 +110,10 @@ export class AgentService {
 
     const session = this.sessionStore.get(payload.sessionId);
     if (!session) {
-      throw new Error("Session not found");
+      throw new Error(formatPersonaErrorKind("session"));
     }
     if ((payload.attachments?.length ?? 0) > MAX_IMAGE_ATTACHMENTS) {
-      throw new Error(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
+      throw new Error(personaAttachmentLimitError());
     }
     const allMessages = session.messages;
     const history = historyForAgentPrompt(allMessages, payload.content);

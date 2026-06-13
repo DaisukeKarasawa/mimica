@@ -3,6 +3,8 @@ import type { AgentMode, AvatarState, ChatAttachment, ChatSession } from "@mimic
 import { AGENT_DISPLAY_NAME } from "@mimica/shared";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
+import { usePersonaReactions } from "../hooks/usePersonaReactions";
+import { formatComposerSubmitError } from "../lib/composerError";
 import { ChatComposer } from "./ChatComposer";
 import { MessageAttachments } from "./ComposerAttachments";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
@@ -30,7 +32,7 @@ interface ChatPanelProps {
   onReorderTab: (draggedId: string, toIndex: number) => void;
   onSelectHistorySession: (id: string) => void;
   onDeleteSession: (id: string) => void;
-  onSend: (text: string, attachments?: ChatAttachment[]) => void;
+  onSend: (text: string, attachments?: ChatAttachment[]) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -59,6 +61,7 @@ export function ChatPanel({
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const personaReactions = usePersonaReactions();
   const prevSessionIdRef = useRef(activeSessionId);
 
   useLayoutEffect(() => {
@@ -103,15 +106,19 @@ export function ChatPanel({
     },
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const text = input.trim();
     if ((!text && attachments.length === 0) || isStreaming) return;
     const outgoing = attachments;
-    setInput("");
-    setAttachments([]);
-    setAttachmentError(null);
     scrollToBottom({ force: true });
-    onSend(text, outgoing.length > 0 ? outgoing : undefined);
+    try {
+      await onSend(text, outgoing.length > 0 ? outgoing : undefined);
+      setInput("");
+      setAttachments([]);
+      setAttachmentError(null);
+    } catch (error) {
+      setAttachmentError(formatComposerSubmitError(error, personaReactions));
+    }
   };
 
   return (
@@ -244,8 +251,9 @@ export function ChatPanel({
                 onChange={setInput}
                 onAttachmentsChange={setAttachments}
                 onAttachmentError={setAttachmentError}
+                personaReactions={personaReactions}
                 onAgentModeChange={onAgentModeChange}
-                onSubmit={handleSubmit}
+                onSubmit={() => void handleSubmit()}
                 onCancel={onCancel}
               />
             </div>

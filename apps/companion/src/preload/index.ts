@@ -8,6 +8,7 @@ import type {
   ChatSession,
   EditorContext,
   ImagePastePayload,
+  PersonaReactions,
   SlashMenuSection,
 } from "@mimica/shared";
 import type { ChatTabShortcutAction } from "../common/chatTabShortcuts.js";
@@ -28,6 +29,7 @@ export interface MimicaApi {
   saveSession: (session: ChatSession) => Promise<ChatSession>;
   getBridgeStatus: () => Promise<{ connected: boolean; port: number }>;
   getCharacterAssets: () => Promise<CharacterAssetStatus>;
+  getPersonaReactions: () => Promise<PersonaReactions | null>;
   submitAgent: (payload: AgentSubmitPayload) => Promise<void>;
   cancelAgent: () => Promise<void>;
   openExternal: (url: string) => Promise<boolean>;
@@ -53,6 +55,7 @@ const api: MimicaApi = {
   saveSession: (session) => ipcRenderer.invoke("sessions:save", session),
   getBridgeStatus: () => ipcRenderer.invoke("bridge:status"),
   getCharacterAssets: () => ipcRenderer.invoke("character:assets"),
+  getPersonaReactions: () => ipcRenderer.invoke("persona:reactions"),
   submitAgent: (payload) => ipcRenderer.invoke("agent:submit", payload),
   cancelAgent: () => ipcRenderer.invoke("agent:cancel"),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),

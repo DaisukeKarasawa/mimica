@@ -26,6 +26,7 @@ import { registerPrivilegedProtocols } from "./privilegedProtocols.js";
 import { registerSlashMenuIpc } from "./ipc/slashMenu.js";
 import { registerAtMenuIpc } from "./ipc/atMenu.js";
 import { registerAttachmentIpc, releaseDraftAttachments } from "./ipc/attachments.js";
+import { getPersonaReactionsForRenderer } from "./personaErrors.js";
 
 const electronApis = electron();
 
@@ -78,6 +79,7 @@ if (!gotLock) {
     attachMainWindow(createMainWindow());
 
     ipcMain.handle("character:assets", () => getCharacterAssetStatus());
+    ipcMain.handle("persona:reactions", () => getPersonaReactionsForRenderer());
     ipcMain.handle("agent:submit", (event, payload) => {
       if (!agentService) throw new Error("Agent service is unavailable");
       const attachmentCount = Array.isArray(payload?.attachments) ? payload.attachments.length : 0;

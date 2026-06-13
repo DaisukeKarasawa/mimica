@@ -77,6 +77,8 @@ export function installUiLabStub(): void {
       chatIconUrl: null,
     }),
 
+    getPersonaReactions: async () => null,
+
     submitAgent: async (payload: AgentSubmitPayload) => {
       void payload;
       console.info("[ui-lab] submitAgent ignored (browser preview only)");

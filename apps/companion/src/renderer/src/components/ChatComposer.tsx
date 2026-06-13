@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type SetStateAction } from "react";
-import type { AgentMode, ChatAttachment, AtMenuItem } from "@mimica/shared";
+import type { AgentMode, ChatAttachment, AtMenuItem, PersonaReactions } from "@mimica/shared";
 import { agentModeComposerPlaceholder, cycleAgentMode } from "@mimica/shared";
 import { ComposerAttachments } from "./ComposerAttachments";
 import { SlashCommandMenu, useSlashMenuSections, useSlashMenuState } from "./SlashCommandMenu";
 import { AtMentionMenu, replaceAtMenuSelection, useAtMenuState } from "./AtMentionMenu";
 import { handleComposerMenuKeyDown } from "./useComposerMenuKeyboard";
 import { fileToBase64 } from "../utils/fileToBase64";
+import { formatComposerSessionError } from "../lib/composerError";
 
 /** Matches `.composer-input` max-height in chat.css */
 const COMPOSER_INPUT_MAX_HEIGHT_PX = 160;
@@ -25,6 +26,7 @@ interface ChatComposerProps {
   onSubmit: () => void;
   onCancel: () => void;
   onAttachmentError?: (message: string) => void;
+  personaReactions?: PersonaReactions;
 }
 
 export function ChatComposer({
@@ -42,6 +44,7 @@ export function ChatComposer({
   onSubmit,
   onCancel,
   onAttachmentError,
+  personaReactions,
 }: ChatComposerProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sections = useSlashMenuSections(workspacePath, agentMode);
@@ -90,7 +93,7 @@ export function ChatComposer({
 
   const pickImages = useCallback(async () => {
     if (!sessionId) {
-      onAttachmentError?.("画像を添付するにはチャットセッションが必要です");
+      onAttachmentError?.(formatComposerSessionError(personaReactions));
       return;
     }
     try {
@@ -102,12 +105,19 @@ export function ChatComposer({
     } catch (error) {
       reportAttachmentError(error);
     }
-  }, [onAttachmentError, onAttachmentsChange, onChange, reportAttachmentError, sessionId]);
+  }, [
+    onAttachmentError,
+    onAttachmentsChange,
+    onChange,
+    personaReactions,
+    reportAttachmentError,
+    sessionId,
+  ]);
 
   const pasteImage = useCallback(
     async (file: File) => {
       if (!sessionId) {
-        onAttachmentError?.("画像を添付するにはチャットセッションが必要です");
+        onAttachmentError?.(formatComposerSessionError(personaReactions));
         return;
       }
       try {
@@ -121,7 +131,7 @@ export function ChatComposer({
         reportAttachmentError(error);
       }
     },
-    [onAttachmentError, onAttachmentsChange, reportAttachmentError, sessionId],
+    [onAttachmentError, onAttachmentsChange, personaReactions, reportAttachmentError, sessionId],
   );
 
   const selectAtItem = useCallback(

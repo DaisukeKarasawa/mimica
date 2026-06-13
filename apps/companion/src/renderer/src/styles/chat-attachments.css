@@ -3,6 +3,7 @@
   padding: 0 2px;
   color: #d9b2ad;
   font-size: 11px;
+  white-space: pre-line;
 }
 
 .composer-attachments {

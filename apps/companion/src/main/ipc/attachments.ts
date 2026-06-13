@@ -4,6 +4,12 @@ import type { ImagePastePayload } from "@mimica/shared";
 import { isChatAttachment, isImagePastePayload } from "@mimica/shared";
 import type { ElectronMain } from "../electron.js";
 import {
+  formatPersonaErrorForUser,
+  formatPersonaErrorKind,
+  personaAttachmentLimitError,
+  personaSessionRequiredError,
+} from "../personaErrors.js";
+import {
   deleteAttachmentFile,
   ImageAttachmentError,
   MAX_IMAGE_ATTACHMENTS,
@@ -72,6 +78,13 @@ function draftKeyFromEvent(sessionId: string, event: IpcMainInvokeEvent): string
   return draftKey(sessionId, event.sender.id);
 }
 
+function throwPersonaAttachmentError(error: unknown): never {
+  if (error instanceof ImageAttachmentError) {
+    throw new ImageAttachmentError(formatPersonaErrorForUser(error.message));
+  }
+  throw error;
+}
+
 export function registerAttachmentIpc(
   ipcMain: IpcMain,
   dialog: Dialog,
@@ -79,12 +92,12 @@ export function registerAttachmentIpc(
 ): void {
   ipcMain.handle("attachments:pick", async (event, sessionId: unknown) => {
     if (typeof sessionId !== "string" || !sessionId.trim()) {
-      throw new ImageAttachmentError("Session is required to attach images");
+      throw new ImageAttachmentError(personaSessionRequiredError());
     }
     const key = draftKeyFromEvent(sessionId, event);
     const remaining = remainingDraftSlots(key);
     if (remaining <= 0) {
-      throw new ImageAttachmentError(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
+      throw new ImageAttachmentError(personaAttachmentLimitError());
     }
 
     const mainWindow = getMainWindow();
@@ -105,10 +118,10 @@ export function registerAttachmentIpc(
     const slotsAfterDialog = remainingDraftSlots(key);
     const toSaveCount = Math.min(result.filePaths.length, slotsAfterDialog);
     if (toSaveCount <= 0) {
-      throw new ImageAttachmentError(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
+      throw new ImageAttachmentError(personaAttachmentLimitError());
     }
     if (!reserveDraftSlots(key, toSaveCount)) {
-      throw new ImageAttachmentError(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
+      throw new ImageAttachmentError(personaAttachmentLimitError());
     }
 
     const saved = [];
@@ -125,32 +138,34 @@ export function registerAttachmentIpc(
         }
       }
       releaseDraftSlots(key, toSaveCount);
-      throw error;
+      throwPersonaAttachmentError(error);
     }
     return saved;
   });
 
   ipcMain.handle("attachments:paste", (event, sessionId: unknown, payload: unknown) => {
     if (typeof sessionId !== "string" || !sessionId.trim()) {
-      throw new ImageAttachmentError("Session is required to attach images");
+      throw new ImageAttachmentError(personaSessionRequiredError());
     }
     const key = draftKeyFromEvent(sessionId, event);
     if (remainingDraftSlots(key) <= 0) {
-      throw new ImageAttachmentError(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
+      throw new ImageAttachmentError(personaAttachmentLimitError());
     }
     if (!isImagePastePayload(payload)) {
-      throw new ImageAttachmentError("Invalid pasted image payload");
+      throw new ImageAttachmentError(
+        formatPersonaErrorKind("attachment", "Invalid pasted image payload"),
+      );
     }
     assertPastePayloadSize(payload);
     if (!reserveDraftSlots(key, 1)) {
-      throw new ImageAttachmentError(`Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`);
+      throw new ImageAttachmentError(personaAttachmentLimitError());
     }
     try {
       const buffer = Buffer.from(payload.data, "base64");
       return saveImageFromBuffer(sessionId, buffer, payload.mimeType, "pasted-image");
     } catch (error) {
       releaseDraftSlots(key, 1);
-      throw error;
+      throwPersonaAttachmentError(error);
     }
   });
 
@@ -190,6 +205,8 @@ export function registerAttachmentIpc(
 
 function assertPastePayloadSize(payload: ImagePastePayload): void {
   if (payload.data.length > MAX_BASE64_LENGTH) {
-    throw new ImageAttachmentError("Pasted image is too large");
+    throw new ImageAttachmentError(
+      formatPersonaErrorKind("attachment", "Pasted image is too large"),
+    );
   }
 }

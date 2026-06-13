@@ -216,10 +216,11 @@ export default function App() {
         editorContext,
         attachments,
       });
-    } catch {
+    } catch (error) {
       setIsStreaming(false);
       resetStreamRef.current();
       director.setState("idle");
+      throw error;
     }
   };
 
