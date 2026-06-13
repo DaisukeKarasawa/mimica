@@ -6,6 +6,7 @@ import { SlashCommandMenu, useSlashMenuSections, useSlashMenuState } from "./Sla
 import { AtMentionMenu, replaceAtMenuSelection, useAtMenuState } from "./AtMentionMenu";
 import { handleComposerMenuKeyDown } from "./useComposerMenuKeyboard";
 import { fileToBase64 } from "../utils/fileToBase64";
+import { formatClientPersonaError, ipcErrorMessage } from "../lib/composerError";
 
 /** Matches `.composer-input` max-height in chat.css */
 const COMPOSER_INPUT_MAX_HEIGHT_PX = 160;
@@ -24,7 +25,7 @@ interface ChatComposerProps {
   onAgentModeChange: (mode: AgentMode) => void;
   onSubmit: () => void;
   onCancel: () => void;
-  onAttachmentError?: (message: string) => void;
+  onComposerError?: (message: string) => void;
 }
 
 export function ChatComposer({
@@ -41,7 +42,7 @@ export function ChatComposer({
   onAgentModeChange,
   onSubmit,
   onCancel,
-  onAttachmentError,
+  onComposerError,
 }: ChatComposerProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sections = useSlashMenuSections(workspacePath, agentMode);
@@ -80,17 +81,16 @@ export function ChatComposer({
     return () => observer.disconnect();
   }, [syncInputHeight]);
 
-  const reportAttachmentError = useCallback(
+  const reportComposerError = useCallback(
     (error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      onAttachmentError?.(message);
+      onComposerError?.(ipcErrorMessage(error));
     },
-    [onAttachmentError],
+    [onComposerError],
   );
 
   const pickImages = useCallback(async () => {
     if (!sessionId) {
-      onAttachmentError?.("画像を添付するにはチャットセッションが必要です");
+      onComposerError?.(await formatClientPersonaError("session"));
       return;
     }
     try {
@@ -100,14 +100,14 @@ export function ChatComposer({
         onChange("");
       }
     } catch (error) {
-      reportAttachmentError(error);
+      reportComposerError(error);
     }
-  }, [onAttachmentError, onAttachmentsChange, onChange, reportAttachmentError, sessionId]);
+  }, [onAttachmentsChange, onChange, onComposerError, reportComposerError, sessionId]);
 
   const pasteImage = useCallback(
     async (file: File) => {
       if (!sessionId) {
-        onAttachmentError?.("画像を添付するにはチャットセッションが必要です");
+        onComposerError?.(await formatClientPersonaError("session"));
         return;
       }
       try {
@@ -118,10 +118,10 @@ export function ChatComposer({
         });
         onAttachmentsChange((prev) => [...prev, saved]);
       } catch (error) {
-        reportAttachmentError(error);
+        reportComposerError(error);
       }
     },
-    [onAttachmentError, onAttachmentsChange, reportAttachmentError, sessionId],
+    [onAttachmentsChange, onComposerError, reportComposerError, sessionId],
   );
 
   const selectAtItem = useCallback(

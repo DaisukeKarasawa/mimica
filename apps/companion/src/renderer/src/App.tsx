@@ -3,11 +3,13 @@ import type { AgentMode, AvatarState, EditorContext } from "@mimica/shared";
 import { DEFAULT_SETTINGS, mapAgentRunToAvatar, resolveCharacterShortNameEn } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
+import { BridgeStatusBanner } from "./components/BridgeStatusBanner";
 import { CharacterStage } from "./components/CharacterStage";
 import { ChatPanel } from "./components/ChatPanel";
 import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
 import { useAgentSubmitQueue } from "./hooks/useAgentSubmitQueue";
+import { useBridgeStatus } from "./hooks/useBridgeStatus";
 import { useCharacterAssets } from "./hooks/useCharacterAssets";
 import { useSessionRunStates } from "./hooks/useSessionRunStates";
 import { useSessionTabs } from "./hooks/useSessionTabs";
@@ -36,6 +38,7 @@ export default function App() {
     () => resolveCharacterShortNameEn(characterAssets?.metadata),
     [characterAssets?.metadata],
   );
+  const bridgeBannerMessage = useBridgeStatus();
 
   const handleStopStreaming = useCallback(
     async (sessionId: string) => {
@@ -263,6 +266,7 @@ export default function App() {
   return (
     <div className="app">
       <TopBar />
+      <BridgeStatusBanner message={bridgeBannerMessage} />
       <MainSplitLayout
         onSplitReady={() => setSplitLayoutReady(true)}
         stage={

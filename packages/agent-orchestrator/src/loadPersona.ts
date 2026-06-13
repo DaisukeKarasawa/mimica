@@ -32,11 +32,12 @@ export function loadPersonaPack(
   const dir = dirname(skillPath);
   const stylePath = join(dir, "style.md");
   const linesPath = join(dir, "lines.json");
+  const linesJson = existsSync(linesPath) ? readFileSync(linesPath, "utf8") : undefined;
 
   return {
     skillMarkdown: readFileSync(skillPath, "utf8"),
     styleMarkdown: existsSync(stylePath) ? readFileSync(stylePath, "utf8") : undefined,
-    linesJson: existsSync(linesPath) ? readFileSync(linesPath, "utf8") : undefined,
+    linesJson,
     sourcePath: skillPath,
   };
 }

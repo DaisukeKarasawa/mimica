@@ -405,13 +405,21 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
         }
         case "agent_error": {
+          const streamId = activeStreamIdRef.current ?? streamMessageId(event.runId, null);
           if (isActiveSession(event.sessionId)) {
             reveal.stop();
-            resetStream(event.sessionId);
+            reveal.reset();
+            activeStreamIdRef.current = null;
+            setAllSessionsRef.current((prev) =>
+              applyAgentComplete(prev, event.sessionId, event.runId, streamId, event.message),
+            );
             onAvatarMomentRef.current?.("error", 2000);
           } else {
             backgroundStreamTextRef.current.delete(
               backgroundBufferKey(event.sessionId, event.runId),
+            );
+            setAllSessionsRef.current((prev) =>
+              applyAgentComplete(prev, event.sessionId, event.runId, streamId, event.message),
             );
           }
           clearSessionRunRef.current(event.sessionId);

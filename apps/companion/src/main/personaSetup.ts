@@ -9,13 +9,14 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parsePersonaLinesJson, type PersonaReactions } from "@mimica/shared";
 import { electron } from "./electron.js";
 import { getActiveMimicaSettings } from "./characterPack.js";
 import { resolveExpandedPath } from "./paths.js";
 
 const LOG_PREFIX = "[personaSetup]";
 /** Bump when bundled persona templates change incompatibly (e.g. three-layer model). */
-export const PERSONA_PACK_VERSION = 2;
+export const PERSONA_PACK_VERSION = 3;
 const PERSONA_PACK_VERSION_FILE = ".pack-version";
 
 export const PERSONA_PACK_SEEDS = [
@@ -33,11 +34,21 @@ const PERSONA_PACK_V1_DIGESTS: Record<(typeof PERSONA_PACK_SEEDS)[number]["dest"
   "lines.json": "e9a37a0149531a2d200c8141ad65898a8ada3e0bbec3383e08d01dede56d6f12",
 };
 
+/** SHA-256 digests of pack v2 bundled templates (before error_by_kind in lines.json). */
+const PERSONA_PACK_V2_DIGESTS: Partial<
+  Record<(typeof PERSONA_PACK_SEEDS)[number]["dest"], string>
+> = {
+  "lines.json": "e9a37a0149531a2d200c8141ad65898a8ada3e0bbec3383e08d01dede56d6f12",
+};
+
+export interface ResolvedPersonaPack {
+  prompt?: string;
+  reactions?: PersonaReactions;
+}
+
 let cachedTemplatePersonaDir: string | undefined;
-let cachedPersonaPrompt: string | undefined;
-let cachedPersonaSourcePath: string | undefined;
-let cachedPersonaSourceMtimeMs: number | undefined;
-let cachedPersonaStyleMtimeMs: number | undefined;
+let cachedPack: ResolvedPersonaPack | undefined;
+let cachedPackKey: string | undefined;
 
 function devTemplatePersonaDir(): string {
   const companionRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -64,16 +75,32 @@ function getTemplatePersonaDir(): string {
   return cachedTemplatePersonaDir;
 }
 
-function readPersonaPack(skillPath: string): string | null {
+function readPersonaReactionsFromDir(personaDir: string): PersonaReactions | undefined {
+  const candidates = [join(personaDir, "lines.json"), join(personaDir, "lines.json.example")];
+  for (const linesPath of candidates) {
+    if (!existsSync(linesPath)) continue;
+    try {
+      const parsed = parsePersonaLinesJson(readFileSync(linesPath, "utf8"));
+      if (parsed) return parsed;
+    } catch (err) {
+      console.warn(`${LOG_PREFIX} failed to parse lines at ${linesPath}:`, err);
+    }
+  }
+  return undefined;
+}
+
+function loadPersonaPackFromSource(sourcePath: string): ResolvedPersonaPack {
   const templatePersonaDir = getTemplatePersonaDir();
-  const candidates = [skillPath, join(templatePersonaDir, "SKILL.md")].filter((p) => existsSync(p));
+  const candidates = [sourcePath, join(templatePersonaDir, "SKILL.md")].filter((p) =>
+    existsSync(p),
+  );
 
   const resolved = candidates[0];
   if (!resolved) {
     console.warn(
       `${LOG_PREFIX} persona pack not found (checked user path and ${templatePersonaDir})`,
     );
-    return null;
+    return {};
   }
 
   const dir = dirname(resolved);
@@ -82,7 +109,14 @@ function readPersonaPack(skillPath: string): string | null {
   if (existsSync(stylePath)) {
     parts.push(`---\n${readFileSync(stylePath, "utf8").trim()}`);
   }
-  return parts.join("\n\n");
+
+  const reactions =
+    readPersonaReactionsFromDir(dir) ?? readPersonaReactionsFromDir(templatePersonaDir);
+
+  return {
+    prompt: parts.join("\n\n"),
+    reactions,
+  };
 }
 
 function readInstalledPersonaPackVersion(targetDir: string): number {
@@ -113,15 +147,17 @@ function shouldReplaceOnUpgrade(
     const v1Digest = PERSONA_PACK_V1_DIGESTS[dest];
     return v1Digest !== undefined && fileSha256(outPath) === v1Digest;
   }
+  if (installedVersion === 2) {
+    const v2Digest = PERSONA_PACK_V2_DIGESTS[dest];
+    return v2Digest !== undefined && fileSha256(outPath) === v2Digest;
+  }
   return false;
 }
 
 export function resetPersonaSetupCachesForTests(): void {
   cachedTemplatePersonaDir = undefined;
-  cachedPersonaPrompt = undefined;
-  cachedPersonaSourcePath = undefined;
-  cachedPersonaSourceMtimeMs = undefined;
-  cachedPersonaStyleMtimeMs = undefined;
+  cachedPack = undefined;
+  cachedPackKey = undefined;
 }
 
 /** Seeds or upgrades persona pack files from bundled templates. */
@@ -167,10 +203,8 @@ export function ensurePersonaPackOnDisk(): void {
   const targetDir = join(assetRoot, "persona");
   const changed = syncPersonaPackFromTemplate(getTemplatePersonaDir(), targetDir);
   if (changed) {
-    cachedPersonaPrompt = undefined;
-    cachedPersonaSourcePath = undefined;
-    cachedPersonaSourceMtimeMs = undefined;
-    cachedPersonaStyleMtimeMs = undefined;
+    cachedPack = undefined;
+    cachedPackKey = undefined;
   }
 }
 
@@ -182,26 +216,30 @@ function personaSourceMtimeMs(sourcePath: string): number | undefined {
   }
 }
 
-export function resolvePersonaSystemPrompt(): string | undefined {
+/** Cached persona pack: system prompt and lines.json reactions from one load path. */
+export function resolvePersonaPack(): ResolvedPersonaPack {
   ensurePersonaPackOnDisk();
   const settings = getActiveMimicaSettings();
   const sourcePath = resolveExpandedPath(settings.personaPackPath);
-  const sourceMtimeMs = personaSourceMtimeMs(sourcePath);
-  const stylePath = join(dirname(sourcePath), "style.md");
-  const styleMtimeMs = personaSourceMtimeMs(stylePath);
-  if (
-    cachedPersonaPrompt &&
-    cachedPersonaSourcePath === sourcePath &&
-    cachedPersonaSourceMtimeMs === sourceMtimeMs &&
-    cachedPersonaStyleMtimeMs === styleMtimeMs
-  ) {
-    return cachedPersonaPrompt;
+  const personaDir = dirname(sourcePath);
+  const linesPath = join(personaDir, "lines.json");
+  const cacheKey = [
+    sourcePath,
+    personaSourceMtimeMs(sourcePath),
+    personaSourceMtimeMs(join(personaDir, "style.md")),
+    personaSourceMtimeMs(linesPath),
+  ].join(":");
+
+  if (cachedPackKey === cacheKey && cachedPack) {
+    return cachedPack;
   }
-  const prompt = readPersonaPack(sourcePath);
-  if (!prompt) return undefined;
-  cachedPersonaSourcePath = sourcePath;
-  cachedPersonaSourceMtimeMs = sourceMtimeMs;
-  cachedPersonaStyleMtimeMs = styleMtimeMs;
-  cachedPersonaPrompt = prompt;
-  return prompt;
+
+  const pack = loadPersonaPackFromSource(sourcePath);
+  cachedPackKey = cacheKey;
+  cachedPack = pack;
+  return pack;
+}
+
+export function resolvePersonaSystemPrompt(): string | undefined {
+  return resolvePersonaPack().prompt;
 }

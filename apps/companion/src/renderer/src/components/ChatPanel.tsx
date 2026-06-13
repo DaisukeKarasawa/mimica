@@ -4,6 +4,7 @@ import { AGENT_DISPLAY_NAME } from "@mimica/shared";
 import type { SessionRunStatus } from "../lib/sessionRunState";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
+import { ipcErrorMessage } from "../lib/composerError";
 import { ChatComposer } from "./ChatComposer";
 import { MessageAttachments } from "./ComposerAttachments";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
@@ -34,7 +35,7 @@ interface ChatPanelProps {
   onReorderTab: (draggedId: string, toIndex: number) => void;
   onSelectHistorySession: (id: string) => void;
   onDeleteSession: (id: string) => void;
-  onSend: (text: string, attachments?: ChatAttachment[]) => void;
+  onSend: (text: string, attachments?: ChatAttachment[]) => void | Promise<void>;
   onCancel: () => void;
   isSessionRunActive?: (sessionId: string) => boolean;
 }
@@ -67,7 +68,7 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [composerBannerError, setComposerBannerError] = useState<string | null>(null);
   const prevSessionIdRef = useRef(activeSessionId);
 
   useEffect(() => {
@@ -83,10 +84,10 @@ export function ChatPanel({
         }
         return [];
       });
-      setAttachmentError(null);
+      setComposerBannerError(null);
     } else if (previousSessionId !== activeSessionId) {
       setAttachments([]);
-      setAttachmentError(null);
+      setComposerBannerError(null);
     }
     prevSessionIdRef.current = activeSessionId;
   }, [activeSessionId]);
@@ -116,15 +117,19 @@ export function ChatPanel({
     },
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const text = input.trim();
     if ((!text && attachments.length === 0) || !workspacePath) return;
     const outgoing = attachments;
-    setInput("");
-    setAttachments([]);
-    setAttachmentError(null);
     scrollToBottom({ force: true });
-    onSend(text, outgoing.length > 0 ? outgoing : undefined);
+    try {
+      await onSend(text, outgoing.length > 0 ? outgoing : undefined);
+      setInput("");
+      setAttachments([]);
+      setComposerBannerError(null);
+    } catch (error) {
+      setComposerBannerError(ipcErrorMessage(error));
+    }
   };
 
   return (
@@ -255,9 +260,9 @@ export function ChatPanel({
                   {submitError}
                 </p>
               ) : null}
-              {attachmentError ? (
-                <p className="composer-attachment-error" role="alert">
-                  {attachmentError}
+              {composerBannerError ? (
+                <p className="composer-banner-error" role="alert">
+                  {composerBannerError}
                 </p>
               ) : null}
               <ChatComposer
@@ -271,9 +276,9 @@ export function ChatPanel({
                 streaming={isStreaming}
                 onChange={setInput}
                 onAttachmentsChange={setAttachments}
-                onAttachmentError={setAttachmentError}
+                onComposerError={setComposerBannerError}
                 onAgentModeChange={onAgentModeChange}
-                onSubmit={handleSubmit}
+                onSubmit={() => void handleSubmit()}
                 onCancel={onCancel}
               />
             </div>
