@@ -3,12 +3,7 @@ import type { BrowserWindow as BrowserWindowType } from "electron";
 import type { ImagePastePayload } from "@mimica/shared";
 import { isChatAttachment, isImagePastePayload } from "@mimica/shared";
 import type { ElectronMain } from "../electron.js";
-import {
-  formatPersonaErrorForUser,
-  formatPersonaErrorKind,
-  personaAttachmentLimitError,
-  personaSessionRequiredError,
-} from "../personaErrors.js";
+import { agentRunError, PersonaFacingError, rethrowPersonaIpcError } from "../personaErrors.js";
 import {
   deleteAttachmentFile,
   ImageAttachmentError,
@@ -78,11 +73,10 @@ function draftKeyFromEvent(sessionId: string, event: IpcMainInvokeEvent): string
   return draftKey(sessionId, event.sender.id);
 }
 
-function throwPersonaAttachmentError(error: unknown): never {
-  if (error instanceof ImageAttachmentError) {
-    throw new ImageAttachmentError(formatPersonaErrorForUser(error.message));
-  }
-  throw error;
+function attachmentLimitError(): PersonaFacingError {
+  return new PersonaFacingError(
+    agentRunError("attachment", `Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`),
+  );
 }
 
 export function registerAttachmentIpc(
@@ -91,122 +85,134 @@ export function registerAttachmentIpc(
   getMainWindow: () => BrowserWindowType | null,
 ): void {
   ipcMain.handle("attachments:pick", async (event, sessionId: unknown) => {
-    if (typeof sessionId !== "string" || !sessionId.trim()) {
-      throw new ImageAttachmentError(personaSessionRequiredError());
-    }
-    const key = draftKeyFromEvent(sessionId, event);
-    const remaining = remainingDraftSlots(key);
-    if (remaining <= 0) {
-      throw new ImageAttachmentError(personaAttachmentLimitError());
-    }
-
-    const mainWindow = getMainWindow();
-    const properties =
-      remaining > 1 ? (["openFile", "multiSelections"] as const) : (["openFile"] as const);
-    const result = mainWindow
-      ? await dialog.showOpenDialog(mainWindow, {
-          properties: [...properties],
-          filters: IMAGE_DIALOG_FILTERS,
-        })
-      : await dialog.showOpenDialog({
-          properties: [...properties],
-          filters: IMAGE_DIALOG_FILTERS,
-        });
-
-    if (result.canceled || result.filePaths.length === 0) return [];
-
-    const slotsAfterDialog = remainingDraftSlots(key);
-    const toSaveCount = Math.min(result.filePaths.length, slotsAfterDialog);
-    if (toSaveCount <= 0) {
-      throw new ImageAttachmentError(personaAttachmentLimitError());
-    }
-    if (!reserveDraftSlots(key, toSaveCount)) {
-      throw new ImageAttachmentError(personaAttachmentLimitError());
-    }
-
-    const saved = [];
     try {
-      for (const filePath of result.filePaths.slice(0, toSaveCount)) {
-        saved.push(saveImageFromPath(sessionId, filePath));
+      if (typeof sessionId !== "string" || !sessionId.trim()) {
+        throw new PersonaFacingError(agentRunError("session"));
       }
-    } catch (error) {
-      for (const attachment of saved) {
-        try {
-          deleteAttachmentFile(sessionId, attachment);
-        } catch {
-          /* best-effort rollback */
+      const key = draftKeyFromEvent(sessionId, event);
+      const remaining = remainingDraftSlots(key);
+      if (remaining <= 0) {
+        throw attachmentLimitError();
+      }
+
+      const mainWindow = getMainWindow();
+      const properties =
+        remaining > 1 ? (["openFile", "multiSelections"] as const) : (["openFile"] as const);
+      const result = mainWindow
+        ? await dialog.showOpenDialog(mainWindow, {
+            properties: [...properties],
+            filters: IMAGE_DIALOG_FILTERS,
+          })
+        : await dialog.showOpenDialog({
+            properties: [...properties],
+            filters: IMAGE_DIALOG_FILTERS,
+          });
+
+      if (result.canceled || result.filePaths.length === 0) return [];
+
+      const slotsAfterDialog = remainingDraftSlots(key);
+      const toSaveCount = Math.min(result.filePaths.length, slotsAfterDialog);
+      if (toSaveCount <= 0) {
+        throw attachmentLimitError();
+      }
+      if (!reserveDraftSlots(key, toSaveCount)) {
+        throw attachmentLimitError();
+      }
+
+      const saved = [];
+      try {
+        for (const filePath of result.filePaths.slice(0, toSaveCount)) {
+          saved.push(saveImageFromPath(sessionId, filePath));
         }
+      } catch (error) {
+        for (const attachment of saved) {
+          try {
+            deleteAttachmentFile(sessionId, attachment);
+          } catch {
+            /* best-effort rollback */
+          }
+        }
+        releaseDraftSlots(key, toSaveCount);
+        throw error;
       }
-      releaseDraftSlots(key, toSaveCount);
-      throwPersonaAttachmentError(error);
+      return saved;
+    } catch (error) {
+      rethrowPersonaIpcError(error);
     }
-    return saved;
   });
 
   ipcMain.handle("attachments:paste", (event, sessionId: unknown, payload: unknown) => {
-    if (typeof sessionId !== "string" || !sessionId.trim()) {
-      throw new ImageAttachmentError(personaSessionRequiredError());
-    }
-    const key = draftKeyFromEvent(sessionId, event);
-    if (remainingDraftSlots(key) <= 0) {
-      throw new ImageAttachmentError(personaAttachmentLimitError());
-    }
-    if (!isImagePastePayload(payload)) {
-      throw new ImageAttachmentError(
-        formatPersonaErrorKind("attachment", "Invalid pasted image payload"),
-      );
-    }
-    assertPastePayloadSize(payload);
-    if (!reserveDraftSlots(key, 1)) {
-      throw new ImageAttachmentError(personaAttachmentLimitError());
-    }
     try {
-      const buffer = Buffer.from(payload.data, "base64");
-      return saveImageFromBuffer(sessionId, buffer, payload.mimeType, "pasted-image");
+      if (typeof sessionId !== "string" || !sessionId.trim()) {
+        throw new PersonaFacingError(agentRunError("session"));
+      }
+      const key = draftKeyFromEvent(sessionId, event);
+      if (remainingDraftSlots(key) <= 0) {
+        throw attachmentLimitError();
+      }
+      if (!isImagePastePayload(payload)) {
+        throw new PersonaFacingError(agentRunError("attachment", "Invalid pasted image payload"));
+      }
+      assertPastePayloadSize(payload);
+      if (!reserveDraftSlots(key, 1)) {
+        throw attachmentLimitError();
+      }
+      try {
+        const buffer = Buffer.from(payload.data, "base64");
+        return saveImageFromBuffer(sessionId, buffer, payload.mimeType, "pasted-image");
+      } catch (error) {
+        releaseDraftSlots(key, 1);
+        throw error;
+      }
     } catch (error) {
-      releaseDraftSlots(key, 1);
-      throwPersonaAttachmentError(error);
+      rethrowPersonaIpcError(error);
     }
   });
 
   ipcMain.handle("attachments:discard", (event, sessionId: unknown, attachment: unknown) => {
-    if (typeof sessionId !== "string" || !sessionId.trim()) {
-      throw new ImageAttachmentError("Session is required to discard attachments");
+    try {
+      if (typeof sessionId !== "string" || !sessionId.trim()) {
+        throw new ImageAttachmentError("Session is required to discard attachments");
+      }
+      if (!isChatAttachment(attachment)) {
+        throw new ImageAttachmentError("Invalid attachment");
+      }
+      deleteAttachmentFile(sessionId, attachment);
+      releaseDraftSlots(draftKeyFromEvent(sessionId, event), 1);
+    } catch (error) {
+      rethrowPersonaIpcError(error);
     }
-    if (!isChatAttachment(attachment)) {
-      throw new ImageAttachmentError("Invalid attachment");
-    }
-    deleteAttachmentFile(sessionId, attachment);
-    releaseDraftSlots(draftKeyFromEvent(sessionId, event), 1);
   });
 
   ipcMain.handle("attachments:discardMany", (event, sessionId: unknown, attachments: unknown) => {
-    if (typeof sessionId !== "string" || !sessionId.trim()) {
-      throw new ImageAttachmentError("Session is required to discard attachments");
-    }
-    if (!Array.isArray(attachments)) {
-      throw new ImageAttachmentError("Invalid attachments list");
-    }
-    let discarded = 0;
-    for (const attachment of attachments) {
-      if (!isChatAttachment(attachment)) continue;
-      try {
-        deleteAttachmentFile(sessionId, attachment);
-        discarded += 1;
-      } catch {
-        /* skip invalid refs */
+    try {
+      if (typeof sessionId !== "string" || !sessionId.trim()) {
+        throw new ImageAttachmentError("Session is required to discard attachments");
       }
-    }
-    if (discarded > 0) {
-      releaseDraftSlots(draftKeyFromEvent(sessionId, event), discarded);
+      if (!Array.isArray(attachments)) {
+        throw new ImageAttachmentError("Invalid attachments list");
+      }
+      let discarded = 0;
+      for (const attachment of attachments) {
+        if (!isChatAttachment(attachment)) continue;
+        try {
+          deleteAttachmentFile(sessionId, attachment);
+          discarded += 1;
+        } catch {
+          /* skip invalid refs */
+        }
+      }
+      if (discarded > 0) {
+        releaseDraftSlots(draftKeyFromEvent(sessionId, event), discarded);
+      }
+    } catch (error) {
+      rethrowPersonaIpcError(error);
     }
   });
 }
 
 function assertPastePayloadSize(payload: ImagePastePayload): void {
   if (payload.data.length > MAX_BASE64_LENGTH) {
-    throw new ImageAttachmentError(
-      formatPersonaErrorKind("attachment", "Pasted image is too large"),
-    );
+    throw new ImageAttachmentError("Pasted image is too large");
   }
 }

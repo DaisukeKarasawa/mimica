@@ -2,13 +2,8 @@ import { relative } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import type { WebContents } from "electron";
 import type { AgentMode, ChatAttachment, EditorContext, AgentRunError } from "@mimica/shared";
-import {
-  agentRunErrorFromUnknown,
-  buildPersonaErrorMessage,
-  isChatAttachment,
-  toMessageContext,
-} from "@mimica/shared";
-import { formatPersonaErrorKind, personaAttachmentLimitError } from "./personaErrors.js";
+import { agentRunErrorFromUnknown, isChatAttachment, toMessageContext } from "@mimica/shared";
+import { agentRunError, formatPersonaErrorForUser, PersonaFacingError } from "./personaErrors.js";
 import {
   AgentRunTimingTrace,
   isAgentPerfEnabled,
@@ -20,7 +15,7 @@ import {
   shouldWarnUnlinkedAtExpansion,
   UNLINKED_AT_EXPANSION_WARNING,
 } from "./agentSubmitWorkspace.js";
-import { resolvePersonaPack, resolvePersonaSystemPrompt } from "./personaSetup.js";
+import { resolvePersonaSystemPrompt } from "./personaSetup.js";
 import type { SessionStore } from "./sessionStore.js";
 import { AgentRunEmitter } from "./agentRunEmitter.js";
 import { appendAssistantMessage, historyForAgentPrompt } from "./sessionMessages.js";
@@ -58,11 +53,7 @@ export class AgentService {
     error: AgentRunError,
     emitter: AgentRunEmitter,
   ): void {
-    const userMessage = buildPersonaErrorMessage(
-      error.kind,
-      error.detail,
-      resolvePersonaPack().reactions,
-    );
+    const userMessage = formatPersonaErrorForUser(error);
     console.error(`[agentService] run ${runId} error (${error.kind}):`, error.detail ?? error.kind);
 
     const current = this.sessionStore.get(sessionId);
@@ -110,10 +101,12 @@ export class AgentService {
 
     const session = this.sessionStore.get(payload.sessionId);
     if (!session) {
-      throw new Error(formatPersonaErrorKind("session"));
+      throw new PersonaFacingError(agentRunError("session"));
     }
     if ((payload.attachments?.length ?? 0) > MAX_IMAGE_ATTACHMENTS) {
-      throw new Error(personaAttachmentLimitError());
+      throw new PersonaFacingError(
+        agentRunError("attachment", `Maximum ${MAX_IMAGE_ATTACHMENTS} images per message`),
+      );
     }
     const allMessages = session.messages;
     const history = historyForAgentPrompt(allMessages, payload.content);

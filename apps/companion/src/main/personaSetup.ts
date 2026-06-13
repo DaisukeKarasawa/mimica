@@ -243,7 +243,3 @@ export function resolvePersonaPack(): ResolvedPersonaPack {
 export function resolvePersonaSystemPrompt(): string | undefined {
   return resolvePersonaPack().prompt;
 }
-
-export function resolvePersonaReactions(): PersonaReactions | undefined {
-  return resolvePersonaPack().reactions;
-}

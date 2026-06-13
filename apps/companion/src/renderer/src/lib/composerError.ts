@@ -1,12 +1,14 @@
-import { agentRunError, formatPersonaErrorMessage, type PersonaReactions } from "@mimica/shared";
+import type { ErrorKind } from "@mimica/shared";
 
-export function formatComposerSessionError(reactions?: PersonaReactions): string {
-  return formatPersonaErrorMessage(agentRunError("session"), reactions);
+/** IPC and preload errors arrive as pre-formatted persona copy from main. */
+export function ipcErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message.trim() || "エラーが発生しました。";
+  }
+  const message = String(error).trim();
+  return message || "エラーが発生しました。";
 }
 
-export function formatComposerSubmitError(error: unknown, reactions?: PersonaReactions): string {
-  if (error instanceof Error) {
-    return error.message.trim() || formatPersonaErrorMessage(agentRunError("generic"), reactions);
-  }
-  return formatPersonaErrorMessage(String(error), reactions);
+export async function formatClientPersonaError(kind: ErrorKind, detail?: string): Promise<string> {
+  return window.mimica.formatPersonaError(kind, detail);
 }

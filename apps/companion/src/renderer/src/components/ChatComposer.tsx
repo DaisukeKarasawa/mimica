@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type SetStateAction } from "react";
-import type { AgentMode, ChatAttachment, AtMenuItem, PersonaReactions } from "@mimica/shared";
+import type { AgentMode, ChatAttachment, AtMenuItem } from "@mimica/shared";
 import { agentModeComposerPlaceholder, cycleAgentMode } from "@mimica/shared";
 import { ComposerAttachments } from "./ComposerAttachments";
 import { SlashCommandMenu, useSlashMenuSections, useSlashMenuState } from "./SlashCommandMenu";
 import { AtMentionMenu, replaceAtMenuSelection, useAtMenuState } from "./AtMentionMenu";
 import { handleComposerMenuKeyDown } from "./useComposerMenuKeyboard";
 import { fileToBase64 } from "../utils/fileToBase64";
-import { formatComposerSessionError } from "../lib/composerError";
+import { formatClientPersonaError, ipcErrorMessage } from "../lib/composerError";
 
 /** Matches `.composer-input` max-height in chat.css */
 const COMPOSER_INPUT_MAX_HEIGHT_PX = 160;
@@ -25,8 +25,7 @@ interface ChatComposerProps {
   onAgentModeChange: (mode: AgentMode) => void;
   onSubmit: () => void;
   onCancel: () => void;
-  onAttachmentError?: (message: string) => void;
-  personaReactions?: PersonaReactions;
+  onComposerError?: (message: string) => void;
 }
 
 export function ChatComposer({
@@ -43,8 +42,7 @@ export function ChatComposer({
   onAgentModeChange,
   onSubmit,
   onCancel,
-  onAttachmentError,
-  personaReactions,
+  onComposerError,
 }: ChatComposerProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sections = useSlashMenuSections(workspacePath, agentMode);
@@ -83,17 +81,16 @@ export function ChatComposer({
     return () => observer.disconnect();
   }, [syncInputHeight]);
 
-  const reportAttachmentError = useCallback(
+  const reportComposerError = useCallback(
     (error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      onAttachmentError?.(message);
+      onComposerError?.(ipcErrorMessage(error));
     },
-    [onAttachmentError],
+    [onComposerError],
   );
 
   const pickImages = useCallback(async () => {
     if (!sessionId) {
-      onAttachmentError?.(formatComposerSessionError(personaReactions));
+      onComposerError?.(await formatClientPersonaError("session"));
       return;
     }
     try {
@@ -103,21 +100,14 @@ export function ChatComposer({
         onChange("");
       }
     } catch (error) {
-      reportAttachmentError(error);
+      reportComposerError(error);
     }
-  }, [
-    onAttachmentError,
-    onAttachmentsChange,
-    onChange,
-    personaReactions,
-    reportAttachmentError,
-    sessionId,
-  ]);
+  }, [onAttachmentsChange, onChange, onComposerError, reportComposerError, sessionId]);
 
   const pasteImage = useCallback(
     async (file: File) => {
       if (!sessionId) {
-        onAttachmentError?.(formatComposerSessionError(personaReactions));
+        onComposerError?.(await formatClientPersonaError("session"));
         return;
       }
       try {
@@ -128,10 +118,10 @@ export function ChatComposer({
         });
         onAttachmentsChange((prev) => [...prev, saved]);
       } catch (error) {
-        reportAttachmentError(error);
+        reportComposerError(error);
       }
     },
-    [onAttachmentError, onAttachmentsChange, personaReactions, reportAttachmentError, sessionId],
+    [onAttachmentsChange, onComposerError, reportComposerError, sessionId],
   );
 
   const selectAtItem = useCallback(

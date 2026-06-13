@@ -77,7 +77,11 @@ export function installUiLabStub(): void {
       chatIconUrl: null,
     }),
 
-    getPersonaReactions: async () => null,
+    formatPersonaError: async (kind, detail) => {
+      void kind;
+      void detail;
+      return "……想定外ね。\n\nエラーが発生しました。";
+    },
 
     submitAgent: async (payload: AgentSubmitPayload) => {
       void payload;

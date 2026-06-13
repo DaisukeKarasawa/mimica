@@ -120,6 +120,32 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     return true;
   }, [reveal]);
 
+  const finalizeRunContent = useCallback(
+    (
+      sessionId: string,
+      runId: string,
+      streamId: string,
+      content: string,
+      avatarState: "error" | "success",
+      idleDelayMs: number,
+    ) => {
+      reveal.stop();
+      reveal.reset();
+      activeStreamIdRef.current = null;
+      setIsStreamingRef.current(false);
+      setAllSessionsRef.current((prev) =>
+        applyAgentComplete(prev, sessionId, runId, streamId, content),
+      );
+      directorRef.current.setState(avatarState);
+      clearCompletionTimeout();
+      completionTimeoutRef.current = setTimeout(() => {
+        completionTimeoutRef.current = null;
+        directorRef.current.setState("idle");
+      }, idleDelayMs);
+    },
+    [reveal],
+  );
+
   const resetStream = useCallback(() => {
     applyPendingCompleteWithoutSuccess();
     reveal.reset();
@@ -214,27 +240,15 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
         }
         case "agent_error": {
-          reveal.stop();
           const streamId = activeStreamIdRef.current ?? streamMessageId(event.runId, null);
-          reveal.reset();
-          activeStreamIdRef.current = null;
-          setIsStreamingRef.current(false);
-          setAllSessionsRef.current((prev) =>
-            applyAgentComplete(prev, event.sessionId, event.runId, streamId, event.message),
-          );
-          directorRef.current.setState("error");
-          clearCompletionTimeout();
-          completionTimeoutRef.current = setTimeout(() => {
-            completionTimeoutRef.current = null;
-            directorRef.current.setState("idle");
-          }, 2000);
+          finalizeRunContent(event.sessionId, event.runId, streamId, event.message, "error", 2000);
           break;
         }
         default:
           break;
       }
     },
-    [resetStream, reveal, syncRevealContext],
+    [finalizeRunContent, resetStream, reveal, syncRevealContext],
   );
 
   return { handleAgentEvent, resetStream, beginStream };

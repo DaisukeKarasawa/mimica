@@ -3,8 +3,7 @@ import type { AgentMode, AvatarState, ChatAttachment, ChatSession } from "@mimic
 import { AGENT_DISPLAY_NAME } from "@mimica/shared";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
-import { usePersonaReactions } from "../hooks/usePersonaReactions";
-import { formatComposerSubmitError } from "../lib/composerError";
+import { ipcErrorMessage } from "../lib/composerError";
 import { ChatComposer } from "./ChatComposer";
 import { MessageAttachments } from "./ComposerAttachments";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
@@ -60,8 +59,7 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const personaReactions = usePersonaReactions();
+  const [composerBannerError, setComposerBannerError] = useState<string | null>(null);
   const prevSessionIdRef = useRef(activeSessionId);
 
   useLayoutEffect(() => {
@@ -73,10 +71,10 @@ export function ChatPanel({
         }
         return [];
       });
-      setAttachmentError(null);
+      setComposerBannerError(null);
     } else if (previousSessionId !== activeSessionId) {
       setAttachments([]);
-      setAttachmentError(null);
+      setComposerBannerError(null);
     }
     prevSessionIdRef.current = activeSessionId;
   }, [activeSessionId]);
@@ -115,9 +113,9 @@ export function ChatPanel({
       await onSend(text, outgoing.length > 0 ? outgoing : undefined);
       setInput("");
       setAttachments([]);
-      setAttachmentError(null);
+      setComposerBannerError(null);
     } catch (error) {
-      setAttachmentError(formatComposerSubmitError(error, personaReactions));
+      setComposerBannerError(ipcErrorMessage(error));
     }
   };
 
@@ -234,9 +232,9 @@ export function ChatPanel({
             </div>
 
             <div className="composer">
-              {attachmentError ? (
-                <p className="composer-attachment-error" role="alert">
-                  {attachmentError}
+              {composerBannerError ? (
+                <p className="composer-banner-error" role="alert">
+                  {composerBannerError}
                 </p>
               ) : null}
               <ChatComposer
@@ -250,8 +248,7 @@ export function ChatPanel({
                 streaming={isStreaming}
                 onChange={setInput}
                 onAttachmentsChange={setAttachments}
-                onAttachmentError={setAttachmentError}
-                personaReactions={personaReactions}
+                onComposerError={setComposerBannerError}
                 onAgentModeChange={onAgentModeChange}
                 onSubmit={() => void handleSubmit()}
                 onCancel={onCancel}

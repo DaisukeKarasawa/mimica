@@ -26,7 +26,11 @@ import { registerPrivilegedProtocols } from "./privilegedProtocols.js";
 import { registerSlashMenuIpc } from "./ipc/slashMenu.js";
 import { registerAtMenuIpc } from "./ipc/atMenu.js";
 import { registerAttachmentIpc, releaseDraftAttachments } from "./ipc/attachments.js";
-import { getPersonaReactionsForRenderer } from "./personaErrors.js";
+import {
+  formatPersonaErrorKind,
+  parsePersonaFormatRequest,
+  rethrowPersonaIpcError,
+} from "./personaErrors.js";
 
 const electronApis = electron();
 
@@ -79,14 +83,24 @@ if (!gotLock) {
     attachMainWindow(createMainWindow());
 
     ipcMain.handle("character:assets", () => getCharacterAssetStatus());
-    ipcMain.handle("persona:reactions", () => getPersonaReactionsForRenderer());
-    ipcMain.handle("agent:submit", (event, payload) => {
+    ipcMain.handle("persona:formatError", (_e, kind: unknown, detail?: unknown) => {
+      const runError = parsePersonaFormatRequest(kind, detail);
+      if (!runError) {
+        throw new Error(formatPersonaErrorKind("generic"));
+      }
+      return formatPersonaErrorKind(runError.kind, runError.detail);
+    });
+    ipcMain.handle("agent:submit", async (event, payload) => {
       if (!agentService) throw new Error("Agent service is unavailable");
       const attachmentCount = Array.isArray(payload?.attachments) ? payload.attachments.length : 0;
       if (attachmentCount > 0 && typeof payload?.sessionId === "string") {
         releaseDraftAttachments(event.sender.id, payload.sessionId, attachmentCount);
       }
-      return agentService.submit(payload);
+      try {
+        return await agentService.submit(payload);
+      } catch (error) {
+        rethrowPersonaIpcError(error);
+      }
     });
     ipcMain.handle("agent:cancel", () => {
       if (!agentService) throw new Error("Agent service is unavailable");
