@@ -46,6 +46,10 @@ let bridgeServer: CursorBridgeServer | null = null;
 const sessionStore = new SessionStore();
 let agentService: AgentService | null = null;
 
+function sendBridgeStatus(connected: boolean): void {
+  mainWindow?.webContents.send("bridge-status", { connected });
+}
+
 function attachMainWindow(win: BrowserWindowType): void {
   mainWindow = win;
   agentService = new AgentService(() => mainWindow?.webContents, sessionStore);
@@ -75,9 +79,14 @@ if (!gotLock) {
     sessionStore.load();
     bindAttachmentSessionGuard((id) => sessionStore.get(id) != null);
     seedWorkspaceAllowlist(sessionStore.list().map((s) => s.workspacePath));
-    bridgeServer = new CursorBridgeServer(DEFAULT_WS_PORT, (context) => {
-      mainWindow?.webContents.send("editor-context", context);
-    });
+    bridgeServer = new CursorBridgeServer(
+      DEFAULT_WS_PORT,
+      (context) => {
+        mainWindow?.webContents.send("editor-context", context);
+      },
+      undefined,
+      sendBridgeStatus,
+    );
     await bridgeServer.start();
 
     attachMainWindow(createMainWindow());

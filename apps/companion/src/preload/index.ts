@@ -34,6 +34,7 @@ export interface MimicaApi {
   cancelAgent: () => Promise<void>;
   openExternal: (url: string) => Promise<boolean>;
   onEditorContext: (cb: (context: EditorContext) => void) => () => void;
+  onBridgeStatusChange: (cb: (status: { connected: boolean }) => void) => () => void;
   onAgentEvent: (cb: (event: AgentEventMessage) => void) => () => void;
   onChatTabShortcut: (cb: (action: ChatTabShortcutAction) => void) => () => void;
   listSlashMenu: (workspacePath: string, mode: AgentMode) => Promise<SlashMenuSection[]>;
@@ -63,6 +64,11 @@ const api: MimicaApi = {
     const handler = (_: unknown, context: EditorContext) => cb(context);
     ipcRenderer.on("editor-context", handler);
     return () => ipcRenderer.removeListener("editor-context", handler);
+  },
+  onBridgeStatusChange: (cb) => {
+    const handler = (_: unknown, status: { connected: boolean }) => cb(status);
+    ipcRenderer.on("bridge-status", handler);
+    return () => ipcRenderer.removeListener("bridge-status", handler);
   },
   onAgentEvent: (cb) => {
     const handler = (_: unknown, event: AgentEventMessage) => cb(event);

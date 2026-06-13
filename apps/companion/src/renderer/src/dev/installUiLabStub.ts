@@ -67,6 +67,11 @@ export function installUiLabStub(): void {
 
     getBridgeStatus: async () => ({ connected: true, port: DEFAULT_WS_PORT }),
 
+    onBridgeStatusChange: (cb) => {
+      void cb;
+      return () => {};
+    },
+
     getCharacterAssets: async () => ({
       baseUrl: "",
       assetRoot: "~/MimicaAssets/characters/rio",
