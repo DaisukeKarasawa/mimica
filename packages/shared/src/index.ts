@@ -1,4 +1,15 @@
 export {
+  type AgentQuestionSource,
+  type AgentQuestionStatus,
+  type AgentQuestionOption,
+  type AgentQuestionItem,
+  type AgentQuestionPrompt,
+  type AgentQuestionAnswerEntry,
+  type AgentQuestionAnswerPayload,
+  type AgentQuestionClientMessage,
+} from "./agentQuestion.js";
+
+export {
   DEFAULT_WS_PORT,
   AGENT_DISPLAY_NAME,
   AGENT_SHORT_NAME,

@@ -1,3 +1,4 @@
+import type { AgentQuestionPrompt, AgentQuestionStatus } from "./agentQuestion.js";
 import type { AgentRunState, AvatarState, MessageContext, MimicaSettings } from "./chat.js";
 
 export type { MimicaSettings };
@@ -45,7 +46,20 @@ export type AgentEventMessage =
   | { type: "agent_complete"; sessionId: string; runId: string; content: string }
   | { type: "agent_error"; sessionId: string; runId: string; message: string }
   | { type: "agent_warning"; sessionId: string; message: string }
-  | { type: "agent_perf"; sessionId: string; runId: string; t0EpochMs: number };
+  | { type: "agent_perf"; sessionId: string; runId: string; t0EpochMs: number }
+  | {
+      type: "agent_question";
+      sessionId: string;
+      runId: string;
+      question: AgentQuestionPrompt;
+    }
+  | {
+      type: "agent_question_resolved";
+      sessionId: string;
+      runId: string;
+      questionId: string;
+      status: AgentQuestionStatus;
+    };
 
 export function mapAgentRunToAvatar(state: AgentRunState): AvatarState {
   switch (state) {
