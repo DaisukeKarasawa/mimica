@@ -105,3 +105,6 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Agent orchestrator tests
+        run: pnpm --filter @mimica/agent-orchestrator test

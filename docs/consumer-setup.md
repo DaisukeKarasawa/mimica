@@ -87,6 +87,8 @@ cp ~/Library/Application\ Support/@mimica/companion/bridge-token \
 | ブリッジ接続エラー     | Companion を一度起動して `bridge-token` ができているか（`~/Library/Application Support/Mimica/bridge-token`）、ポート `43721` が他プロセスに占有されていないか。v0.1.0–0.1.1 DMG で token が `@mimica/companion` にある場合は VSIX 更新か手動コピー（上記 § v0.1.x の bridge-token パスずれ） |
 | キャラが表示されない   | Release 付属 DMG か（開発用ビルドは `~/MimicaAssets` フォールバックあり）                                                                                                                                                                                                                     |
 | Agent が動かない       | `CURSOR_API_KEY` が Cursor プロセスから見えているか                                                                                                                                                                                                                                           |
+| 送信が連続で失敗する   | しばらく待ってから再送信。改善しない場合は該当チャットタブを閉じるか Mimica を再起動。`CURSOR_API_KEY` が有効か [secrets-setup.md](./secrets-setup.md) を確認                                                                                                                                 |
+| 再起動なしで復旧したい | 通信エラー後も Companion は落ちない想定（#50）。エラー表示後にキー修正または再送信を試す                                                                                                                                                                                                      |
 
 ## 開発者向け（参考）
 
