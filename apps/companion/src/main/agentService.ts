@@ -65,7 +65,7 @@ export class AgentService {
       }
     }
 
-    emitter.error(userMessage);
+    emitter.terminalError(userMessage);
     this.activeRunId = null;
   }
 
