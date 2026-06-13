@@ -269,9 +269,28 @@ export class AgentService {
       return session;
     }
 
+    if (this.activeRunId !== null) {
+      throw new Error("Cannot answer while an agent run is in progress");
+    }
+
     const followUp = buildAskQuestionFollowUpText(prompt, input.payload);
-    let updated = updateAgentQuestionStatus(session, input.payload.questionPromptId, "answered");
-    updated = appendUserMessage(updated, followUp);
+    const withUserMessage = appendUserMessage(session, followUp);
+    this.sessionStore.save(withUserMessage);
+
+    try {
+      await this.submit({
+        sessionId: input.sessionId,
+        content: followUp,
+        workspacePath: session.workspacePath,
+        mode: input.mode,
+      });
+    } catch (error) {
+      this.sessionStore.save(session);
+      throw error;
+    }
+
+    let updated = this.sessionStore.get(input.sessionId) ?? withUserMessage;
+    updated = updateAgentQuestionStatus(updated, input.payload.questionPromptId, "answered");
     this.sessionStore.save(updated);
 
     emitQuestionResolved(
@@ -281,13 +300,6 @@ export class AgentService {
       input.payload.questionPromptId,
       "answered",
     );
-
-    await this.submit({
-      sessionId: input.sessionId,
-      content: followUp,
-      workspacePath: session.workspacePath,
-      mode: input.mode,
-    });
 
     return this.sessionStore.get(input.sessionId) ?? updated;
   }

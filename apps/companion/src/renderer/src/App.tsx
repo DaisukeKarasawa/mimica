@@ -8,7 +8,11 @@ import type {
   ChatMessage,
   EditorContext,
 } from "@mimica/shared";
-import { DEFAULT_SETTINGS, resolveCharacterShortNameEn } from "@mimica/shared";
+import {
+  DEFAULT_SETTINGS,
+  resolveCharacterShortNameEn,
+  sessionHasPendingQuestion,
+} from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
 import { CharacterStage } from "./components/CharacterStage";
@@ -183,6 +187,7 @@ export default function App() {
     if (!session) {
       session = await tabs.handleNewSession(workspacePath);
     }
+    if (sessionHasPendingQuestion(session)) return;
 
     const userMsg: ChatMessage = {
       id: uuidv4(),

@@ -21,15 +21,18 @@ export function applyAgentDelta(
   streamId: string,
   content: string,
 ): ChatSession[] {
-  const partial: ChatMessage = {
-    id: streamId,
-    role: "assistant",
-    content,
-    createdAt: new Date().toISOString(),
-    agentRunId: runId,
-  };
   return sessions.map((s) => {
     if (s.id !== sessionId) return s;
+    const existing = s.messages.find((m) => m.id === streamId);
+    const partial: ChatMessage = {
+      id: streamId,
+      role: "assistant",
+      content,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      agentRunId: runId,
+      ...(existing?.agentQuestion ? { agentQuestion: existing.agentQuestion } : {}),
+      ...(existing?.toolCalls?.length ? { toolCalls: existing.toolCalls } : {}),
+    };
     const rest = s.messages.filter((m) => m.id !== streamId);
     return { ...s, messages: [...rest, partial] };
   });

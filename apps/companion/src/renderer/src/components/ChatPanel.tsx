@@ -6,7 +6,7 @@ import type {
   ChatAttachment,
   ChatSession,
 } from "@mimica/shared";
-import { AGENT_DISPLAY_NAME } from "@mimica/shared";
+import { AGENT_DISPLAY_NAME, sessionHasPendingQuestion } from "@mimica/shared";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
 import { ChatComposer } from "./ChatComposer";
@@ -71,6 +71,8 @@ export function ChatPanel({
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const prevSessionIdRef = useRef(activeSessionId);
+  const hasPendingQuestion =
+    activeSession != null ? sessionHasPendingQuestion(activeSession) : false;
 
   useLayoutEffect(() => {
     const previousSessionId = prevSessionIdRef.current;
@@ -235,7 +237,11 @@ export function ChatPanel({
                           <QuestionCard
                             key={msg.agentQuestion.id}
                             question={msg.agentQuestion}
-                            disabled={!msg.agentRunId}
+                            disabled={
+                              !msg.agentRunId ||
+                              msg.agentQuestion.status !== "pending" ||
+                              isStreaming
+                            }
                             onSubmit={(payload) => void onQuestionAnswer(msg.agentRunId!, payload)}
                             onDismiss={() =>
                               void onQuestionDismiss(msg.agentRunId!, msg.agentQuestion!.id)
@@ -263,7 +269,7 @@ export function ChatPanel({
                 workspacePath={workspacePath}
                 sessionId={activeSession?.id ?? null}
                 attachments={attachments}
-                disabled={!workspacePath}
+                disabled={!workspacePath || hasPendingQuestion}
                 streaming={isStreaming}
                 onChange={setInput}
                 onAttachmentsChange={setAttachments}
