@@ -24,6 +24,7 @@ export default function App() {
 
   const resetStreamRef = useRef<(sessionId?: string) => void>(() => {});
   const onRunSettledRef = useRef<(sessionId: string) => void>(() => {});
+  const clearQueueForSessionRef = useRef<(sessionId: string) => void>(() => {});
   const avatarMomentHoldRef = useRef(false);
   const [avatarSyncTick, bumpAvatarSync] = useState(0);
   const workspaceSyncInFlight = useRef(new Set<string>());
@@ -38,6 +39,7 @@ export default function App() {
 
   const handleStopStreaming = useCallback(
     async (sessionId: string) => {
+      clearQueueForSessionRef.current(sessionId);
       const run = sessionRuns.getSessionRun(sessionId);
       try {
         await window.mimica.cancelAgent({ sessionId, runId: run.runId });
@@ -101,6 +103,8 @@ export default function App() {
       setAllSessions: tabs.setAllSessions,
       handleNewSession: tabs.handleNewSession,
     });
+
+  clearQueueForSessionRef.current = clearQueueForSession;
 
   const activeSessionRun = sessionRuns.getSessionRun(tabs.activeSessionId);
   const isActiveSessionStreaming = isSessionRunActive(activeSessionRun);

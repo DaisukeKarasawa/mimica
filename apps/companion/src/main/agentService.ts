@@ -88,94 +88,95 @@ export class AgentService {
     const emitter = new AgentRunEmitter(wc, payload.sessionId, runId, () =>
       this.isRunActive(payload.sessionId, runId),
     );
-    const runner = await this.getRunner();
-    if (!this.isRunActive(payload.sessionId, runId)) return;
-
-    const editorContext = payload.editorContext;
-    const context = editorContext
-      ? toMessageContext(editorContext)
-      : { workspacePath: payload.workspacePath };
-
-    const allMessages = session.messages;
-    const history = historyForAgentPrompt(allMessages, payload.content);
-
-    const rawWorkspace =
-      editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "";
-
-    const { slashWorkspace, cwd, canExpandAt } = resolveAgentSubmitWorkspace(
-      rawWorkspace,
-      resolveWorkspacePath,
-    );
-
-    const resolved = resolveSlashInput(slashWorkspace, payload.content, payload.mode);
-    if (resolved.warning) {
-      emitter.warning(resolved.warning);
-    }
-    if (resolved.kind && resolved.name) {
-      debugLogSlashResolution(resolved.kind, resolved.name, resolved.expanded.length);
-    }
-
-    let atResolved: Awaited<ReturnType<typeof resolveAtInput>>;
-    if (canExpandAt) {
-      const skipAtPaths: string[] = [];
-      if (editorContext?.currentFilePath) {
-        const rel = relative(cwd, editorContext.currentFilePath).replace(/\\/g, "/");
-        if (rel && !rel.startsWith("..")) {
-          skipAtPaths.push(rel);
-        }
-      }
-      atResolved = await resolveAtInput(cwd, resolved.expanded, {
-        tokenSource: payload.content,
-        skipPaths: skipAtPaths,
-        getSession: (id) => this.sessionStore.get(id),
-      });
-    } else {
-      atResolved = { expanded: resolved.expanded };
-      if (shouldWarnUnlinkedAtExpansion(canExpandAt, payload.content)) {
-        emitter.warning(UNLINKED_AT_EXPANSION_WARNING);
-      }
-    }
-    if (!this.isRunActive(payload.sessionId, runId)) return;
-    if (atResolved.warning) {
-      emitter.warning(atResolved.warning);
-    }
-    if (atResolved.paths?.length) {
-      debugLogAtResolution(atResolved.paths, atResolved.expanded.length);
-    }
-
-    const sdkImages: Array<{ data: string; mimeType: string }> = [];
-    for (const attachment of payload.attachments ?? []) {
-      if (!isChatAttachment(attachment)) {
-        emitter.warning("Invalid attachment payload was skipped");
-        continue;
-      }
-      try {
-        sdkImages.push(readAttachmentBase64(payload.sessionId, attachment));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        emitter.warning(`画像を読み取れませんでした (${attachment.fileName}): ${message}`);
-      }
-    }
-
-    let promptText = atResolved.expanded;
-    if (!promptText.trim() && sdkImages.length > 0) {
-      promptText = "Please analyze the attached image(s).";
-    }
-
-    const timing = isAgentPerfEnabled()
-      ? new AgentRunTimingTrace(runId, {
-          mode: payload.mode,
-          workspacePath: cwd,
-          promptChars: promptText.length,
-        })
-      : undefined;
-    if (timing) {
-      emitter.perf(Date.now());
-    }
-
-    if (!this.isRunActive(payload.sessionId, runId)) return;
 
     try {
+      const runner = await this.getRunner();
+      if (!this.isRunActive(payload.sessionId, runId)) return;
+
+      const editorContext = payload.editorContext;
+      const context = editorContext
+        ? toMessageContext(editorContext)
+        : { workspacePath: payload.workspacePath };
+
+      const allMessages = session.messages;
+      const history = historyForAgentPrompt(allMessages, payload.content);
+
+      const rawWorkspace =
+        editorContext?.workspacePath ?? payload.workspacePath ?? session?.workspacePath ?? "";
+
+      const { slashWorkspace, cwd, canExpandAt } = resolveAgentSubmitWorkspace(
+        rawWorkspace,
+        resolveWorkspacePath,
+      );
+
+      const resolved = resolveSlashInput(slashWorkspace, payload.content, payload.mode);
+      if (resolved.warning) {
+        emitter.warning(resolved.warning);
+      }
+      if (resolved.kind && resolved.name) {
+        debugLogSlashResolution(resolved.kind, resolved.name, resolved.expanded.length);
+      }
+
+      let atResolved: Awaited<ReturnType<typeof resolveAtInput>>;
+      if (canExpandAt) {
+        const skipAtPaths: string[] = [];
+        if (editorContext?.currentFilePath) {
+          const rel = relative(cwd, editorContext.currentFilePath).replace(/\\/g, "/");
+          if (rel && !rel.startsWith("..")) {
+            skipAtPaths.push(rel);
+          }
+        }
+        atResolved = await resolveAtInput(cwd, resolved.expanded, {
+          tokenSource: payload.content,
+          skipPaths: skipAtPaths,
+          getSession: (id) => this.sessionStore.get(id),
+        });
+      } else {
+        atResolved = { expanded: resolved.expanded };
+        if (shouldWarnUnlinkedAtExpansion(canExpandAt, payload.content)) {
+          emitter.warning(UNLINKED_AT_EXPANSION_WARNING);
+        }
+      }
+      if (!this.isRunActive(payload.sessionId, runId)) return;
+      if (atResolved.warning) {
+        emitter.warning(atResolved.warning);
+      }
+      if (atResolved.paths?.length) {
+        debugLogAtResolution(atResolved.paths, atResolved.expanded.length);
+      }
+
+      const sdkImages: Array<{ data: string; mimeType: string }> = [];
+      for (const attachment of payload.attachments ?? []) {
+        if (!isChatAttachment(attachment)) {
+          emitter.warning("Invalid attachment payload was skipped");
+          continue;
+        }
+        try {
+          sdkImages.push(readAttachmentBase64(payload.sessionId, attachment));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          emitter.warning(`画像を読み取れませんでした (${attachment.fileName}): ${message}`);
+        }
+      }
+
+      let promptText = atResolved.expanded;
+      if (!promptText.trim() && sdkImages.length > 0) {
+        promptText = "Please analyze the attached image(s).";
+      }
+
+      const timing = isAgentPerfEnabled()
+        ? new AgentRunTimingTrace(runId, {
+            mode: payload.mode,
+            workspacePath: cwd,
+            promptChars: promptText.length,
+          })
+        : undefined;
+      if (timing) {
+        emitter.perf(Date.now());
+      }
+
+      if (!this.isRunActive(payload.sessionId, runId)) return;
+
       await runner.runChat({
         sessionId: payload.sessionId,
         prompt: promptText,
@@ -197,15 +198,9 @@ export class AgentService {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
             }
             emitter.complete(content);
-            if (this.isRunActive(payload.sessionId, runId)) {
-              this.activeRuns.delete(payload.sessionId);
-            }
           },
           onError: (message) => {
             emitter.error(message);
-            if (this.isRunActive(payload.sessionId, runId)) {
-              this.activeRuns.delete(payload.sessionId);
-            }
           },
         },
       });

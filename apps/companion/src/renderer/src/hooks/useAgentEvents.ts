@@ -160,8 +160,10 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
         snapshot.content,
       ),
     );
+    clearSessionRunRef.current(snapshot.sessionId);
+    notifyRunSettled(snapshot.sessionId, snapshot.runId);
     return true;
-  }, [reveal]);
+  }, [notifyRunSettled, reveal]);
 
   const hydrateRevealFromBackground = useCallback(
     (sessionId: string) => {

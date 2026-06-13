@@ -16,6 +16,8 @@ import type {
 } from "@mimica/shared";
 import { useMessageQueue } from "./useMessageQueue";
 
+const SESSION_ALREADY_ACTIVE_ERROR = "Session already has an active agent run";
+
 export interface UseAgentSubmitQueueOptions {
   beginStream: (sessionId: string) => string;
   resetStream: (sessionId?: string) => void;
@@ -29,6 +31,32 @@ export interface UseAgentSubmitQueueOptions {
   resolveWorkspacePath: () => string | null;
   setAllSessions: Dispatch<SetStateAction<ChatSession[]>>;
   handleNewSession: (workspacePath: string) => Promise<ChatSession>;
+}
+
+async function persistUserTurn(
+  session: ChatSession,
+  userMsg: ChatMessage,
+  workspacePath: string,
+  setAllSessions: Dispatch<SetStateAction<ChatSession[]>>,
+): Promise<ChatSession | null> {
+  let title = session.title;
+  if (session.messages.length === 0) {
+    const titleSource = userMsg.content.trim() || (userMsg.attachments?.length ? "Image" : "");
+    title = titleSource.slice(0, 24) + (titleSource.length > 24 ? "…" : "");
+  }
+
+  const authoritative =
+    (await window.mimica.listSessions()).find((s) => s.id === session.id) ?? session;
+  const updated = {
+    ...authoritative,
+    title,
+    workspacePath,
+    messages: [...authoritative.messages, userMsg],
+  };
+
+  const saved = await window.mimica.saveSession(updated);
+  setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+  return saved;
 }
 
 export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
@@ -49,7 +77,16 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
 
   const messageQueue = useMessageQueue();
   const drainInFlightBySessionRef = useRef(new Set<string>());
+  const submitPendingBySessionRef = useRef(new Set<string>());
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const isEffectivelyRunning = useCallback(
+    (sessionId: string) =>
+      isSessionRunning(sessionId) ||
+      submitPendingBySessionRef.current.has(sessionId) ||
+      drainInFlightBySessionRef.current.has(sessionId),
+    [isSessionRunning],
+  );
 
   const submitToAgent = useCallback(
     async (params: {
@@ -60,7 +97,6 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
       editorContext?: EditorContext | null;
       attachments?: ChatAttachment[];
     }): Promise<boolean> => {
-      beginStream(params.sessionId);
       setSubmitError(null);
       try {
         await window.mimica.submitAgent({
@@ -71,11 +107,14 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
           editorContext: params.editorContext ?? undefined,
           attachments: params.attachments,
         });
+        beginStream(params.sessionId);
         return true;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        clearSessionRun(params.sessionId);
-        resetStream(params.sessionId);
+        if (message !== SESSION_ALREADY_ACTIVE_ERROR) {
+          clearSessionRun(params.sessionId);
+          resetStream(params.sessionId);
+        }
         setSubmitError(message);
         return false;
       }
@@ -90,9 +129,32 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
       if (!next) return;
 
       drainInFlightBySessionRef.current.add(sessionId);
-      let ok = false;
       try {
-        ok = await submitToAgent({
+        const list = await window.mimica.listSessions();
+        const session = list.find((s) => s.id === sessionId);
+        if (!session) {
+          messageQueue.dequeue(sessionId);
+          return;
+        }
+
+        const userMsg: ChatMessage = {
+          id: uuidv4(),
+          role: "user",
+          content: next.content,
+          createdAt: new Date().toISOString(),
+          context: next.editorContext ?? undefined,
+          attachments: next.attachments?.length ? next.attachments : undefined,
+        };
+
+        try {
+          await persistUserTurn(session, userMsg, next.workspacePath, setAllSessions);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setSubmitError(`セッション保存失敗: ${message}`);
+          return;
+        }
+
+        const ok = await submitToAgent({
           sessionId,
           content: next.content,
           workspacePath: next.workspacePath,
@@ -105,12 +167,9 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
         }
       } finally {
         drainInFlightBySessionRef.current.delete(sessionId);
-        if (ok && messageQueue.peek(sessionId)) {
-          void drainQueue(sessionId);
-        }
       }
     },
-    [messageQueue, submitToAgent],
+    [messageQueue, setAllSessions, submitToAgent],
   );
 
   useEffect(() => {
@@ -129,41 +188,8 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
         session = await handleNewSession(workspacePath);
       }
 
-      const userMsg: ChatMessage = {
-        id: uuidv4(),
-        role: "user",
-        content,
-        createdAt: new Date().toISOString(),
-        context: editorContext ?? undefined,
-        attachments: attachments?.length ? attachments : undefined,
-      };
-      let title = session.title;
-      if (session.messages.length === 0) {
-        const titleSource = content.trim() || (attachments?.length ? "Image" : "");
-        title = titleSource.slice(0, 24) + (titleSource.length > 24 ? "…" : "");
-      }
-
-      const authoritative =
-        (await window.mimica.listSessions()).find((s) => s.id === session.id) ?? session;
-      const updated = {
-        ...authoritative,
-        title,
-        workspacePath,
-        messages: [...authoritative.messages, userMsg],
-      };
-
-      let saved: ChatSession;
-      try {
-        saved = await window.mimica.saveSession(updated);
-        setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setSubmitError(`セッション保存失敗: ${message}`);
-        return;
-      }
-
-      if (isSessionRunning(saved.id)) {
-        messageQueue.enqueue(saved.id, {
+      if (isEffectivelyRunning(session.id)) {
+        messageQueue.enqueue(session.id, {
           content,
           attachments,
           editorContext,
@@ -173,21 +199,43 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
         return;
       }
 
-      await submitToAgent({
-        sessionId: saved.id,
+      const userMsg: ChatMessage = {
+        id: uuidv4(),
+        role: "user",
         content,
-        workspacePath,
-        mode: agentMode,
-        editorContext,
-        attachments,
-      });
+        createdAt: new Date().toISOString(),
+        context: editorContext ?? undefined,
+        attachments: attachments?.length ? attachments : undefined,
+      };
+
+      submitPendingBySessionRef.current.add(session.id);
+      try {
+        try {
+          await persistUserTurn(session, userMsg, workspacePath, setAllSessions);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setSubmitError(`セッション保存失敗: ${message}`);
+          return;
+        }
+
+        await submitToAgent({
+          sessionId: session.id,
+          content,
+          workspacePath,
+          mode: agentMode,
+          editorContext,
+          attachments,
+        });
+      } finally {
+        submitPendingBySessionRef.current.delete(session.id);
+      }
     },
     [
       activeSession,
       agentMode,
       editorContext,
       handleNewSession,
-      isSessionRunning,
+      isEffectivelyRunning,
       messageQueue,
       resolveWorkspacePath,
       setAllSessions,
