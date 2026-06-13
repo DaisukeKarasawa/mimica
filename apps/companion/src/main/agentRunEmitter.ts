@@ -56,6 +56,11 @@ export class AgentRunEmitter {
 
   error(message: string): void {
     if (!this.isActive()) return;
+    this.terminalError(message);
+  }
+
+  /** Always delivered so the UI can replace partial stream text after persistence. */
+  terminalError(message: string): void {
     emitAgentEvent(this.wc, {
       type: "agent_error",
       sessionId: this.sessionId,

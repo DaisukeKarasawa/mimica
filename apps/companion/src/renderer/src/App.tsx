@@ -10,10 +10,12 @@ import type {
 import { DEFAULT_SETTINGS, resolveCharacterShortNameEn } from "@mimica/shared";
 import { CharacterDirector } from "@mimica/character-runtime";
 import { TopBar } from "./components/TopBar";
+import { BridgeStatusBanner } from "./components/BridgeStatusBanner";
 import { CharacterStage } from "./components/CharacterStage";
 import { ChatPanel } from "./components/ChatPanel";
 import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
+import { useBridgeStatus } from "./hooks/useBridgeStatus";
 import { useCharacterAssets } from "./hooks/useCharacterAssets";
 import { useSessionTabs } from "./hooks/useSessionTabs";
 import { matchChatTabShortcut, type ChatTabShortcutAction } from "./lib/chatTabShortcuts";
@@ -36,6 +38,7 @@ export default function App() {
     () => resolveCharacterShortNameEn(characterAssets?.metadata),
     [characterAssets?.metadata],
   );
+  const bridgeBannerMessage = useBridgeStatus();
 
   const handleStopStreaming = useCallback(async () => {
     await window.mimica.cancelAgent();
@@ -216,10 +219,22 @@ export default function App() {
         editorContext,
         attachments,
       });
-    } catch {
+    } catch (error) {
       setIsStreaming(false);
       resetStreamRef.current();
       director.setState("idle");
+      try {
+        const rolledBack = {
+          ...saved,
+          title: session.title,
+          messages: saved.messages.filter((message) => message.id !== userMsg.id),
+        };
+        const restored = await window.mimica.saveSession(rolledBack);
+        tabs.setAllSessions((prev) => prev.map((s) => (s.id === restored.id ? restored : s)));
+      } catch (rollbackError) {
+        console.error("[App] failed to roll back user message after submit error:", rollbackError);
+      }
+      throw error;
     }
   };
 
@@ -231,6 +246,7 @@ export default function App() {
   return (
     <div className="app">
       <TopBar />
+      <BridgeStatusBanner message={bridgeBannerMessage} />
       <MainSplitLayout
         onSplitReady={() => setSplitLayoutReady(true)}
         stage={
@@ -263,7 +279,7 @@ export default function App() {
             onReorderTab={tabs.reorderOpenTab}
             onSelectHistorySession={tabs.openSessionTab}
             onDeleteSession={(id) => void tabs.handleDeleteSession(id)}
-            onSend={(text, attachments) => void handleSend(text, attachments)}
+            onSend={handleSend}
             onCancel={() => void handleCancel()}
           />
         }

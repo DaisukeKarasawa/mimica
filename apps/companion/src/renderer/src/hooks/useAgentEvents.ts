@@ -120,6 +120,32 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     return true;
   }, [reveal]);
 
+  const finalizeRunContent = useCallback(
+    (
+      sessionId: string,
+      runId: string,
+      streamId: string,
+      content: string,
+      avatarState: "error" | "success",
+      idleDelayMs: number,
+    ) => {
+      reveal.stop();
+      reveal.reset();
+      activeStreamIdRef.current = null;
+      setIsStreamingRef.current(false);
+      setAllSessionsRef.current((prev) =>
+        applyAgentComplete(prev, sessionId, runId, streamId, content),
+      );
+      directorRef.current.setState(avatarState);
+      clearCompletionTimeout();
+      completionTimeoutRef.current = setTimeout(() => {
+        completionTimeoutRef.current = null;
+        directorRef.current.setState("idle");
+      }, idleDelayMs);
+    },
+    [reveal],
+  );
+
   const resetStream = useCallback(() => {
     applyPendingCompleteWithoutSuccess();
     reveal.reset();
@@ -151,11 +177,16 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             directorRef.current.setState(mapAgentRunToAvatar(event.state));
           }
           if (event.state === "streaming") setIsStreamingRef.current(true);
-          if (event.state === "failed" || event.state === "cancelled") {
+          if (event.state === "cancelled") {
             reveal.stop();
             resetStream();
             setIsStreamingRef.current(false);
-            scheduleReturnToIdleRef.current(event.state === "failed" ? 2000 : 1200);
+            scheduleReturnToIdleRef.current(1200);
+          }
+          if (event.state === "failed") {
+            reveal.stop();
+            setIsStreamingRef.current(false);
+            scheduleReturnToIdleRef.current(2000);
           }
           break;
         }
@@ -209,22 +240,15 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
         }
         case "agent_error": {
-          reveal.stop();
-          resetStream();
-          setIsStreamingRef.current(false);
-          directorRef.current.setState("error");
-          clearCompletionTimeout();
-          completionTimeoutRef.current = setTimeout(() => {
-            completionTimeoutRef.current = null;
-            directorRef.current.setState("idle");
-          }, 2000);
+          const streamId = activeStreamIdRef.current ?? streamMessageId(event.runId, null);
+          finalizeRunContent(event.sessionId, event.runId, streamId, event.message, "error", 2000);
           break;
         }
         default:
           break;
       }
     },
-    [resetStream, reveal, syncRevealContext],
+    [finalizeRunContent, resetStream, reveal, syncRevealContext],
   );
 
   return { handleAgentEvent, resetStream, beginStream };

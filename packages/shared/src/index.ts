@@ -138,3 +138,18 @@ export {
   MIMICA_BRIDGE_TOKEN_FILENAME,
   MIMICA_COMPANION_APP_DEFAULT_PATH,
 } from "./mimicaPathConstants.js";
+
+export {
+  type ErrorKind,
+  type AgentRunError,
+  type PersonaReactionState,
+  type PersonaReactions,
+  agentRunError,
+  agentRunErrorFromUnknown,
+  classifyAgentError,
+  buildPersonaErrorMessage,
+  formatPersonaErrorMessage,
+  parsePersonaReactions,
+  parsePersonaLinesJson,
+  pickPersonaReactionLine,
+} from "./personaError.js";
