@@ -1,8 +1,4 @@
-import type {
-  AgentQuestionAnswerPayload,
-  AgentQuestionPrompt,
-  AgentQuestionStatus,
-} from "./agentQuestion.js";
+import type { AgentQuestionPrompt, AgentQuestionStatus } from "./agentQuestion.js";
 import type { AgentRunState, AvatarState, MessageContext, MimicaSettings } from "./chat.js";
 
 export type { MimicaSettings };
@@ -41,25 +37,7 @@ export type CompanionMessage =
   | { type: "chat_submit"; sessionId: string; content: string; context?: MessageContext }
   | { type: "chat_cancel"; sessionId: string; runId: string }
   | { type: "settings_get" }
-  | { type: "settings_update"; settings: Partial<MimicaSettings> }
-  | {
-      type: "agent_question_answer";
-      sessionId: string;
-      runId: string;
-      payload: AgentQuestionAnswerPayload;
-    }
-  | {
-      type: "agent_question_dismiss";
-      sessionId: string;
-      runId: string;
-      questionPromptId: string;
-    };
-
-/** Renderer → main IPC subset (Phase 1 wiring). */
-export type AgentQuestionClientMessage = Extract<
-  CompanionMessage,
-  { type: "agent_question_answer" } | { type: "agent_question_dismiss" }
->;
+  | { type: "settings_update"; settings: Partial<MimicaSettings> };
 
 export type AgentEventMessage =
   | { type: "agent_state"; sessionId: string; state: AgentRunState; runId?: string }

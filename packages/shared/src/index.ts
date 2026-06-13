@@ -6,6 +6,8 @@ export {
   type AgentQuestionPrompt,
   type AgentQuestionAnswerEntry,
   type AgentQuestionAnswerPayload,
+  type AgentQuestionAnswerInput,
+  type AgentQuestionDismissInput,
 } from "./agentQuestion.js";
 
 export {
@@ -38,9 +40,15 @@ export {
   upsertAssistantQuestion,
   updateAgentQuestionStatus,
   findAgentQuestionPrompt,
+  sessionHasPendingQuestion,
 } from "./agentQuestionSession.js";
 
-export { upsertAssistantTurn, type UpsertAssistantTurnParams } from "./sessionMessages.js";
+export {
+  upsertAssistantTurn,
+  findAssistantTurnIndex,
+  type UpsertAssistantTurnParams,
+  type FindAssistantTurnParams,
+} from "./sessionMessages.js";
 
 export {
   type MotionMap,
@@ -64,7 +72,6 @@ export {
   type ServerMessage,
   type CompanionMessage,
   type AgentEventMessage,
-  type AgentQuestionClientMessage,
   mapAgentRunToAvatar,
 } from "./protocol.js";
 

@@ -7,6 +7,24 @@ export interface UpsertAssistantTurnParams {
   streamId?: string;
 }
 
+export interface FindAssistantTurnParams {
+  runId: string;
+  streamId?: string;
+}
+
+/** Resolve the assistant message row for an agent run (stream bubble preferred). */
+export function findAssistantTurnIndex(
+  session: ChatSession,
+  params: FindAssistantTurnParams,
+): number {
+  const { runId, streamId } = params;
+  if (streamId) {
+    const streamIndex = session.messages.findIndex((m) => m.id === streamId);
+    if (streamIndex >= 0) return streamIndex;
+  }
+  return session.messages.findIndex((m) => m.role === "assistant" && m.agentRunId === runId);
+}
+
 /**
  * One agent run → one assistant message. Updates stream bubble or existing run,
  * dedupes duplicate assistant rows for the same runId, or appends.
@@ -16,12 +34,7 @@ export function upsertAssistantTurn(
   params: UpsertAssistantTurnParams,
 ): ChatSession {
   const { runId, content, streamId } = params;
-
-  const streamIndex = streamId ? session.messages.findIndex((m) => m.id === streamId) : -1;
-  const runIndex = session.messages.findIndex(
-    (m) => m.role === "assistant" && m.agentRunId === runId,
-  );
-  const targetIndex = streamIndex >= 0 ? streamIndex : runIndex;
+  const targetIndex = findAssistantTurnIndex(session, { runId, streamId });
 
   if (targetIndex >= 0) {
     const messages = session.messages.map((m, i) =>

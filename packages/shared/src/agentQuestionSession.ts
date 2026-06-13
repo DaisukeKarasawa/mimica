@@ -1,13 +1,6 @@
 import type { AgentQuestionPrompt, AgentQuestionStatus } from "./agentQuestion.js";
 import type { ChatSession } from "./chat.js";
-
-function findAssistantRunIndex(session: ChatSession, runId: string, streamId?: string): number {
-  if (streamId) {
-    const streamIndex = session.messages.findIndex((m) => m.id === streamId);
-    if (streamIndex >= 0) return streamIndex;
-  }
-  return session.messages.findIndex((m) => m.role === "assistant" && m.agentRunId === runId);
-}
+import { findAssistantTurnIndex } from "./sessionMessages.js";
 
 /** Attach or replace a structured question on the assistant turn for a run. */
 export function upsertAssistantQuestion(
@@ -15,7 +8,7 @@ export function upsertAssistantQuestion(
   params: { runId: string; question: AgentQuestionPrompt; streamId?: string },
 ): ChatSession {
   const { runId, question, streamId } = params;
-  const targetIndex = findAssistantRunIndex(session, runId, streamId);
+  const targetIndex = findAssistantTurnIndex(session, { runId, streamId });
 
   if (targetIndex >= 0) {
     const messages = session.messages.map((m, i) =>
@@ -64,4 +57,8 @@ export function findAgentQuestionPrompt(
     }
   }
   return undefined;
+}
+
+export function sessionHasPendingQuestion(session: ChatSession): boolean {
+  return session.messages.some((message) => message.agentQuestion?.status === "pending");
 }
