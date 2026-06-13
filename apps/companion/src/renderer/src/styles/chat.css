@@ -649,6 +649,12 @@
   font-size: 12px;
 }
 
+.md-table-scroll th,
+.md-table-scroll td {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
 .md-preview th,
 .md-preview td {
   padding: 8px 10px;
