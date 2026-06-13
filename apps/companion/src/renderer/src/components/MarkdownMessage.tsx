@@ -8,6 +8,11 @@ interface MarkdownMessageProps {
 }
 
 const markdownComponents: Components = {
+  table: ({ children }) => (
+    <div className="md-table-scroll">
+      <table>{children}</table>
+    </div>
+  ),
   a: ({ href, children }) => (
     <a
       href={href}
