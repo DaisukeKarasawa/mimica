@@ -34,6 +34,12 @@ export {
   type MimicaSettings,
 } from "./chat.js";
 
+export {
+  upsertAssistantQuestion,
+  updateAgentQuestionStatus,
+  findAgentQuestionPrompt,
+} from "./agentQuestionSession.js";
+
 export { upsertAssistantTurn, type UpsertAssistantTurnParams } from "./sessionMessages.js";
 
 export {
