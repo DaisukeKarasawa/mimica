@@ -1,9 +1,5 @@
 import type { Run } from "@cursor/sdk";
-import {
-  formatSdkRejection,
-  isConnectCanceledError,
-  isSdkConnectError,
-} from "./sdkTransportError.js";
+import { isConnectCanceledError } from "./sdkTransportError.js";
 
 export function isAbortError(err: unknown): boolean {
   if (err instanceof DOMException && err.name === "AbortError") return true;
@@ -40,6 +36,13 @@ export function trackIntentionalCancelPromise<T>(promise: Promise<T>): Promise<T
   return tracked;
 }
 
+export function shouldSuppressTrackedAbortRejection(
+  reason: unknown,
+  promise: Promise<unknown>,
+): boolean {
+  return isAbortError(reason) && trackedCanceledPromises.has(promise);
+}
+
 /** Cancel a run without surfacing SDK AbortError from intentional cancellation. */
 export async function cancelRun(run: Run | null | undefined): Promise<void> {
   if (!run) return;
@@ -49,30 +52,4 @@ export async function cancelRun(run: Run | null | undefined): Promise<void> {
   } catch (err) {
     if (!isIntentionalCancellationError(err)) throw err;
   }
-}
-
-let abortRejectionHandlerInstalled = false;
-
-/** Suppress orphan SDK cancel/transport rejections; never fatalize the main process. */
-export function installAbortRejectionHandler(): void {
-  if (abortRejectionHandlerInstalled) return;
-  abortRejectionHandlerInstalled = true;
-  process.on("unhandledRejection", (reason, promise) => {
-    if (isAbortError(reason) && trackedCanceledPromises.has(promise)) return;
-    if (isConnectCanceledError(reason)) {
-      console.debug(
-        "[agent-orchestrator] suppressed Connect canceled rejection:",
-        formatSdkRejection(reason),
-      );
-      return;
-    }
-    if (isSdkConnectError(reason)) {
-      console.error(
-        "[agent-orchestrator] SDK Connect rejection (non-fatal):",
-        formatSdkRejection(reason),
-      );
-      return;
-    }
-    console.error("[agent-orchestrator] unhandled rejection (non-fatal):", promise, reason);
-  });
 }

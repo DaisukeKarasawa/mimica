@@ -16,7 +16,6 @@ interface PooledSession {
   personaFingerprint: string;
   turnsSent: number;
   lastActivityAt: number;
-  transportUnhealthy: boolean;
 }
 
 /** Default idle eviction: 30 minutes without a completed turn. */
@@ -54,8 +53,7 @@ export class AgentSessionPool {
       existing.workspacePath === params.workspacePath &&
       existing.mode === params.mode &&
       existing.apiKey === params.apiKey &&
-      existing.personaFingerprint === personaFingerprint &&
-      !existing.transportUnhealthy
+      existing.personaFingerprint === personaFingerprint
     ) {
       existing.lastActivityAt = Date.now();
       return { agent: existing.agent, isFollowUp: existing.turnsSent > 0 };
@@ -81,7 +79,6 @@ export class AgentSessionPool {
       personaFingerprint,
       turnsSent: 0,
       lastActivityAt: now,
-      transportUnhealthy: false,
     });
 
     this.logPoolDebug("acquire", params.sessionId);
@@ -94,14 +91,6 @@ export class AgentSessionPool {
     if (!session) return;
     session.turnsSent += 1;
     session.lastActivityAt = Date.now();
-    session.transportUnhealthy = false;
-  }
-
-  markTransportUnhealthy(sessionId: string): void {
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      session.transportUnhealthy = true;
-    }
   }
 
   /** Drop a pooled agent after a non-completed turn so the next send starts fresh. */
@@ -144,6 +133,19 @@ export class AgentSessionPool {
 
   getPoolSize(): number {
     return this.sessions.size;
+  }
+
+  /** Package test seam: seed idle metadata without a live SDK agent. */
+  seedIdleSessionForTests(sessionId: string, lastActivityAt: number): void {
+    this.sessions.set(sessionId, {
+      agent: { close() {} } as SDKAgent,
+      workspacePath: "/test",
+      mode: "agent",
+      apiKey: "test-key",
+      personaFingerprint: "",
+      turnsSent: 0,
+      lastActivityAt,
+    });
   }
 
   private logPoolDebug(reason: string, sessionId?: string): void {

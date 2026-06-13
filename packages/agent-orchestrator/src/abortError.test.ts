@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 import { ConnectError, Code } from "@connectrpc/connect";
 import {
-  installAbortRejectionHandler,
   isAbortError,
   isIntentionalCancellationError,
+  shouldSuppressTrackedAbortRejection,
 } from "./abortError.js";
+import {
+  installAbortRejectionHandler,
+  resetSdkRejectionHandlerForTests,
+} from "./sdkRejectionHandler.js";
 
 describe("isIntentionalCancellationError", () => {
   it("recognizes AbortError", () => {
@@ -34,6 +38,14 @@ describe("isAbortError", () => {
   });
 });
 
+describe("shouldSuppressTrackedAbortRejection", () => {
+  it("suppresses only tracked AbortError promises", () => {
+    const promise = Promise.resolve();
+    const err = Object.assign(new Error("aborted"), { name: "AbortError" });
+    assert.equal(shouldSuppressTrackedAbortRejection(err, promise), false);
+  });
+});
+
 describe("installAbortRejectionHandler", () => {
   it("does not fatalize ConnectError rejections", () => {
     const listeners = new Map<string, (...args: unknown[]) => void>();
@@ -50,6 +62,7 @@ describe("installAbortRejectionHandler", () => {
     });
 
     try {
+      resetSdkRejectionHandlerForTests();
       installAbortRejectionHandler();
       const handler = listeners.get("unhandledRejection");
       assert.ok(handler);
@@ -69,6 +82,54 @@ describe("installAbortRejectionHandler", () => {
           Promise.resolve(),
         );
         assert.equal(throwImmediate.mock.calls.length, 0);
+      } finally {
+        Object.defineProperty(globalThis, "setImmediate", {
+          configurable: true,
+          value: originalSetImmediate,
+        });
+      }
+    } finally {
+      Object.defineProperty(globalThis, "process", {
+        configurable: true,
+        value: originalProcess,
+      });
+    }
+  });
+
+  it("fatalizes non-SDK rejections", () => {
+    const listeners = new Map<string, (...args: unknown[]) => void>();
+    const proc = {
+      on: (event: string, listener: (...args: unknown[]) => void) => {
+        listeners.set(event, listener);
+      },
+    };
+
+    const originalProcess = globalThis.process;
+    Object.defineProperty(globalThis, "process", {
+      configurable: true,
+      value: proc,
+    });
+
+    try {
+      resetSdkRejectionHandlerForTests();
+      installAbortRejectionHandler();
+      const handler = listeners.get("unhandledRejection");
+      assert.ok(handler);
+
+      const scheduled: Array<() => void> = [];
+      const throwImmediate = mock.fn((fn: () => void) => {
+        scheduled.push(fn);
+      });
+      const originalSetImmediate = globalThis.setImmediate;
+      Object.defineProperty(globalThis, "setImmediate", {
+        configurable: true,
+        value: throwImmediate,
+      });
+
+      try {
+        handler(new Error("logic bug"), Promise.resolve());
+        assert.equal(throwImmediate.mock.calls.length, 1);
+        assert.throws(() => scheduled[0]?.(), /logic bug/);
       } finally {
         Object.defineProperty(globalThis, "setImmediate", {
           configurable: true,

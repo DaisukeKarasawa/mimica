@@ -35,7 +35,7 @@ describe("classifySdkTransportError", () => {
     assert.ok(result);
     assert.equal(result.category, "transport");
     assert.equal(result.retryOnce, true);
-    assert.equal(result.errorKind, "connection");
+    assert.equal(result.errorKind, "sdk_transport");
   });
 
   it("classifies canceled without retry", () => {
@@ -59,15 +59,15 @@ describe("classifySdkTransportError", () => {
     const result = classifySdkTransportError(err);
     assert.ok(result);
     assert.equal(result.retryOnce, true);
-    assert.equal(result.errorKind, "connection");
+    assert.equal(result.errorKind, "sdk_transport");
   });
 });
 
 describe("mapSdkTransportToAgentRunError", () => {
-  it("maps transport errors to connection kind", () => {
+  it("maps transport errors to sdk_transport kind", () => {
     const err = new ConnectError("unavailable", Code.Unavailable);
     const mapped = mapSdkTransportToAgentRunError(err);
-    assert.equal(mapped.kind, "connection");
+    assert.equal(mapped.kind, "sdk_transport");
     assert.match(mapped.detail ?? "", /unavailable/i);
   });
 });

@@ -15,15 +15,6 @@ export function unwrapConnectError(err: unknown): ConnectError | null {
   if (err instanceof Error && err.name === "ConnectError" && "code" in err) {
     return err as ConnectError;
   }
-  if (err instanceof Error) {
-    const converted = ConnectError.from(err);
-    if (converted.code === Code.Canceled && /abort|canceled|cancelled/i.test(err.message)) {
-      return converted;
-    }
-    if (/\[(internal|canceled|unauthenticated|unavailable)\]/i.test(err.message)) {
-      return converted;
-    }
-  }
   return null;
 }
 
@@ -31,8 +22,9 @@ export function isConnectCanceledError(err: unknown): boolean {
   return unwrapConnectError(err)?.code === Code.Canceled;
 }
 
-export function isSdkConnectError(err: unknown): boolean {
-  return unwrapConnectError(err) !== null || err instanceof CursorAgentError;
+/** True when an unhandled rejection originates from Connect RPC or SDK agent errors. */
+export function isSdkConnectRejection(reason: unknown): boolean {
+  return unwrapConnectError(reason) !== null || reason instanceof CursorAgentError;
 }
 
 export function formatSdkRejection(reason: unknown): string {
@@ -106,7 +98,7 @@ export function classifySdkTransportError(err: unknown): SdkTransportClassificat
         category: "transport",
         invalidatePool: true,
         retryOnce: true,
-        errorKind: "connection",
+        errorKind: "sdk_transport",
         logDetail: msg,
       };
     }
@@ -114,7 +106,7 @@ export function classifySdkTransportError(err: unknown): SdkTransportClassificat
       category: "transport",
       invalidatePool: true,
       retryOnce: false,
-      errorKind: "connection",
+      errorKind: "sdk_transport",
       logDetail: msg,
     };
   }
@@ -124,7 +116,7 @@ export function classifySdkTransportError(err: unknown): SdkTransportClassificat
       category: "sdk",
       invalidatePool: true,
       retryOnce: err.isRetryable,
-      errorKind: err instanceof AuthenticationError ? "auth_missing" : "connection",
+      errorKind: "sdk_transport",
       logDetail: err.message,
     };
   }

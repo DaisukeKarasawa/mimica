@@ -13,6 +13,7 @@ const ERROR_KINDS: ErrorKind[] = [
   "agent_timeout",
   "auth_missing",
   "connection",
+  "sdk_transport",
   "attachment",
   "session",
   "read_only_blocked",

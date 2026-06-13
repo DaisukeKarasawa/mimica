@@ -1,4 +1,4 @@
-export { installAbortRejectionHandler } from "./abortError.js";
+export { installAbortRejectionHandler } from "./sdkRejectionHandler.js";
 export { mapRunStateToAvatar, buildContextPrompt } from "./eventMapper.js";
 export { AgentRunner, type AgentRunCallbacks, type RunChatParams } from "./agentRunner.js";
 export { resolveCursorApiKey } from "./resolveApiKey.js";
@@ -14,8 +14,3 @@ export {
 } from "./toolCallStreamQuestionAdapter.js";
 export { parseAskQuestionToolCall } from "./parseAskQuestionToolCall.js";
 export { buildAskQuestionFollowUpText, isAskQuestionToolName } from "./agentQuestionFollowUp.js";
-export {
-  classifySdkTransportError,
-  mapSdkTransportToAgentRunError,
-  type SdkTransportClassification,
-} from "./sdkTransportError.js";
