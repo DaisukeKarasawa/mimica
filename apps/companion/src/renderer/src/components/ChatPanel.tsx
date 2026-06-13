@@ -7,6 +7,7 @@ import { ChatComposer } from "./ChatComposer";
 import { MessageAttachments } from "./ComposerAttachments";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
 import { MarkdownMessage } from "./MarkdownMessage";
+import { QuestionCard } from "./QuestionCard";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 
 export type ChatPanelMode = "chat" | "history";
@@ -206,7 +207,7 @@ export function ChatPanel({
                   );
                 }
 
-                if (!msg.content.trim()) return null;
+                if (!msg.content.trim() && !msg.agentQuestion) return null;
 
                 return (
                   <div key={msg.id} className="msg agent">
@@ -217,7 +218,22 @@ export function ChatPanel({
                     )}
                     <div className="bubble-shell">
                       <div className="bubble">
-                        <MarkdownMessage content={msg.content} />
+                        {msg.content.trim() ? <MarkdownMessage content={msg.content} /> : null}
+                        {msg.agentQuestion ? (
+                          <QuestionCard
+                            question={msg.agentQuestion}
+                            disabled={isStreaming}
+                            onSubmit={(payload) => {
+                              console.info(
+                                "[question-card] submit (Phase 1 wiring pending)",
+                                payload,
+                              );
+                            }}
+                            onDismiss={() => {
+                              console.info("[question-card] dismiss (Phase 1 wiring pending)");
+                            }}
+                          />
+                        ) : null}
                       </div>
                     </div>
                   </div>

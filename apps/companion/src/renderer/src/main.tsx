@@ -9,6 +9,7 @@ import "./styles/stage-placeholder.css";
 import "./styles/chat.css";
 import "./styles/chat-slash-menu.css";
 import "./styles/chat-attachments.css";
+import "./styles/chat-question-card.css";
 import "./styles/ui-lab.css";
 
 if (import.meta.env.VITE_UI_LAB === "true") {

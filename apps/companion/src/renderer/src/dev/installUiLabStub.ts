@@ -131,7 +131,12 @@ export function installUiLabStub(): void {
   if (!localStorage.getItem(OPEN_TAB_IDS_STORAGE_KEY)) {
     localStorage.setItem(
       OPEN_TAB_IDS_STORAGE_KEY,
-      JSON.stringify([UI_LAB_SESSION_IDS.impl, UI_LAB_SESSION_IDS.bug, UI_LAB_SESSION_IDS.review]),
+      JSON.stringify([
+        UI_LAB_SESSION_IDS.impl,
+        UI_LAB_SESSION_IDS.bug,
+        UI_LAB_SESSION_IDS.review,
+        UI_LAB_SESSION_IDS.askQuestions,
+      ]),
     );
   }
 
