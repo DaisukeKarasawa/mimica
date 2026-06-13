@@ -1,5 +1,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import type { AgentMode, AvatarState, ChatAttachment, ChatSession } from "@mimica/shared";
+import type {
+  AgentMode,
+  AgentQuestionAnswerPayload,
+  AvatarState,
+  ChatAttachment,
+  ChatSession,
+} from "@mimica/shared";
 import { AGENT_DISPLAY_NAME } from "@mimica/shared";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
@@ -33,6 +39,8 @@ interface ChatPanelProps {
   onDeleteSession: (id: string) => void;
   onSend: (text: string, attachments?: ChatAttachment[]) => void;
   onCancel: () => void;
+  onQuestionAnswer: (runId: string, payload: AgentQuestionAnswerPayload) => Promise<void>;
+  onQuestionDismiss: (runId: string, questionPromptId: string) => Promise<void>;
 }
 
 export function ChatPanel({
@@ -56,6 +64,8 @@ export function ChatPanel({
   onDeleteSession,
   onSend,
   onCancel,
+  onQuestionAnswer,
+  onQuestionDismiss,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -225,16 +235,13 @@ export function ChatPanel({
                           <QuestionCard
                             key={msg.agentQuestion.id}
                             question={msg.agentQuestion}
-                            disabled={isStreaming}
-                            onSubmit={(payload) => {
-                              console.info(
-                                "[question-card] submit (Phase 1 wiring pending)",
-                                payload,
-                              );
-                            }}
-                            onDismiss={() => {
-                              console.info("[question-card] dismiss (Phase 1 wiring pending)");
-                            }}
+                            disabled={false}
+                            onSubmit={(payload) =>
+                              void onQuestionAnswer(msg.agentRunId ?? "", payload)
+                            }
+                            onDismiss={() =>
+                              void onQuestionDismiss(msg.agentRunId ?? "", msg.agentQuestion!.id)
+                            }
                           />
                         ) : null}
                       </div>

@@ -84,6 +84,22 @@ export function installUiLabStub(): void {
 
     cancelAgent: async () => {},
 
+    answerAgentQuestion: async (input) => {
+      void input;
+      console.info("[ui-lab] answerAgentQuestion ignored (browser preview only)");
+      const session = sessions.find((s) => s.id === input.sessionId);
+      if (!session) throw new Error("Session not found");
+      return structuredClone(session);
+    },
+
+    dismissAgentQuestion: async (input) => {
+      void input;
+      console.info("[ui-lab] dismissAgentQuestion ignored (browser preview only)");
+      const session = sessions.find((s) => s.id === input.sessionId);
+      if (!session) throw new Error("Session not found");
+      return structuredClone(session);
+    },
+
     openExternal: async (url) => {
       console.info("[ui-lab] openExternal:", url);
       return true;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type {
   AgentMode,
+  AgentQuestionAnswerPayload,
   AvatarState,
   ChatAttachment,
   ChatMessage,
@@ -228,6 +229,39 @@ export default function App() {
     director.setState("idle");
   };
 
+  const handleQuestionAnswer = async (runId: string, payload: AgentQuestionAnswerPayload) => {
+    const session = tabs.activeSession;
+    if (!session || !runId) return;
+    try {
+      const saved = await window.mimica.answerAgentQuestion({
+        sessionId: session.id,
+        runId,
+        mode: agentMode,
+        payload,
+      });
+      tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+      beginStream();
+      setIsStreaming(true);
+    } catch {
+      director.setState("idle");
+    }
+  };
+
+  const handleQuestionDismiss = async (runId: string, questionPromptId: string) => {
+    const session = tabs.activeSession;
+    if (!session || !runId) return;
+    try {
+      const saved = await window.mimica.dismissAgentQuestion({
+        sessionId: session.id,
+        runId,
+        questionPromptId,
+      });
+      tabs.setAllSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <div className="app">
       <TopBar />
@@ -265,6 +299,8 @@ export default function App() {
             onDeleteSession={(id) => void tabs.handleDeleteSession(id)}
             onSend={(text, attachments) => void handleSend(text, attachments)}
             onCancel={() => void handleCancel()}
+            onQuestionAnswer={handleQuestionAnswer}
+            onQuestionDismiss={handleQuestionDismiss}
           />
         }
       />

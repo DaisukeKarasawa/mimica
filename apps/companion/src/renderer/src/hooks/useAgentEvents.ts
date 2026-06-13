@@ -6,7 +6,10 @@ import type { CharacterDirector } from "@mimica/character-runtime";
 import {
   applyAgentComplete,
   applyAgentDelta,
+  applyAgentQuestion,
+  applyAgentQuestionResolved,
   applyAgentTool,
+  sessionHasPendingQuestion,
   streamMessageId,
 } from "../lib/agentSessionUpdate";
 import { logAgentPerfUi, type AgentPerfUiRecord } from "../lib/agentPerfUi";
@@ -74,18 +77,25 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           perfByRunIdRef.current.delete(pending.runId);
         }
         activeStreamIdRef.current = null;
-        setAllSessionsRef.current((prev) =>
-          applyAgentComplete(
+        setAllSessionsRef.current((prev) => {
+          const updated = applyAgentComplete(
             prev,
             pending.sessionId,
             pending.runId,
             pending.streamId,
             pending.content,
-          ),
-        );
-        directorRef.current.setState("success");
+          );
+          const session = updated.find((s) => s.id === pending.sessionId);
+          const hasPendingQuestion = session != null && sessionHasPendingQuestion(session);
+          if (hasPendingQuestion) {
+            directorRef.current.setState("waiting");
+          } else {
+            directorRef.current.setState("success");
+            scheduleReturnToIdleRef.current(1200);
+          }
+          return updated;
+        });
         setIsStreamingRef.current(false);
-        scheduleReturnToIdleRef.current(1200);
       },
     });
   }
@@ -218,6 +228,23 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             completionTimeoutRef.current = null;
             directorRef.current.setState("idle");
           }, 2000);
+          break;
+        }
+        case "agent_question": {
+          const streamId = activeStreamIdRef.current ?? streamMessageId(event.runId, null);
+          setAllSessionsRef.current((prev) =>
+            applyAgentQuestion(prev, event.sessionId, event.runId, event.question, streamId),
+          );
+          directorRef.current.setState("waiting");
+          break;
+        }
+        case "agent_question_resolved": {
+          setAllSessionsRef.current((prev) =>
+            applyAgentQuestionResolved(prev, event.sessionId, event.questionPromptId, event.status),
+          );
+          if (event.status === "answered") {
+            directorRef.current.setState("thinking");
+          }
           break;
         }
         default:

@@ -1,5 +1,14 @@
-import type { ChatMessage, ChatSession } from "@mimica/shared";
-import { upsertAssistantTurn } from "@mimica/shared";
+import type {
+  AgentQuestionPrompt,
+  AgentQuestionStatus,
+  ChatMessage,
+  ChatSession,
+} from "@mimica/shared";
+import {
+  updateAgentQuestionStatus,
+  upsertAssistantQuestion,
+  upsertAssistantTurn,
+} from "@mimica/shared";
 
 export function streamMessageId(runId: string, activeStreamId: string | null): string {
   return activeStreamId ?? `stream-${runId}`;
@@ -36,6 +45,33 @@ export function applyAgentComplete(
   return sessions.map((s) =>
     s.id === sessionId ? upsertAssistantTurn(s, { runId, content, streamId }) : s,
   );
+}
+
+export function applyAgentQuestion(
+  sessions: ChatSession[],
+  sessionId: string,
+  runId: string,
+  question: AgentQuestionPrompt,
+  streamId?: string,
+): ChatSession[] {
+  return sessions.map((s) =>
+    s.id === sessionId ? upsertAssistantQuestion(s, { runId, question, streamId }) : s,
+  );
+}
+
+export function applyAgentQuestionResolved(
+  sessions: ChatSession[],
+  sessionId: string,
+  questionPromptId: string,
+  status: AgentQuestionStatus,
+): ChatSession[] {
+  return sessions.map((s) =>
+    s.id === sessionId ? updateAgentQuestionStatus(s, questionPromptId, status) : s,
+  );
+}
+
+export function sessionHasPendingQuestion(session: ChatSession): boolean {
+  return session.messages.some((message) => message.agentQuestion?.status === "pending");
 }
 
 export function applyAgentTool(
