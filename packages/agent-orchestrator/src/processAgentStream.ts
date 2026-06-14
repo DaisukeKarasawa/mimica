@@ -8,6 +8,7 @@ import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import type { AgentRunTimingTrace } from "./agentRunTiming.js";
 import type { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { streamVisibleText } from "./streamVisibleText.js";
+import { formatToolCallDetail } from "./toolCallDetail.js";
 import { tryParseAskQuestionStreamEvent } from "./toolCallStreamQuestionAdapter.js";
 import { stripMetaNarration } from "./userFacingText.js";
 
@@ -70,10 +71,17 @@ export async function processAgentStream(params: {
       } else {
         setThinking();
       }
-      callbacks.onTool?.(event.name, event.status);
+      callbacks.onTool?.(
+        event.name,
+        formatToolCallDetail(event.name, event.status, toolEvent.args),
+      );
     }
     if (event.status === "completed") {
       timing?.markLatest("T3_last_tool_done");
+      callbacks.onTool?.(
+        event.name,
+        formatToolCallDetail(event.name, event.status, "args" in event ? event.args : undefined),
+      );
     }
     return false;
   };
