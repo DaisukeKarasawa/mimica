@@ -20,6 +20,7 @@ import { preloadMermaid } from "./lib/mermaidTheme";
 import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
 import { useAgentSubmitQueue } from "./hooks/useAgentSubmitQueue";
+import { useRunLog } from "./hooks/useRunLog";
 import { useBridgeStatus } from "./hooks/useBridgeStatus";
 import { useCharacterAssets } from "./hooks/useCharacterAssets";
 import { useSessionRunStates } from "./hooks/useSessionRunStates";
@@ -89,6 +90,8 @@ export default function App() {
     },
     [director],
   );
+
+  const runLog = useRunLog();
 
   const { handleAgentEvent, resetStream, beginStream } = useAgentEvents({
     setAllSessions: tabs.setAllSessions,
@@ -176,12 +179,16 @@ export default function App() {
 
   useEffect(() => {
     const unsubCtx = window.mimica.onEditorContext(setEditorContext);
-    const unsubAgent = window.mimica.onAgentEvent(handleAgentEvent);
+    const onAgentEvent = (event: Parameters<typeof handleAgentEvent>[0]) => {
+      runLog.handleAgentEvent(event);
+      handleAgentEvent(event);
+    };
+    const unsubAgent = window.mimica.onAgentEvent(onAgentEvent);
     return () => {
       unsubCtx();
       unsubAgent();
     };
-  }, [handleAgentEvent]);
+  }, [handleAgentEvent, runLog.handleAgentEvent]);
 
   useEffect(() => {
     if (!linkedWorkspacePath || tabs.openTabIds.length > 0) return;
@@ -248,6 +255,9 @@ export default function App() {
           break;
         case "history":
           tabs.setPanelMode(tabs.panelMode === "history" ? "chat" : "history");
+          break;
+        case "log":
+          tabs.setPanelMode(tabs.panelMode === "log" ? "chat" : "log");
           break;
         case "tabsBar":
           setTabsBarVisible((visible) => !visible);
@@ -346,6 +356,9 @@ export default function App() {
             panelMode={tabs.panelMode}
             tabsBarVisible={tabsBarVisible}
             isStreaming={isActiveSessionStreaming}
+            activeSessionRunId={activeSessionRun.runId}
+            runLogEntries={runLog.getLogsForSession(tabs.activeSessionId)}
+            editedFiles={runLog.getEditedFilesForSession(tabs.activeSessionId)}
             activeSessionRunStatus={activeSessionRun.status}
             queuedItems={queuedItems}
             submitError={submitError}
