@@ -94,7 +94,9 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
 
   const finalizeComplete = useCallback(
     (sessionId: string, runId: string, streamId: string, content: string) => {
-      activeStreamIdRef.current = null;
+      if (isActiveSession(sessionId)) {
+        activeStreamIdRef.current = null;
+      }
       setAllSessionsRef.current((prev) => {
         const updated = applyAgentComplete(prev, sessionId, runId, streamId, content);
         const session = updated.find((s) => s.id === sessionId);

@@ -73,6 +73,24 @@ export function applyAgentQuestionResolved(
   );
 }
 
+function upsertToolCall(
+  toolCalls: NonNullable<ChatMessage["toolCalls"]>,
+  name: string,
+  detail: string | undefined,
+): NonNullable<ChatMessage["toolCalls"]> {
+  if (detail?.startsWith("completed")) {
+    for (let i = toolCalls.length - 1; i >= 0; i--) {
+      const existing = toolCalls[i]!;
+      if (existing.name === name && existing.detail?.startsWith("running")) {
+        const updated = [...toolCalls];
+        updated[i] = { ...existing, detail };
+        return updated;
+      }
+    }
+  }
+  return [...toolCalls, { id: crypto.randomUUID(), name, detail }];
+}
+
 export function applyAgentTool(
   sessions: ChatSession[],
   sessionId: string,
@@ -82,7 +100,6 @@ export function applyAgentTool(
   name: string,
   detail?: string,
 ): ChatSession[] {
-  const tool = { id: crypto.randomUUID(), name, detail };
   return sessions.map((s) => {
     if (s.id !== sessionId) return s;
     const idx = s.messages.findIndex((m) => m.id === streamId);
@@ -97,7 +114,7 @@ export function applyAgentTool(
             content: streamContent,
             createdAt: new Date().toISOString(),
             agentRunId: runId,
-            toolCalls: [tool],
+            toolCalls: upsertToolCall([], name, detail),
           },
         ],
       };
@@ -106,7 +123,7 @@ export function applyAgentTool(
     const msg = messages[idx]!;
     messages[idx] = {
       ...msg,
-      toolCalls: [...(msg.toolCalls ?? []), tool],
+      toolCalls: upsertToolCall(msg.toolCalls ?? [], name, detail),
     };
     return { ...s, messages };
   });

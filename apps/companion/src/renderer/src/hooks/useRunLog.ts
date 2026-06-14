@@ -51,17 +51,20 @@ export function useRunLog() {
       let entries = prev[sessionId] ?? [];
       const runId = "runId" in event && typeof event.runId === "string" ? event.runId : undefined;
 
+      let runStartedAdded = false;
       if (runId && !entries.some((entry) => entry.runId === runId)) {
         entries = appendRunLogEntry(entries, {
           runId,
           kind: "state",
           label: "Run started",
         });
+        runStartedAdded = true;
       }
 
       // Response text is shown in the chat bubble; keep errors, tools, and state in the log.
       if (event.type === "agent_delta") {
-        return prev;
+        if (!runStartedAdded) return prev;
+        return { ...prev, [sessionId]: entries };
       }
 
       const mapped = runLogEntryFromAgentEvent(event);
