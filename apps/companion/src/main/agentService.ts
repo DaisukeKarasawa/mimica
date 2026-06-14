@@ -44,6 +44,9 @@ import {
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
 import { debugLogAtResolution, resolveAtInput } from "./cursorAt/index.js";
 import { MAX_IMAGE_ATTACHMENTS, readAttachmentBase64 } from "./imageAttachments.js";
+import { getActiveMimicaSettings } from "./characterPack.js";
+import { resolveTuttiVoiceConfig } from "./tuttiVoiceConfig.js";
+import { tuttiVoiceService } from "./tuttiVoiceService.js";
 
 export type { AgentQuestionAnswerInput, AgentQuestionDismissInput };
 
@@ -321,7 +324,49 @@ export class AgentService {
             if (current) {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
             }
-            emitter.complete(content);
+
+            const deliverAnswerToUi = () => {
+              emitAgentEvent(wc, {
+                type: "agent_complete",
+                sessionId: payload.sessionId,
+                runId,
+                content,
+              });
+            };
+
+            const settings = getActiveMimicaSettings();
+            const voiceConfig = resolveTuttiVoiceConfig(settings);
+            if (!voiceConfig.enabled) {
+              deliverAnswerToUi();
+              return;
+            }
+
+            emitAgentEvent(wc, {
+              type: "agent_state",
+              sessionId: payload.sessionId,
+              runId,
+              state: "thinking",
+            });
+
+            tuttiVoiceService.speakReadout({
+              text: content,
+              speaker: settings.activeCharacterId,
+              sessionId: payload.sessionId,
+              runId,
+              workspacePath: payload.workspacePath,
+              getRunner: () => this.getRunner(),
+              settings,
+              onPlaybackStart: () => {
+                emitAgentEvent(wc, {
+                  type: "agent_readout",
+                  sessionId: payload.sessionId,
+                  runId,
+                  phase: "start",
+                });
+              },
+              onPlaybackEnd: deliverAnswerToUi,
+              onFailure: deliverAnswerToUi,
+            });
           },
           onError: (error) => {
             this.persistAgentRunError(payload.sessionId, runId, error, emitter);
@@ -359,6 +404,7 @@ export class AgentService {
     if (this.runner) {
       await this.runner.cancel(payload.sessionId);
     }
+    tuttiVoiceService.cancelForSession(payload.sessionId);
     this.activeRuns.delete(payload.sessionId);
   }
 
