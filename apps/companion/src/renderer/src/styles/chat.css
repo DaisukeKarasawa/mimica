@@ -565,15 +565,6 @@
   }
 }
 
-.bubble pre {
-  margin: 9px 0 0;
-  padding: 10px;
-  border-radius: 12px;
-  overflow: auto;
-  background: rgba(13, 12, 12, 0.42);
-  font-size: 12px;
-}
-
 /* Markdown preview (GFM) */
 .md-preview {
   overflow-wrap: anywhere;

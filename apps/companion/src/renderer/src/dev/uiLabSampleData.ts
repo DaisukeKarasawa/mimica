@@ -55,6 +55,11 @@ export function createUiLabSampleSessions(): ChatSession[] {
             "```ts",
             "pnpm dev:ui-lab",
             "```",
+            "",
+            "```bash",
+            "pnpm typecheck",
+            "pnpm dev:companion",
+            "```",
           ].join("\n"),
           createdAt: now,
           toolCalls: [

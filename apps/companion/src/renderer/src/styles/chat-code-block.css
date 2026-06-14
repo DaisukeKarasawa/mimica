@@ -1,0 +1,63 @@
+.code-block-shell {
+  margin: 9px 0 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(13, 12, 12, 0.42);
+  font-size: 12px;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(98, 94, 90, 0.35);
+}
+
+.code-block-header--no-lang {
+  justify-content: flex-end;
+}
+
+.code-block-language {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.code-block-copy {
+  flex-shrink: 0;
+  border: 1px solid rgba(98, 94, 90, 0.55);
+  color: var(--text);
+  background: rgba(197, 201, 197, 0.08);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.code-block-copy:hover:not(:disabled) {
+  background: rgba(197, 201, 197, 0.14);
+  border-color: rgba(122, 131, 130, 0.55);
+}
+
+.code-block-copy:focus-visible {
+  outline: 2px solid rgba(135, 169, 135, 0.75);
+  outline-offset: 2px;
+}
+
+.code-block-copy:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.code-block-shell pre {
+  margin: 0;
+  padding: 10px;
+  border-radius: 0;
+  overflow: auto;
+  background: transparent;
+  font-size: inherit;
+}

@@ -2,12 +2,16 @@ import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { normalizeCollapsedTables } from "../lib/normalizeMarkdown";
+import { CodeBlockPre } from "./CodeBlockPre";
 
 interface MarkdownMessageProps {
   content: string;
 }
 
 const markdownComponents: Components = {
+  pre({ children, ...props }) {
+    return <CodeBlockPre {...props}>{children}</CodeBlockPre>;
+  },
   table: ({ children }) => (
     <div className="md-table-scroll">
       <table>{children}</table>
