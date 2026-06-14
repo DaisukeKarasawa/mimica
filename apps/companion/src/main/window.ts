@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import type { BrowserWindow as BrowserWindowType } from "electron";
+import { loadAppIcon } from "./appIcon.js";
 import { electron } from "./electron.js";
 import { userDataJoin } from "./userDataPaths.js";
 import { openAllowedExternalUrl } from "./openExternal.js";
@@ -76,6 +77,8 @@ export function createMainWindow(): BrowserWindowType {
   const width = Math.min(state.width, display.width);
   const height = Math.min(state.height, display.height);
 
+  const appIcon = loadAppIcon();
+
   const win = new BrowserWindow({
     width,
     height,
@@ -84,6 +87,7 @@ export function createMainWindow(): BrowserWindowType {
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
     title: "Mimica",
+    ...(appIcon ? { icon: appIcon } : {}),
     backgroundColor: "#0d0c0c",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),

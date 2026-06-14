@@ -8,6 +8,7 @@ import {
   setupAssetProtocolHandler,
   getCharacterAssetStatus,
 } from "./assetProtocol.js";
+import { applyAppIcon } from "./appIcon.js";
 import { createMainWindow } from "./window.js";
 import { SessionStore } from "./sessionStore.js";
 import { CursorBridgeServer } from "./cursorBridge.js";
@@ -90,6 +91,7 @@ if (!gotLock) {
     );
     await bridgeServer.start();
 
+    applyAppIcon();
     attachMainWindow(createMainWindow());
 
     ipcMain.handle("character:assets", () => getCharacterAssetStatus());
