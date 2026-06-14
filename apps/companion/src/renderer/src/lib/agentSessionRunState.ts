@@ -1,6 +1,6 @@
 import type { AgentRunState } from "@mimica/shared";
 
-/** Active-session `completed` is deferred until stream reveal finalizes. */
+/** Active-session `completed` may arrive after `agent_complete` finalizes the turn. */
 export function shouldApplyAgentStateToSessionRun(
   state: AgentRunState,
   isActiveSession: boolean,

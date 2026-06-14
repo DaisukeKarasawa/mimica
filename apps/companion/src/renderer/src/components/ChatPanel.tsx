@@ -6,6 +6,7 @@ import type {
   ChatSession,
 } from "@mimica/shared";
 import type { QueuedAgentSubmit } from "../lib/messageQueue";
+import type { EditedFileEntry, RunLogEntry } from "../lib/runLog";
 import { AGENT_DISPLAY_NAME, sessionHasPendingQuestion } from "@mimica/shared";
 import type { SessionRunStatus } from "../lib/sessionRunState";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
@@ -15,11 +16,12 @@ import { ChatComposer } from "./ChatComposer";
 import { ComposerQueue } from "./ComposerQueue";
 import { MessageAttachments } from "./ComposerAttachments";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
+import { ChatLogPanel } from "./ChatLogPanel";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { QuestionCard } from "./QuestionCard";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 
-export type ChatPanelMode = "chat" | "history";
+export type ChatPanelMode = "chat" | "history" | "log";
 
 interface ChatPanelProps {
   openSessions: ChatSession[];
@@ -29,6 +31,9 @@ interface ChatPanelProps {
   panelMode: ChatPanelMode;
   tabsBarVisible: boolean;
   isStreaming: boolean;
+  activeSessionRunId?: string | null;
+  runLogEntries?: RunLogEntry[];
+  editedFiles?: EditedFileEntry[];
   activeSessionRunStatus?: SessionRunStatus;
   queuedItems?: QueuedAgentSubmit[];
   submitError?: string | null;
@@ -58,6 +63,9 @@ export function ChatPanel({
   panelMode,
   tabsBarVisible,
   isStreaming,
+  activeSessionRunId = null,
+  runLogEntries = [],
+  editedFiles = [],
   activeSessionRunStatus = "idle",
   queuedItems = [],
   submitError = null,
@@ -115,6 +123,8 @@ export function ChatPanel({
     });
 
   const showChat = panelMode === "chat";
+  const showHistory = panelMode === "history";
+  const showLog = panelMode === "log";
   const lastMessage = activeSession?.messages.at(-1);
   const awaitingAssistantReply =
     lastMessage?.role === "user" ||
@@ -216,7 +226,7 @@ export function ChatPanel({
                   {workspacePath ? (
                     <>
                       タブがありません。Mimica ウィンドウを選択した状態で ⌘T（Windows は Ctrl+T）で
-                      New Chat を開くか、⌘Y（Ctrl+Y）で履歴を開いてください。
+                      New Chat を開くか、⌘Y（Ctrl+Y）で履歴、⌘J（Ctrl+J）でログを開いてください。
                     </>
                   ) : (
                     <>
@@ -246,6 +256,14 @@ export function ChatPanel({
                 }
 
                 if (!msg.content.trim() && !msg.agentQuestion) return null;
+                if (
+                  msg.agentRunId &&
+                  msg.agentRunId === activeSessionRunId &&
+                  isStreaming &&
+                  !msg.agentQuestion
+                ) {
+                  return null;
+                }
 
                 return (
                   <div key={msg.id} className="msg agent">
@@ -310,12 +328,18 @@ export function ChatPanel({
               />
             </div>
           </>
-        ) : (
+        ) : showHistory ? (
           <ChatHistoryPanel
             sessions={historySessions}
             activeSessionId={activeSessionId}
             onSelect={onSelectHistorySession}
             onDelete={onDeleteSession}
+          />
+        ) : (
+          <ChatLogPanel
+            entries={runLogEntries}
+            editedFiles={editedFiles}
+            activeSessionId={activeSessionId}
           />
         )}
       </div>

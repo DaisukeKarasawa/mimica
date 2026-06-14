@@ -6,6 +6,7 @@ export const CHAT_TAB_SHORTCUT_ACTIONS = [
   "next",
   "prev",
   "history",
+  "log",
   "tabsBar",
 ] as const;
 
@@ -58,6 +59,7 @@ export const MOD_KEY_CHAT_SHORTCUTS: readonly ModKeyChatShortcut[] = [
   { key: "t", action: "new", forwardFromMain: false },
   { key: "w", action: "close", forwardFromMain: true },
   { key: "y", action: "history", forwardFromMain: true },
+  { key: "j", action: "log", forwardFromMain: true },
   { key: "b", action: "tabsBar", forwardFromMain: true },
 ];
 
