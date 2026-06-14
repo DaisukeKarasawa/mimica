@@ -101,7 +101,7 @@ export default function App() {
     [editorContext?.workspacePath, tabs.activeSession?.workspacePath],
   );
 
-  const { handleSend, clearQueueForSession, queuedCount, submitError, clearSubmitError } =
+  const { handleSend, clearQueueForSession, queuedItems, submitError, clearSubmitError } =
     useAgentSubmitQueue({
       beginStream,
       resetStream,
@@ -342,7 +342,7 @@ export default function App() {
             tabsBarVisible={tabsBarVisible}
             isStreaming={isActiveSessionStreaming}
             activeSessionRunStatus={activeSessionRun.status}
-            queuedCount={queuedCount}
+            queuedItems={queuedItems}
             submitError={submitError}
             onClearSubmitError={clearSubmitError}
             agentMode={agentMode}

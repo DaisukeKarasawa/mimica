@@ -250,14 +250,14 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
     [messageQueue],
   );
 
-  const queuedCount = messageQueue.getQueueSize(activeSessionId);
+  const queuedItems = messageQueue.getQueue(activeSessionId);
 
   const clearSubmitError = useCallback(() => setSubmitError(null), []);
 
   return {
     handleSend,
     clearQueueForSession,
-    queuedCount,
+    queuedItems,
     submitError,
     clearSubmitError,
   };

@@ -5,12 +5,14 @@ import type {
   ChatAttachment,
   ChatSession,
 } from "@mimica/shared";
+import type { QueuedAgentSubmit } from "../lib/messageQueue";
 import { AGENT_DISPLAY_NAME, sessionHasPendingQuestion } from "@mimica/shared";
 import type { SessionRunStatus } from "../lib/sessionRunState";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
 import { ipcErrorMessage } from "../lib/composerError";
 import { ChatComposer } from "./ChatComposer";
+import { ComposerQueue } from "./ComposerQueue";
 import { MessageAttachments } from "./ComposerAttachments";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
 import { MarkdownMessage } from "./MarkdownMessage";
@@ -28,7 +30,7 @@ interface ChatPanelProps {
   tabsBarVisible: boolean;
   isStreaming: boolean;
   activeSessionRunStatus?: SessionRunStatus;
-  queuedCount?: number;
+  queuedItems?: QueuedAgentSubmit[];
   submitError?: string | null;
   onClearSubmitError?: () => void;
   agentMode: AgentMode;
@@ -57,7 +59,7 @@ export function ChatPanel({
   tabsBarVisible,
   isStreaming,
   activeSessionRunStatus = "idle",
-  queuedCount = 0,
+  queuedItems = [],
   submitError = null,
   onClearSubmitError,
   agentMode,
@@ -279,11 +281,7 @@ export function ChatPanel({
             </div>
 
             <div className="composer">
-              {queuedCount > 0 ? (
-                <p className="composer-queue-badge" aria-live="polite">
-                  キュー {queuedCount} 件
-                </p>
-              ) : null}
+              <ComposerQueue items={queuedItems} />
               {submitError ? (
                 <p className="composer-submit-error" role="alert">
                   {submitError}
