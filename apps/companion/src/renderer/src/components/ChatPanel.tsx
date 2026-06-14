@@ -8,7 +8,7 @@ import type {
 import type { QueuedAgentSubmit } from "../lib/messageQueue";
 import type { EditedFileEntry, RunLogEntry } from "../lib/runLog";
 import { AGENT_DISPLAY_NAME, sessionHasPendingQuestion } from "@mimica/shared";
-import type { SessionRunStatus } from "../lib/sessionRunState";
+import { shouldShowAssistantPendingIndicator, type SessionRunStatus } from "../lib/sessionRunState";
 import { useStickToBottomScroll } from "../hooks/useStickToBottomScroll";
 import { useTabPointerReorder } from "../hooks/useTabPointerReorder";
 import { ipcErrorMessage } from "../lib/composerError";
@@ -125,20 +125,18 @@ export function ChatPanel({
   const showChat = panelMode === "chat";
   const showHistory = panelMode === "history";
   const showLog = panelMode === "log";
-  const lastMessage = activeSession?.messages.at(-1);
-  const awaitingAssistantReply =
-    lastMessage?.role === "user" ||
-    (lastMessage?.role === "assistant" &&
-      !lastMessage.content.trim() &&
-      !lastMessage.agentQuestion);
-  const showThinkingIndicator = activeSessionRunStatus === "thinking" && awaitingAssistantReply;
+  const showAssistantPendingIndicator = shouldShowAssistantPendingIndicator(
+    activeSessionRunStatus,
+    activeSession,
+    activeSessionRunId,
+  );
   const { containerRef: messagesRef, scrollToBottom } = useStickToBottomScroll({
     enabled: showChat,
     resetKey: activeSessionId,
     contentVersion: {
       messageCount: activeSession?.messages.length ?? 0,
       trailingContentLength: activeSession?.messages.at(-1)?.content.length ?? 0,
-      showThinkingIndicator,
+      showThinkingIndicator: showAssistantPendingIndicator,
       isStreaming,
     },
   });
@@ -260,7 +258,8 @@ export function ChatPanel({
                   msg.agentRunId &&
                   msg.agentRunId === activeSessionRunId &&
                   isStreaming &&
-                  !msg.agentQuestion
+                  !msg.agentQuestion &&
+                  !msg.content.trim()
                 ) {
                   return null;
                 }
@@ -295,7 +294,9 @@ export function ChatPanel({
                   </div>
                 );
               })}
-              {showThinkingIndicator && <ThinkingIndicator chatIconUrl={chatIconUrl} />}
+              {showAssistantPendingIndicator ? (
+                <ThinkingIndicator chatIconUrl={chatIconUrl} />
+              ) : null}
             </div>
 
             <div className="composer">

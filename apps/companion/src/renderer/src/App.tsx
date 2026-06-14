@@ -7,7 +7,6 @@ import type {
 } from "@mimica/shared";
 import {
   DEFAULT_SETTINGS,
-  mapAgentRunToAvatar,
   resolveCharacterShortNameEn,
   sessionHasPendingQuestion,
 } from "@mimica/shared";
@@ -25,7 +24,7 @@ import { useBridgeStatus } from "./hooks/useBridgeStatus";
 import { useCharacterAssets } from "./hooks/useCharacterAssets";
 import { useSessionRunStates } from "./hooks/useSessionRunStates";
 import { useSessionTabs } from "./hooks/useSessionTabs";
-import { isSessionRunActive } from "./lib/sessionRunState";
+import { isSessionRunActive, mapSessionRunToAvatar } from "./lib/sessionRunState";
 import { matchChatTabShortcut, type ChatTabShortcutAction } from "./lib/chatTabShortcuts";
 
 export default function App() {
@@ -145,11 +144,7 @@ export default function App() {
       director.setState("idle");
       return;
     }
-    director.setState(
-      run.status === "streaming"
-        ? mapAgentRunToAvatar("streaming")
-        : mapAgentRunToAvatar("thinking"),
-    );
+    director.setState(mapSessionRunToAvatar(run.status));
   }, [
     director,
     sessionRuns.runs,

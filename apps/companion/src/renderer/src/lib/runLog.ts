@@ -136,6 +136,12 @@ export function runLogEntryFromAgentEvent(
         kind: "complete",
         label: "Response finalized",
       };
+    case "agent_readout":
+      return {
+        runId: event.runId,
+        kind: "tool",
+        label: event.phase === "start" ? "Readout playback" : "Readout ended",
+      };
     case "agent_error":
       return {
         runId: event.runId,
