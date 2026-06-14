@@ -19,7 +19,7 @@
 }
 
 .md-preview button.mermaid-diagram:focus-visible {
-  outline: 1px solid rgba(135, 169, 135, 0.55);
+  outline: 1px solid rgba(135, 169, 135, 0.75);
   outline-offset: 2px;
 }
 
@@ -96,7 +96,7 @@
 }
 
 .mermaid-diagram-modal__close:focus-visible {
-  outline: 1px solid rgba(135, 169, 135, 0.55);
+  outline: 1px solid rgba(135, 169, 135, 0.75);
   outline-offset: 1px;
 }
 
