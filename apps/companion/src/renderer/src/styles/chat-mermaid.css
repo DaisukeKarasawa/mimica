@@ -1,0 +1,118 @@
+.md-preview button.mermaid-diagram {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0.5em 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: zoom-in;
+  transition: background 0.12s ease;
+}
+
+.md-preview button.mermaid-diagram:hover {
+  background: rgba(13, 12, 12, 0.22);
+}
+
+.md-preview button.mermaid-diagram:focus-visible {
+  outline: 1px solid rgba(135, 169, 135, 0.55);
+  outline-offset: 2px;
+}
+
+.md-preview .mermaid-diagram__canvas {
+  width: 100%;
+  max-height: min(45vh, 360px);
+  overflow: hidden;
+}
+
+.md-preview .mermaid-diagram__canvas svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: min(45vh, 360px);
+  margin: 0 auto;
+  pointer-events: none;
+}
+
+.md-preview .mermaid-diagram--pending {
+  margin: 0.5em 0;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.mermaid-diagram-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px 24px;
+}
+
+.mermaid-diagram-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(8, 8, 7, 0.8);
+  cursor: pointer;
+}
+
+.mermaid-diagram-modal__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(13, 12, 12, 0.45);
+  padding: 0;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.mermaid-diagram-modal__close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mermaid-diagram-modal__close:hover {
+  color: var(--text);
+  background: rgba(13, 12, 12, 0.72);
+}
+
+.mermaid-diagram-modal__close:focus-visible {
+  outline: 1px solid rgba(135, 169, 135, 0.55);
+  outline-offset: 1px;
+}
+
+.mermaid-diagram-modal__viewport {
+  position: relative;
+  z-index: 1;
+  max-width: min(96vw, 1200px);
+  max-height: 100%;
+  overflow: auto;
+}
+
+.mermaid-diagram-modal__viewport svg {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100vh - 72px);
+  margin: 0 auto;
+}

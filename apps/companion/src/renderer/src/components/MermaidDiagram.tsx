@@ -1,4 +1,9 @@
-import { useEffect, useId, useRef, useState } from "react";
+import mermaid from "mermaid";
+import { startTransition, useEffect, useId, useRef, useState } from "react";
+import { scheduleIdleTask, yieldToMain } from "../lib/mainThreadYield";
+import { MermaidDiagramModal } from "./MermaidDiagramModal";
+
+export const MERMAID_PENDING_LABEL = "Rendering diagram…";
 
 /** Kanagawa Dragon–aligned Mermaid theme (dark base + CSS variables). */
 const MERMAID_THEME_VARIABLES = {
@@ -26,21 +31,31 @@ const MERMAID_THEME_VARIABLES = {
   labelTextColor: "#c5c9c5",
 } as const;
 
-let mermaidInitPromise: Promise<typeof import("mermaid").default> | null = null;
+let mermaidReady = false;
 
-async function loadMermaid(): Promise<typeof import("mermaid").default> {
-  if (!mermaidInitPromise) {
-    mermaidInitPromise = import("mermaid").then((mod) => {
-      mod.default.initialize({
-        startOnLoad: false,
-        theme: "dark",
-        securityLevel: "strict",
-        themeVariables: MERMAID_THEME_VARIABLES,
-      });
-      return mod.default;
+function ensureMermaid(): typeof mermaid {
+  if (!mermaidReady) {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: "dark",
+      securityLevel: "strict",
+      themeVariables: MERMAID_THEME_VARIABLES,
+      flowchart: {
+        htmlLabels: false,
+        useMaxWidth: false,
+      },
+      sequence: {
+        useMaxWidth: false,
+      },
     });
+    mermaidReady = true;
   }
-  return mermaidInitPromise;
+  return mermaid;
+}
+
+/** Warm mermaid so the first diagram does not wait on initialization. */
+export function preloadMermaid(): void {
+  ensureMermaid();
 }
 
 export interface MermaidDiagramProps {
@@ -49,61 +64,109 @@ export interface MermaidDiagramProps {
   renderable?: boolean;
 }
 
+/** Plain function export so MarkdownMessage can detect and unwrap from CodeBlockPre. */
 export function MermaidDiagram({ source, renderable = true }: MermaidDiagramProps) {
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const baseId = useId().replace(/:/g, "");
   const renderGenerationRef = useRef(0);
   const lastRenderedSourceRef = useRef<string | null>(null);
+  const inFlightRef = useRef(false);
+  const queuedSourceRef = useRef<string | null>(null);
+
+  const renderSource = source.trim();
 
   useEffect(() => {
-    if (!renderable) {
+    if (!renderable || !renderSource) {
       return;
     }
 
-    const trimmed = source.trim();
-    if (!trimmed) {
+    if (lastRenderedSourceRef.current === renderSource) {
       return;
     }
 
-    if (lastRenderedSourceRef.current === trimmed) {
+    queuedSourceRef.current = renderSource;
+    if (inFlightRef.current) {
       return;
     }
 
     let cancelled = false;
-    const generation = ++renderGenerationRef.current;
-    setFailed(false);
-
-    void (async () => {
-      try {
-        const mermaid = await loadMermaid();
-        const elementId = `mermaid-${baseId}-${generation}`;
-        const { svg: renderedSvg } = await mermaid.render(elementId, trimmed);
-        if (cancelled || generation !== renderGenerationRef.current) {
-          return;
-        }
-        lastRenderedSourceRef.current = trimmed;
-        setFailed(false);
-        setSvg(renderedSvg);
-      } catch (error) {
-        console.warn("[MermaidDiagram] render failed", error);
-        if (cancelled || generation !== renderGenerationRef.current) {
-          return;
-        }
-        setFailed(true);
-        setSvg(null);
+    const cancelSchedule = scheduleIdleTask(() => {
+      if (cancelled || inFlightRef.current) {
+        return;
       }
-    })();
+      inFlightRef.current = true;
+
+      const runQueue = async () => {
+        try {
+          const mermaidApi = ensureMermaid();
+
+          while (queuedSourceRef.current) {
+            const nextSource = queuedSourceRef.current;
+            queuedSourceRef.current = null;
+
+            if (lastRenderedSourceRef.current === nextSource) {
+              continue;
+            }
+
+            const generation = ++renderGenerationRef.current;
+            startTransition(() => {
+              setFailed(false);
+            });
+
+            try {
+              await yieldToMain();
+              if (cancelled || generation !== renderGenerationRef.current) {
+                continue;
+              }
+              const elementId = `mermaid-${baseId}-${generation}`;
+              const { svg: renderedSvg } = await mermaidApi.render(elementId, nextSource);
+              if (cancelled || generation !== renderGenerationRef.current) {
+                continue;
+              }
+              lastRenderedSourceRef.current = nextSource;
+              startTransition(() => {
+                setFailed(false);
+                setSvg(renderedSvg);
+              });
+            } catch (error) {
+              if (cancelled || generation !== renderGenerationRef.current) {
+                continue;
+              }
+              console.warn("[MermaidDiagram] render failed", error);
+              startTransition(() => {
+                setFailed(true);
+                setSvg(null);
+              });
+            }
+          }
+        } finally {
+          inFlightRef.current = false;
+          if (!cancelled && queuedSourceRef.current) {
+            inFlightRef.current = true;
+            void runQueue();
+          }
+        }
+      };
+
+      void runQueue();
+    });
 
     return () => {
       cancelled = true;
+      cancelSchedule();
     };
-  }, [source, renderable, baseId]);
+  }, [renderSource, renderable, baseId]);
 
   if (!renderable) {
     return (
-      <div className="mermaid-diagram mermaid-diagram--pending" aria-busy="true">
-        図を描画中…
+      <div
+        className="mermaid-diagram mermaid-diagram--pending"
+        aria-busy="true"
+        aria-label={MERMAID_PENDING_LABEL}
+      >
+        {MERMAID_PENDING_LABEL}
       </div>
     );
   }
@@ -118,17 +181,32 @@ export function MermaidDiagram({ source, renderable = true }: MermaidDiagramProp
 
   if (!svg) {
     return (
-      <div className="mermaid-diagram mermaid-diagram--pending" aria-busy="true">
-        図を描画中…
+      <div
+        className="mermaid-diagram mermaid-diagram--pending"
+        aria-busy="true"
+        aria-label={MERMAID_PENDING_LABEL}
+      >
+        {MERMAID_PENDING_LABEL}
       </div>
     );
   }
 
   return (
-    <div
-      className="mermaid-diagram"
-      // SVG from mermaid.render with securityLevel: "strict"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <>
+      <button
+        type="button"
+        className="mermaid-diagram"
+        onClick={() => setExpanded(true)}
+        aria-label="Expand diagram"
+        title="Expand diagram"
+      >
+        <div
+          className="mermaid-diagram__canvas"
+          // SVG from mermaid.render with securityLevel: "strict"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </button>
+      {expanded ? <MermaidDiagramModal svg={svg} onClose={() => setExpanded(false)} /> : null}
+    </>
   );
 }
