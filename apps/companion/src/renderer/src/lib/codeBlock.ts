@@ -14,7 +14,11 @@ export function parseLanguageFromCodeClass(className?: string): string | null {
 export function isPreCodeChild(child: ReactNode): child is CodeBlockElement {
   if (!isValidReactElement(child)) return false;
   if (child.type === "code") return true;
-  return "children" in child.props;
+  return hasFencedCodeClassName(child.props.className);
+}
+
+function hasFencedCodeClassName(className: unknown): boolean {
+  return typeof className === "string" && /\blanguage-[\w+#.-]+/.test(className);
 }
 
 function isValidReactElement(child: ReactNode): child is CodeBlockElement {

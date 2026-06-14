@@ -61,4 +61,12 @@ describe("isPreCodeChild", () => {
     assert.equal(isPreCodeChild(null), false);
     assert.equal(isPreCodeChild("text"), false);
   });
+
+  it("rejects elements without a fenced-code language class", () => {
+    function SpanLike() {
+      return null;
+    }
+    const notCode = { type: SpanLike, props: { children: "hello" } } as CodeBlockElement;
+    assert.equal(isPreCodeChild(notCode), false);
+  });
 });

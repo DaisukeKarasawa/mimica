@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { resolveAppIconPath, resolveCompanionPackageRoot } from "./appIcon.js";
+import { ICON_CANDIDATES, resolveAppIconPath, resolveCompanionPackageRoot } from "./appIcon.js";
 
 describe("appIcon", () => {
   it("resolves companion package root (not out/)", () => {
@@ -24,11 +24,3 @@ describe("appIcon", () => {
     }
   });
 });
-
-const ICON_CANDIDATES = [
-  "icon-dock.png",
-  "icon.icns",
-  "icon.png",
-  "icon.jpg",
-  "icon.jpeg",
-] as const;

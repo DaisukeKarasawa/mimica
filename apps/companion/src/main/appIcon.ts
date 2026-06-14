@@ -5,7 +5,8 @@ import type { NativeImage } from "electron";
 import { electron } from "./electron.js";
 
 const COMPANION_PACKAGE_NAME = "@mimica/companion";
-const ICON_CANDIDATES = [
+
+export const ICON_CANDIDATES = [
   "icon-dock.png",
   "icon.icns",
   "icon.png",
@@ -35,22 +36,23 @@ export function resolveCompanionPackageRoot(): string {
   return join(moduleDir, "../..");
 }
 
-export function resolveAppIconPath(): string | undefined {
-  const root = resolveCompanionPackageRoot();
+function* eachBuildIconPath(root: string): Generator<string> {
   for (const name of ICON_CANDIDATES) {
     const path = join(root, "build", name);
-    if (existsSync(path)) return path;
+    if (existsSync(path)) yield path;
   }
-  return undefined;
+}
+
+export function resolveAppIconPath(): string | undefined {
+  const root = resolveCompanionPackageRoot();
+  return eachBuildIconPath(root).next().value;
 }
 
 export function loadAppIcon(): NativeImage | undefined {
   const { nativeImage } = electron();
   const root = resolveCompanionPackageRoot();
 
-  for (const name of ICON_CANDIDATES) {
-    const iconPath = join(root, "build", name);
-    if (!existsSync(iconPath)) continue;
+  for (const iconPath of eachBuildIconPath(root)) {
     const image = nativeImage.createFromPath(iconPath);
     if (!image.isEmpty()) return image;
   }

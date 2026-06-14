@@ -1,6 +1,11 @@
-/** Copy plain text; prefers Clipboard API, then Electron IPC, then execCommand. */
+/** Copy plain text; Electron uses main-process clipboard IPC, then Clipboard API, then execCommand. */
 export async function copyTextToClipboard(text: string): Promise<void> {
   if (!text) return;
+
+  if (typeof window !== "undefined" && window.mimica?.writeClipboardText) {
+    await window.mimica.writeClipboardText(text);
+    return;
+  }
 
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
     try {
@@ -9,11 +14,6 @@ export async function copyTextToClipboard(text: string): Promise<void> {
     } catch {
       /* fall through */
     }
-  }
-
-  if (typeof window !== "undefined" && window.mimica?.writeClipboardText) {
-    await window.mimica.writeClipboardText(text);
-    return;
   }
 
   const textarea = document.createElement("textarea");
