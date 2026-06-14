@@ -43,6 +43,15 @@ function clearBackgroundBuffersForSession(buffers: Map<string, string>, sessionI
   }
 }
 
+function clearBufferedStreamForRun(
+  buffers: Map<string, string>,
+  sessionId: string,
+  runId: string | undefined,
+): void {
+  if (!runId) return;
+  buffers.delete(backgroundBufferKey(sessionId, runId));
+}
+
 function resolveBufferedContent(
   buffers: Map<string, string>,
   sessionId: string,
@@ -167,11 +176,12 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             updateSessionRunFromAgentState(event.sessionId, event.state, event.runId);
           }
           if (event.state === "failed" || event.state === "cancelled") {
-            if (event.runId) {
-              backgroundStreamTextRef.current.delete(
-                backgroundBufferKey(event.sessionId, event.runId),
-              );
-            } else {
+            clearBufferedStreamForRun(
+              backgroundStreamTextRef.current,
+              event.sessionId,
+              event.runId,
+            );
+            if (!event.runId) {
               clearBackgroundBuffersForSession(backgroundStreamTextRef.current, event.sessionId);
             }
             if (isActiveSession(event.sessionId)) {
@@ -200,11 +210,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
         }
         case "agent_tool": {
-          if (event.runId) {
-            backgroundStreamTextRef.current.delete(
-              backgroundBufferKey(event.sessionId, event.runId),
-            );
-          }
+          clearBufferedStreamForRun(backgroundStreamTextRef.current, event.sessionId, event.runId);
           const streamId =
             (isActiveSession(event.sessionId) ? activeStreamIdRef.current : null) ??
             streamMessageId(event.runId, null);
@@ -239,8 +245,10 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             (isActiveSession(event.sessionId) ? activeStreamIdRef.current : null) ??
             streamMessageId(event.runId, null);
           if (event.runId) {
-            backgroundStreamTextRef.current.delete(
-              backgroundBufferKey(event.sessionId, event.runId),
+            clearBufferedStreamForRun(
+              backgroundStreamTextRef.current,
+              event.sessionId,
+              event.runId,
             );
           }
           if (isActiveSession(event.sessionId)) {
@@ -259,6 +267,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
         }
         case "agent_question": {
+          clearBufferedStreamForRun(backgroundStreamTextRef.current, event.sessionId, event.runId);
           const streamId =
             (isActiveSession(event.sessionId) ? activeStreamIdRef.current : null) ??
             streamMessageId(event.runId, null);
