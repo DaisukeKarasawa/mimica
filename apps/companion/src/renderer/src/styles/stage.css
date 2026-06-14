@@ -1,13 +1,10 @@
 .stage {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 26px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02)),
-    radial-gradient(circle at 45% 16%, rgba(255, 255, 255, 0.2), transparent 18%),
-    linear-gradient(135deg, #16234a 0%, #172f56 42%, #24345f 58%, #10182f 100%);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--line-subtle);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #16234a 0%, #172f56 42%, #24345f 58%, #10182f 100%);
+  box-shadow: none;
 }
 
 .spine-host {
