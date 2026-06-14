@@ -20,9 +20,9 @@ export function isMermaidBlockComplete(content: string, blockIndex: number): boo
       if (MERMAID_FENCE_OPEN.test(trimmed)) {
         if (mermaidIndex === blockIndex) {
           trackingTarget = true;
-          inFence = true;
-          fenceLanguage = "mermaid";
         }
+        inFence = true;
+        fenceLanguage = "mermaid";
         mermaidIndex += 1;
       } else if (FENCE_CLOSE.test(trimmed)) {
         // stray close — ignore
@@ -57,6 +57,7 @@ export function countMermaidBlocks(content: string): number {
     if (!inFence) {
       if (MERMAID_FENCE_OPEN.test(trimmed)) {
         count += 1;
+        inFence = true;
       } else if (trimmed.startsWith("```")) {
         inFence = true;
       }

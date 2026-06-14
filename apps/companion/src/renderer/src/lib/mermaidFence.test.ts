@@ -60,4 +60,22 @@ describe("countMermaidBlocks", () => {
     ].join("\n");
     assert.equal(countMermaidBlocks(content), 2);
   });
+
+  it("ignores literal ```mermaid lines inside a mermaid block body", () => {
+    const content = [
+      "```mermaid",
+      'note["```mermaid"]',
+      "graph TD",
+      "A-->B",
+      "```",
+      "",
+      "```mermaid",
+      "graph LR",
+      "C-->D",
+      "```",
+    ].join("\n");
+    assert.equal(countMermaidBlocks(content), 2);
+    assert.equal(isMermaidBlockComplete(content, 0), true);
+    assert.equal(isMermaidBlockComplete(content, 1), true);
+  });
 });

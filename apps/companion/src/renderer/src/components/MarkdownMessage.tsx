@@ -1,4 +1,4 @@
-import { isValidElement, type ReactNode } from "react";
+import { isValidElement, useMemo, useRef, type ReactNode } from "react";
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -24,65 +24,72 @@ function extractCodeText(children: ReactNode): string {
   return String(children).replace(/\n$/, "");
 }
 
-function createMarkdownComponents(content: string): Components {
-  let mermaidBlockIndex = 0;
+export function MarkdownMessage({ content }: MarkdownMessageProps) {
+  const normalized = normalizeCollapsedTables(content);
+  const contentRef = useRef(normalized);
+  contentRef.current = normalized;
+  const mermaidBlockIndexRef = useRef(0);
 
-  return {
-    pre: ({ children, ...props }) => {
-      if (isValidElement(children) && children.type === MermaidDiagram) {
-        return children;
-      }
-      return <CodeBlockPre {...props}>{children}</CodeBlockPre>;
-    },
-    table: ({ children }) => (
-      <div className="md-table-scroll">
-        <table>{children}</table>
-      </div>
-    ),
-    a: ({ href, children }) => (
-      <a
-        href={href}
-        rel="noopener noreferrer"
-        target="_blank"
-        onClick={(event) => {
-          event.preventDefault();
-          if (href) void window.mimica.openExternal(href);
-        }}
-      >
-        {children}
-      </a>
-    ),
-    code: ({ className, children, ...props }) => {
-      const language = /language-(\S+)/.exec(className ?? "")?.[1];
-      if (language === "mermaid") {
-        const blockIndex = mermaidBlockIndex;
-        mermaidBlockIndex += 1;
-        const source = extractCodeText(children);
-        const renderable = isMermaidBlockComplete(content, blockIndex);
-        return <MermaidDiagram source={source} renderable={renderable} />;
-      }
+  const components = useMemo<Components>(
+    () => ({
+      pre: function MarkdownPre({ children, ...props }) {
+        if (isValidElement(children) && children.type === MermaidDiagram) {
+          return children;
+        }
+        return <CodeBlockPre {...props}>{children}</CodeBlockPre>;
+      },
+      table: function MarkdownTable({ children }) {
+        return (
+          <div className="md-table-scroll">
+            <table>{children}</table>
+          </div>
+        );
+      },
+      a: function MarkdownAnchor({ href, children }) {
+        return (
+          <a
+            href={href}
+            rel="noopener noreferrer"
+            target="_blank"
+            onClick={(event) => {
+              event.preventDefault();
+              if (href) void window.mimica.openExternal(href);
+            }}
+          >
+            {children}
+          </a>
+        );
+      },
+      code: function MarkdownCode({ className, children, ...props }) {
+        const language = /language-(\S+)/.exec(className ?? "")?.[1];
+        if (language === "mermaid") {
+          const blockIndex = mermaidBlockIndexRef.current;
+          mermaidBlockIndexRef.current += 1;
+          const source = extractCodeText(children);
+          const renderable = isMermaidBlockComplete(contentRef.current, blockIndex);
+          return <MermaidDiagram source={source} renderable={renderable} />;
+        }
 
-      const isBlock = Boolean(className);
-      if (isBlock) {
+        const isBlock = Boolean(className);
+        if (isBlock) {
+          return (
+            <code className={className} {...props}>
+              {children}
+            </code>
+          );
+        }
+
         return (
           <code className={className} {...props}>
             {children}
           </code>
         );
-      }
+      },
+    }),
+    [],
+  );
 
-      return (
-        <code className={className} {...props}>
-          {children}
-        </code>
-      );
-    },
-  };
-}
-
-export function MarkdownMessage({ content }: MarkdownMessageProps) {
-  const normalized = normalizeCollapsedTables(content);
-  const components = createMarkdownComponents(normalized);
+  mermaidBlockIndexRef.current = 0;
 
   return (
     <div className="md-preview">
