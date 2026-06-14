@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import { useMermaidSvg } from "../hooks/useMermaidSvg";
 import { MermaidDiagramModal } from "./MermaidDiagramModal";
 
-export const MERMAID_PENDING_LABEL = "Rendering diagram…";
+export const MERMAID_PENDING_LABEL = "図を描画中…";
 
 export interface MermaidDiagramProps {
   source: string;
@@ -54,8 +54,8 @@ export function MermaidDiagram({ source, renderable = true }: MermaidDiagramProp
         type="button"
         className="mermaid-diagram"
         onClick={() => setExpanded(true)}
-        aria-label="Expand diagram"
-        title="Expand diagram"
+        aria-label="図を拡大"
+        title="図を拡大"
       >
         <div
           className="mermaid-diagram__canvas"

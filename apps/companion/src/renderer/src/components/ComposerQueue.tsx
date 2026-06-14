@@ -6,9 +6,9 @@ function formatQueuedItemLabel(item: QueuedAgentSubmit): string {
   if (text) return text;
   if (item.attachments?.length) {
     const count = item.attachments.length;
-    return count === 1 ? "Image attachment" : `${count} image attachments`;
+    return count === 1 ? "画像添付1件" : `画像添付${count}件`;
   }
-  return "Empty message";
+  return "空のメッセージ";
 }
 
 interface ComposerQueueProps {
@@ -27,7 +27,7 @@ export function ComposerQueue({ items }: ComposerQueueProps) {
 
   if (items.length === 0) return null;
 
-  const countLabel = items.length === 1 ? "1 Queued" : `${items.length} Queued`;
+  const countLabel = `キュー ${items.length} 件`;
 
   return (
     <div className="composer-queue" aria-live="polite">
