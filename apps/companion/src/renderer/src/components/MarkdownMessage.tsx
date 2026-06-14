@@ -1,4 +1,4 @@
-import { isValidElement, useMemo, useRef, type ReactNode } from "react";
+import { Children, isValidElement, useMemo, useRef, type ReactNode } from "react";
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -33,8 +33,9 @@ export function MarkdownMessage({ content }: MarkdownMessageProps) {
   const components = useMemo<Components>(
     () => ({
       pre: function MarkdownPre({ children, ...props }) {
-        if (isValidElement(children) && children.type === MermaidDiagram) {
-          return children;
+        const child = Children.toArray(children)[0];
+        if (isValidElement(child) && child.type === MermaidDiagram) {
+          return child;
         }
         return <CodeBlockPre {...props}>{children}</CodeBlockPre>;
       },

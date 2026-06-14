@@ -8,6 +8,7 @@ import {
   setupAssetProtocolHandler,
   getCharacterAssetStatus,
 } from "./assetProtocol.js";
+import { applyAppIcon } from "./appIcon.js";
 import { createMainWindow } from "./window.js";
 import { SessionStore } from "./sessionStore.js";
 import { CursorBridgeServer } from "./cursorBridge.js";
@@ -90,6 +91,7 @@ if (!gotLock) {
     );
     await bridgeServer.start();
 
+    applyAppIcon();
     attachMainWindow(createMainWindow());
 
     ipcMain.handle("character:assets", () => getCharacterAssetStatus());
@@ -138,6 +140,13 @@ if (!gotLock) {
     ipcMain.handle("shell:openExternal", (_e, url: unknown) => {
       if (typeof url !== "string") return false;
       return openAllowedExternalUrl(url);
+    });
+    ipcMain.handle("clipboard:writeText", (_e, text: unknown) => {
+      if (typeof text !== "string") {
+        throw new Error("text must be a string");
+      }
+      const { clipboard } = electronApis;
+      clipboard.writeText(text);
     });
     registerSlashMenuIpc(ipcMain, resolveWorkspacePath);
     registerAtMenuIpc(ipcMain, resolveWorkspacePath, {

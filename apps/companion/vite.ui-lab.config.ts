@@ -30,5 +30,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ["@mimica/character-runtime"],
+    esbuildOptions: {
+      target: "esnext",
+    },
+  },
+  build: {
+    target: "esnext",
   },
 });

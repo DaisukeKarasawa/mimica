@@ -40,6 +40,13 @@ export default defineConfig({
     },
     optimizeDeps: {
       exclude: ["@mimica/character-runtime"],
+      // mermaid 11.x and markdown deps use patterns esbuild cannot downlevel to legacy targets.
+      esbuildOptions: {
+        target: "esnext",
+      },
+    },
+    build: {
+      target: "esnext",
     },
     plugins: [react()],
   },

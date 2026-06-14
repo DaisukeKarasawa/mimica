@@ -16,6 +16,7 @@ import { TopBar } from "./components/TopBar";
 import { BridgeStatusBanner } from "./components/BridgeStatusBanner";
 import { CharacterStage } from "./components/CharacterStage";
 import { ChatPanel } from "./components/ChatPanel";
+import { preloadMermaid } from "./lib/mermaidTheme";
 import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
 import { useAgentSubmitQueue } from "./hooks/useAgentSubmitQueue";
@@ -27,6 +28,10 @@ import { isSessionRunActive } from "./lib/sessionRunState";
 import { matchChatTabShortcut, type ChatTabShortcutAction } from "./lib/chatTabShortcuts";
 
 export default function App() {
+  useEffect(() => {
+    preloadMermaid();
+  }, []);
+
   const [editorContext, setEditorContext] = useState<EditorContext | null>(null);
   const [avatarState, setAvatarState] = useState<AvatarState>("idle");
   const characterAssets = useCharacterAssets();
@@ -101,7 +106,7 @@ export default function App() {
     [editorContext?.workspacePath, tabs.activeSession?.workspacePath],
   );
 
-  const { handleSend, clearQueueForSession, queuedCount, submitError, clearSubmitError } =
+  const { handleSend, clearQueueForSession, queuedItems, submitError, clearSubmitError } =
     useAgentSubmitQueue({
       beginStream,
       resetStream,
@@ -342,7 +347,7 @@ export default function App() {
             tabsBarVisible={tabsBarVisible}
             isStreaming={isActiveSessionStreaming}
             activeSessionRunStatus={activeSessionRun.status}
-            queuedCount={queuedCount}
+            queuedItems={queuedItems}
             submitError={submitError}
             onClearSubmitError={clearSubmitError}
             agentMode={agentMode}

@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { CodeBlockElement } from "./codeBlock.ts";
-import { extractCodeBlockText, parseLanguageFromCodeClass } from "./codeBlock.ts";
+import { extractCodeBlockText, isPreCodeChild, parseLanguageFromCodeClass } from "./codeBlock.ts";
 
-function codeElement(children: unknown): CodeBlockElement {
-  return { props: { children } } as CodeBlockElement;
+function codeElement(children: unknown, className?: string): CodeBlockElement {
+  return { type: "code", props: { children, className } } as CodeBlockElement;
+}
+
+function customCodeComponent(children: unknown, className?: string): CodeBlockElement {
+  function MarkdownCode() {
+    return null;
+  }
+  return { type: MarkdownCode, props: { children, className } } as CodeBlockElement;
 }
 
 describe("parseLanguageFromCodeClass", () => {
@@ -38,5 +45,28 @@ describe("extractCodeBlockText", () => {
     assert.equal(extractCodeBlockText(null), "");
     assert.equal(extractCodeBlockText(undefined), "");
     assert.equal(extractCodeBlockText(codeElement(undefined)), "");
+  });
+});
+
+describe("isPreCodeChild", () => {
+  it("accepts native code elements", () => {
+    assert.equal(isPreCodeChild(codeElement("hello")), true);
+  });
+
+  it("accepts react-markdown custom code components", () => {
+    assert.equal(isPreCodeChild(customCodeComponent("pnpm dev:ui-lab", "language-ts")), true);
+  });
+
+  it("rejects non-elements", () => {
+    assert.equal(isPreCodeChild(null), false);
+    assert.equal(isPreCodeChild("text"), false);
+  });
+
+  it("rejects elements without a fenced-code language class", () => {
+    function SpanLike() {
+      return null;
+    }
+    const notCode = { type: SpanLike, props: { children: "hello" } } as CodeBlockElement;
+    assert.equal(isPreCodeChild(notCode), false);
   });
 });

@@ -8,6 +8,7 @@ import "./styles/stage.css";
 import "./styles/stage-placeholder.css";
 import "./styles/chat.css";
 import "./styles/chat-code-block.css";
+import "./styles/chat-mermaid.css";
 import "./styles/chat-slash-menu.css";
 import "./styles/chat-attachments.css";
 import "./styles/chat-question-card.css";

@@ -52,6 +52,7 @@ export interface MimicaApi {
   pasteImageAttachment: (sessionId: string, payload: ImagePastePayload) => Promise<ChatAttachment>;
   discardImageAttachment: (sessionId: string, attachment: ChatAttachment) => Promise<void>;
   discardImageAttachments: (sessionId: string, attachments: ChatAttachment[]) => Promise<void>;
+  writeClipboardText: (text: string) => Promise<void>;
 }
 
 const api: MimicaApi = {
@@ -97,6 +98,7 @@ const api: MimicaApi = {
     ipcRenderer.invoke("attachments:discard", sessionId, attachment),
   discardImageAttachments: (sessionId, attachments) =>
     ipcRenderer.invoke("attachments:discardMany", sessionId, attachments),
+  writeClipboardText: (text) => ipcRenderer.invoke("clipboard:writeText", text),
 };
 
 contextBridge.exposeInMainWorld("mimica", api);

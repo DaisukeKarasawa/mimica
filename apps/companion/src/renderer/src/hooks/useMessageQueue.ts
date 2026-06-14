@@ -45,6 +45,11 @@ export function useMessageQueue() {
     return queuesRef.current.get(sessionId)?.length ?? 0;
   }, []);
 
+  const getQueue = useCallback((sessionId: string | null): QueuedAgentSubmit[] => {
+    if (!sessionId) return [];
+    return [...(queuesRef.current.get(sessionId) ?? [])];
+  }, []);
+
   const clear = useCallback(
     (sessionId: string) => {
       if (!queuesRef.current.has(sessionId)) return;
@@ -54,5 +59,5 @@ export function useMessageQueue() {
     [bump],
   );
 
-  return { enqueue, dequeue, peek, getQueueSize, clear };
+  return { enqueue, dequeue, peek, getQueueSize, getQueue, clear };
 }

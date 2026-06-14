@@ -8,6 +8,7 @@
 }
 
 .bridge-status-banner {
+  grid-row: 2;
   margin: -6px 0 0;
   padding: 10px 14px;
   border: 1px solid rgba(217, 178, 173, 0.35);
@@ -20,31 +21,28 @@
 }
 
 .topbar {
+  grid-row: 1;
   display: flex;
   align-items: center;
-  padding: 0 16px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: rgba(18, 18, 15, 0.76);
-  backdrop-filter: blur(18px);
-  box-shadow: var(--shadow);
+  padding: 0 14px;
+  border: 1px solid var(--line-subtle);
+  border-radius: 12px;
+  background: rgba(18, 18, 15, 0.82);
+  box-shadow: none;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .orb {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--chrome-mark-bg);
-  border: 1px solid var(--chrome-mark-border);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.24) inset,
-    0 0 24px var(--chrome-mark-glow);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-subtle);
 }
 
 .brand h1 {
@@ -55,6 +53,7 @@
 }
 
 .main {
+  grid-row: 3;
   min-height: 0;
   display: flex;
   align-items: stretch;

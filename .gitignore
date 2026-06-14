@@ -14,6 +14,10 @@ out/
 *.tsbuildinfo
 apps/companion/release/
 apps/companion/build/packs/
+apps/companion/build/icon.icns
+apps/companion/build/icon-dock.png
+apps/companion/build/icon.iconset/
+apps/companion/build/.icon-source.png
 apps/cursor-extension/*.vsix
 .vscode-test/
 

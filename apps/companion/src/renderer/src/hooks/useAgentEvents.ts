@@ -10,6 +10,7 @@ import {
   applyAgentTool,
   streamMessageId,
 } from "../lib/agentSessionUpdate";
+import { shouldApplyAgentStateToSessionRun } from "../lib/agentSessionRunState";
 import { logAgentPerfUi, type AgentPerfUiRecord } from "../lib/agentPerfUi";
 import { runStatusFromAgentState, type SessionRunState } from "../lib/sessionRunState";
 import type { PendingStreamComplete, StreamRevealContext } from "../lib/streamRevealController";
@@ -312,7 +313,9 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     (event: AgentEventMessage) => {
       switch (event.type) {
         case "agent_state": {
-          updateSessionRunFromAgentState(event.sessionId, event.state, event.runId);
+          if (shouldApplyAgentStateToSessionRun(event.state, isActiveSession(event.sessionId))) {
+            updateSessionRunFromAgentState(event.sessionId, event.state, event.runId);
+          }
           if (event.state === "failed" || event.state === "cancelled") {
             if (isActiveSession(event.sessionId)) {
               reveal.stop();
@@ -396,6 +399,10 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
         }
         case "agent_complete": {
+          setSessionRunRef.current(event.sessionId, {
+            status: "streaming",
+            runId: event.runId,
+          });
           if (!isActiveSession(event.sessionId)) {
             finalizeBackgroundComplete(event);
             break;
