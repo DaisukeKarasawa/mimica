@@ -1,5 +1,9 @@
 import type { Run } from "@cursor/sdk";
-import { cancelRun, isAbortError, trackIntentionalCancelPromise } from "./abortError.js";
+import {
+  cancelRun,
+  isIntentionalCancellationError,
+  trackIntentionalCancelPromise,
+} from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import type { AgentRunTimingTrace } from "./agentRunTiming.js";
 import type { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
@@ -142,7 +146,7 @@ export async function processAgentStream(params: {
   try {
     await trackIntentionalCancelPromise(consumeStream());
   } catch (err) {
-    if (isAbortError(err) || isCancelled() || signal?.aborted) {
+    if (isIntentionalCancellationError(err) || isCancelled() || signal?.aborted) {
       callbacks.onState("cancelled");
       return { sawToolCall, preToolText, postToolText };
     }

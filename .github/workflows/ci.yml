@@ -31,7 +31,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 20
+          # undici@8.3.0 (pnpm override) needs webidl.util.markAsUncloneable — unavailable on Node 20 CI
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
@@ -105,3 +106,6 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Agent orchestrator tests
+        run: pnpm --filter @mimica/agent-orchestrator test

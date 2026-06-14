@@ -4,6 +4,7 @@ export type ErrorKind =
   | "agent_timeout"
   | "auth_missing"
   | "connection"
+  | "sdk_transport"
   | "attachment"
   | "session"
   | "read_only_blocked"
@@ -49,6 +50,7 @@ const ERROR_KINDS: ErrorKind[] = [
   "agent_timeout",
   "auth_missing",
   "connection",
+  "sdk_transport",
   "attachment",
   "session",
   "read_only_blocked",
@@ -65,6 +67,8 @@ const ERROR_FACT_TEMPLATES: Record<ErrorKind, string> = {
   auth_missing:
     "Cursor API キーが設定されていません。.env または環境変数 CURSOR_API_KEY を確認してください。",
   connection: "接続を確立できませんでした。Companion と Cursor の接続を確認してください。",
+  sdk_transport:
+    "Agent との通信で問題が発生しました。しばらく待ってから再送信してください。改善しない場合は Mimica を再起動してください。",
   attachment: "画像の添付に失敗しました。",
   session: "チャットセッションが見つかりません。",
   read_only_blocked: "Ask モードでは書き込みツールは利用できません。",
@@ -150,6 +154,11 @@ export function classifyAgentError(raw: string, errorName?: string): ErrorKind {
   }
   if (/CURSOR_API_KEY/i.test(message)) {
     return "auth_missing";
+  }
+  if (
+    /NGHTTP2_REFUSED_STREAM|REFUSED_STREAM|ConnectError|\[unavailable\]|\[internal\]/i.test(message)
+  ) {
+    return "sdk_transport";
   }
   if (
     /read-only mode/i.test(message) ||

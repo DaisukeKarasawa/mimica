@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { isMermaidBlockComplete } from "../lib/mermaidFence";
 import { normalizeCollapsedTables } from "../lib/normalizeMarkdown";
+import { CodeBlockPre } from "./CodeBlockPre";
 import { MermaidDiagram } from "./MermaidDiagram";
 
 interface MarkdownMessageProps {
@@ -27,6 +28,17 @@ function createMarkdownComponents(content: string): Components {
   let mermaidBlockIndex = 0;
 
   return {
+    pre: ({ children, ...props }) => {
+      if (isValidElement(children) && children.type === MermaidDiagram) {
+        return children;
+      }
+      return <CodeBlockPre {...props}>{children}</CodeBlockPre>;
+    },
+    table: ({ children }) => (
+      <div className="md-table-scroll">
+        <table>{children}</table>
+      </div>
+    ),
     a: ({ href, children }) => (
       <a
         href={href}
@@ -40,12 +52,6 @@ function createMarkdownComponents(content: string): Components {
         {children}
       </a>
     ),
-    pre: ({ children, ...props }) => {
-      if (isValidElement(children) && children.type === MermaidDiagram) {
-        return children;
-      }
-      return <pre {...props}>{children}</pre>;
-    },
     code: ({ className, children, ...props }) => {
       const language = /language-(\S+)/.exec(className ?? "")?.[1];
       if (language === "mermaid") {
