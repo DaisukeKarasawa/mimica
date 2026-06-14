@@ -44,9 +44,7 @@ import {
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
 import { debugLogAtResolution, resolveAtInput } from "./cursorAt/index.js";
 import { MAX_IMAGE_ATTACHMENTS, readAttachmentBase64 } from "./imageAttachments.js";
-import { getActiveMimicaSettings } from "./characterPack.js";
-import { resolveTuttiVoiceConfig } from "./tuttiVoiceConfig.js";
-import { tuttiVoiceService } from "./tuttiVoiceService.js";
+import { answerDeliveryCoordinator } from "./answerDeliveryCoordinator.js";
 
 export type { AgentQuestionAnswerInput, AgentQuestionDismissInput };
 
@@ -325,47 +323,13 @@ export class AgentService {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
             }
 
-            const deliverAnswerToUi = () => {
-              emitAgentEvent(wc, {
-                type: "agent_complete",
-                sessionId: payload.sessionId,
-                runId,
-                content,
-              });
-            };
-
-            const settings = getActiveMimicaSettings();
-            const voiceConfig = resolveTuttiVoiceConfig(settings);
-            if (!voiceConfig.enabled) {
-              deliverAnswerToUi();
-              return;
-            }
-
-            emitAgentEvent(wc, {
-              type: "agent_state",
+            answerDeliveryCoordinator.deliver({
+              wc,
               sessionId: payload.sessionId,
               runId,
-              state: "thinking",
-            });
-
-            tuttiVoiceService.speakReadout({
-              text: content,
-              speaker: settings.activeCharacterId,
-              sessionId: payload.sessionId,
-              runId,
+              content,
               workspacePath: payload.workspacePath,
               getRunner: () => this.getRunner(),
-              settings,
-              onPlaybackStart: () => {
-                emitAgentEvent(wc, {
-                  type: "agent_readout",
-                  sessionId: payload.sessionId,
-                  runId,
-                  phase: "start",
-                });
-              },
-              onPlaybackEnd: deliverAnswerToUi,
-              onFailure: deliverAnswerToUi,
             });
           },
           onError: (error) => {
@@ -389,11 +353,12 @@ export class AgentService {
 
   async cancel(payload: AgentCancelPayload): Promise<void> {
     const active = this.activeRuns.get(payload.sessionId);
-    if (!active) {
+    const pendingDelivery = answerDeliveryCoordinator.hasPending(payload.sessionId);
+    if (!active && !pendingDelivery) {
       console.warn(`[agentService] cancel ignored: no active run for session ${payload.sessionId}`);
       return;
     }
-    if (payload.runId && active.runId !== payload.runId) {
+    if (active && payload.runId && active.runId !== payload.runId) {
       console.warn("[agentService] cancel ignored: stale runId");
       return;
     }
@@ -401,11 +366,13 @@ export class AgentService {
       console.warn(`[agentService] cancel ignored: unknown session ${payload.sessionId}`);
       return;
     }
-    if (this.runner) {
+    if (active && this.runner) {
       await this.runner.cancel(payload.sessionId);
     }
-    tuttiVoiceService.cancelForSession(payload.sessionId);
-    this.activeRuns.delete(payload.sessionId);
+    answerDeliveryCoordinator.cancelSession(payload.sessionId);
+    if (active) {
+      this.activeRuns.delete(payload.sessionId);
+    }
   }
 
   async answerQuestion(input: AgentQuestionAnswerInput): Promise<ChatSession> {

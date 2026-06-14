@@ -1,8 +1,11 @@
+import type { WebContents } from "electron";
+import type { AgentRunner } from "@mimica/agent-orchestrator";
+import { resolveTuttiSpeakerId, type TuttiSpeakerId } from "@mimica/shared";
 import { MAX_SPEECH_CHARS } from "./readoutText.js";
 
 const MAX_ANSWER_CONTEXT_CHARS = 6_000;
 
-const SPEAKER_VOICE_GUIDE: Record<string, string> = {
+const SPEAKER_VOICE_GUIDE: Record<TuttiSpeakerId, string> = {
   rio: [
     "話者: 調月リオ。一人称「私」。二人称は「先生」。",
     "冷静で分析的な口調。文末は「わ」「かしら」「のだけれど」「ね」「でしょう？」などを自然に混ぜる。",
@@ -19,7 +22,7 @@ const SPEAKER_VOICE_GUIDE: Record<string, string> = {
 };
 
 function speakerGuide(speaker: string): string {
-  return SPEAKER_VOICE_GUIDE[speaker] ?? SPEAKER_VOICE_GUIDE.rio;
+  return SPEAKER_VOICE_GUIDE[resolveTuttiSpeakerId(speaker)];
 }
 
 export function buildReadoutSummaryPrompt(answerMarkdown: string, speaker: string): string {

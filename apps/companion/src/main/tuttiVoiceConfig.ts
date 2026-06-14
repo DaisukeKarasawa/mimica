@@ -1,17 +1,10 @@
 import type { MimicaSettings } from "@mimica/shared";
 import { DEFAULT_TUTTI_BASE_URL } from "@mimica/shared";
+import { parseEnvBool } from "./envBool.js";
 
 export interface TuttiVoiceConfig {
   enabled: boolean;
   baseUrl: string;
-}
-
-function parseEnvBool(value: string | undefined): boolean | undefined {
-  if (value === undefined || value.trim() === "") return undefined;
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) return true;
-  if (["0", "false", "no", "off"].includes(normalized)) return false;
-  return undefined;
 }
 
 export function resolveTuttiVoiceConfig(settings: MimicaSettings): TuttiVoiceConfig {

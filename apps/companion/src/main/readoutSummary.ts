@@ -1,5 +1,6 @@
 import type { AgentRunner } from "@mimica/agent-orchestrator";
 import { buildReadoutSummaryPrompt } from "./readoutSummaryPrompt.js";
+import { parseEnvBool } from "./envBool.js";
 import { MAX_SPEECH_CHARS, prepareReadoutText, summarizeForReadout } from "./readoutText.js";
 
 const READOUT_SUMMARY_TIMEOUT_MS = 60_000;
@@ -13,14 +14,6 @@ export interface GenerateReadoutSummaryParams {
   answerMarkdown: string;
   speaker: string;
   signal?: AbortSignal;
-}
-
-function parseEnvBool(value: string | undefined): boolean | undefined {
-  if (value === undefined || value.trim() === "") return undefined;
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) return true;
-  if (["0", "false", "no", "off"].includes(normalized)) return false;
-  return undefined;
 }
 
 function isLlmSummaryEnabled(): boolean {

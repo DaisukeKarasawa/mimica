@@ -3,15 +3,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentRunner } from "@mimica/agent-orchestrator";
 import type { MimicaSettings } from "@mimica/shared";
+import { resolveTuttiSpeakerId } from "@mimica/shared";
 import { generateReadoutSummary } from "./readoutSummary.js";
-import { resolveTuttiVoiceConfig, type TuttiVoiceConfig } from "./tuttiVoiceConfig.js";
+import { type TuttiVoiceConfig } from "./tuttiVoiceConfig.js";
 import { userDataJoin } from "./userDataPaths.js";
 
 const POLL_INTERVAL_MS = 750;
 const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 15_000;
-
-const TUTTI_SPEAKERS = new Set(["rio", "mari", "mine"]);
 
 type SpeakJobResponse = {
   ok?: boolean;
@@ -32,11 +31,12 @@ export interface SpeakReadoutInput {
   workspacePath: string;
   getRunner: () => Promise<AgentRunner>;
   settings: MimicaSettings;
+  config: TuttiVoiceConfig;
   /** Fired when local playback begins (avatar talking; answer not shown yet). */
   onPlaybackStart?: () => void;
   /** Fired after playback finishes successfully (start answer reveal). */
   onPlaybackEnd?: () => void;
-  /** Fired when synthesis/playback fails; UI should still show the answer. */
+  /** Fired when synthesis/playback fails or is aborted; UI should still show the answer. */
   onFailure?: () => void;
 }
 
@@ -45,14 +45,15 @@ type SessionVoiceState = {
   jobId?: string;
 };
 
+type ReadoutCallbacks = Pick<SpeakReadoutInput, "onPlaybackStart" | "onPlaybackEnd" | "onFailure">;
+
 export class TuttiVoiceService {
   private readonly sessions = new Map<string, SessionVoiceState>();
   private activePlayer: ChildProcess | null = null;
   private queue: Promise<void> = Promise.resolve();
 
   speakReadout(input: SpeakReadoutInput): void {
-    const config = resolveTuttiVoiceConfig(input.settings);
-    if (!config.enabled) {
+    if (!input.config.enabled) {
       input.onFailure?.();
       return;
     }
@@ -62,30 +63,35 @@ export class TuttiVoiceService {
       return;
     }
 
-    const speaker = TUTTI_SPEAKERS.has(input.speaker) ? input.speaker : "rio";
+    const speaker = resolveTuttiSpeakerId(input.speaker);
     this.cancelForSession(input.sessionId);
 
     const abort = new AbortController();
     this.sessions.set(input.sessionId, { abort });
 
     this.queue = this.queue
-      .then(() => this.prepareAndRunReadout({ ...input, speaker, config, abort }))
+      .then(() => this.prepareAndRunReadout({ ...input, speaker, abort }))
       .catch((error: unknown) => {
         console.warn("[tuttiVoice] readout failed:", error);
+        input.onFailure?.();
       });
   }
 
   private async prepareAndRunReadout(
     params: SpeakReadoutInput & {
-      speaker: string;
-      config: TuttiVoiceConfig;
+      speaker: ReturnType<typeof resolveTuttiSpeakerId>;
       abort: AbortController;
     },
   ): Promise<void> {
     const { speaker, config, abort, onPlaybackStart, onPlaybackEnd, onFailure } = params;
+    const callbacks: ReadoutCallbacks = { onPlaybackStart, onPlaybackEnd, onFailure };
     let readoutText: string;
     try {
       const runner = await params.getRunner();
+      if (abort.signal.aborted) {
+        this.finishReadout(callbacks, "failure");
+        return;
+      }
       readoutText = await generateReadoutSummary({
         runner,
         workspacePath: params.workspacePath,
@@ -96,14 +102,17 @@ export class TuttiVoiceService {
         signal: abort.signal,
       });
     } catch (error) {
-      if (abort.signal.aborted) return;
+      if (abort.signal.aborted) {
+        this.finishReadout(callbacks, "failure");
+        return;
+      }
       console.warn("[tuttiVoice] readout summary failed:", error);
-      onFailure?.();
+      this.finishReadout(callbacks, "failure");
       return;
     }
 
     if (!readoutText || abort.signal.aborted) {
-      onFailure?.();
+      this.finishReadout(callbacks, "failure");
       return;
     }
 
@@ -114,9 +123,7 @@ export class TuttiVoiceService {
       runId: params.runId,
       config,
       abort,
-      onPlaybackStart,
-      onPlaybackEnd,
-      onFailure,
+      callbacks,
     });
   }
 
@@ -136,19 +143,24 @@ export class TuttiVoiceService {
     player.kill("SIGTERM");
   }
 
+  private finishReadout(callbacks: ReadoutCallbacks, outcome: "success" | "failure"): void {
+    if (outcome === "success") {
+      callbacks.onPlaybackEnd?.();
+      return;
+    }
+    callbacks.onFailure?.();
+  }
+
   private async runReadout(params: {
     text: string;
-    speaker: string;
+    speaker: ReturnType<typeof resolveTuttiSpeakerId>;
     sessionId: string;
     runId?: string;
     config: TuttiVoiceConfig;
     abort: AbortController;
-    onPlaybackStart?: () => void;
-    onPlaybackEnd?: () => void;
-    onFailure?: () => void;
+    callbacks: ReadoutCallbacks;
   }): Promise<void> {
-    const { text, speaker, sessionId, runId, config, abort, onPlaybackStart, onPlaybackEnd, onFailure } =
-      params;
+    const { text, speaker, sessionId, runId, config, abort, callbacks } = params;
     const logPrefix = `[tuttiVoice] session=${sessionId}${runId ? ` run=${runId}` : ""}`;
 
     try {
@@ -158,26 +170,37 @@ export class TuttiVoiceService {
       state.jobId = jobId;
 
       const ready = await this.waitForJob(config.baseUrl, jobId, abort.signal);
-      if (!ready || abort.signal.aborted) return;
+      if (!ready || abort.signal.aborted) {
+        this.finishReadout(callbacks, "failure");
+        return;
+      }
 
       const audio = await this.fetchAudio(config.baseUrl, jobId, abort.signal);
-      if (!audio || abort.signal.aborted) return;
+      if (!audio || abort.signal.aborted) {
+        this.finishReadout(callbacks, "failure");
+        return;
+      }
 
       const cacheDir = userDataJoin("tts-cache");
       await mkdir(cacheDir, { recursive: true });
       const cachePath = join(cacheDir, `${jobId}.wav`);
       await writeFile(cachePath, audio);
 
-      onPlaybackStart?.();
+      callbacks.onPlaybackStart?.();
       await this.playAudio(cachePath, abort.signal);
-      if (abort.signal.aborted) return;
-      onPlaybackEnd?.();
+      if (abort.signal.aborted) {
+        this.finishReadout(callbacks, "failure");
+        return;
+      }
+      this.finishReadout(callbacks, "success");
       console.info(`${logPrefix} played ${jobId}`);
     } catch (error) {
-      if (abort.signal.aborted) return;
+      if (abort.signal.aborted) {
+        this.finishReadout(callbacks, "failure");
+        return;
+      }
       console.warn(`${logPrefix} skipped:`, error instanceof Error ? error.message : error);
-      onFailure?.();
-      return;
+      this.finishReadout(callbacks, "failure");
     } finally {
       const state = this.sessions.get(sessionId);
       if (state?.abort === abort) {
@@ -189,24 +212,21 @@ export class TuttiVoiceService {
   private async requestSpeak(
     baseUrl: string,
     text: string,
-    speaker: string,
+    speaker: ReturnType<typeof resolveTuttiSpeakerId>,
     signal: AbortSignal,
   ): Promise<string> {
-    const response = await this.fetchJson<SpeakJobResponse>(
-      `${baseUrl}/v1/speak`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          speaker,
-          play: false,
-          async: true,
-          purpose: "mimica_readout",
-        }),
-        signal,
-      },
-    );
+    const response = await this.fetchJson<SpeakJobResponse>(`${baseUrl}/v1/speak`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        speaker,
+        play: false,
+        async: true,
+        purpose: "mimica_readout",
+      }),
+      signal,
+    });
     if (!response.ok || !response.jobId) {
       const message = response.error?.message ?? "speak request failed";
       throw new Error(message);
@@ -214,20 +234,16 @@ export class TuttiVoiceService {
     return response.jobId;
   }
 
-  private async waitForJob(
-    baseUrl: string,
-    jobId: string,
-    signal: AbortSignal,
-  ): Promise<boolean> {
+  private async waitForJob(baseUrl: string, jobId: string, signal: AbortSignal): Promise<boolean> {
     const started = Date.now();
     while (!signal.aborted) {
       if (Date.now() - started > POLL_TIMEOUT_MS) {
         throw new Error(`job ${jobId} timed out`);
       }
-      const status = await this.fetchJson<JobStatusResponse>(
-        `${baseUrl}/v1/jobs/${jobId}`,
-        { method: "GET", signal },
-      );
+      const status = await this.fetchJson<JobStatusResponse>(`${baseUrl}/v1/jobs/${jobId}`, {
+        method: "GET",
+        signal,
+      });
       if (status.status === "completed") return true;
       if (status.status === "failed" || status.status === "cancelled") {
         const message = status.error?.message ?? status.status;
@@ -313,7 +329,7 @@ export class TuttiVoiceService {
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (signal.aborted) {
       resolve();
       return;
