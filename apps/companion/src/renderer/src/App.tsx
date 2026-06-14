@@ -16,7 +16,7 @@ import { TopBar } from "./components/TopBar";
 import { BridgeStatusBanner } from "./components/BridgeStatusBanner";
 import { CharacterStage } from "./components/CharacterStage";
 import { ChatPanel } from "./components/ChatPanel";
-import { preloadMermaid } from "./components/MermaidDiagram";
+import { preloadMermaid } from "./lib/mermaidTheme";
 import { MainSplitLayout } from "./components/MainSplitLayout";
 import { useAgentEvents } from "./hooks/useAgentEvents";
 import { useAgentSubmitQueue } from "./hooks/useAgentSubmitQueue";
