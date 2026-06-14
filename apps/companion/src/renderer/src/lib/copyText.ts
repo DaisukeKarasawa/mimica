@@ -3,8 +3,12 @@ export async function copyTextToClipboard(text: string): Promise<void> {
   if (!text) return;
 
   if (typeof window !== "undefined" && window.mimica?.writeClipboardText) {
-    await window.mimica.writeClipboardText(text);
-    return;
+    try {
+      await window.mimica.writeClipboardText(text);
+      return;
+    } catch {
+      /* fall through */
+    }
   }
 
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
