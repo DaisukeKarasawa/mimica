@@ -12,6 +12,11 @@ const markdownComponents: Components = {
   pre({ children, ...props }) {
     return <CodeBlockPre {...props}>{children}</CodeBlockPre>;
   },
+  table: ({ children }) => (
+    <div className="md-table-scroll">
+      <table>{children}</table>
+    </div>
+  ),
   a: ({ href, children }) => (
     <a
       href={href}

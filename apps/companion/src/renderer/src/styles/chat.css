@@ -18,7 +18,9 @@
 .chat .messages,
 .chat .history-panel,
 .chat .tabs-scroll,
+.chat .user .bubble,
 .chat .bubble pre,
+.chat .md-table-scroll,
 .chat .composer-input {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
@@ -27,7 +29,9 @@
 .chat .messages::-webkit-scrollbar,
 .chat .history-panel::-webkit-scrollbar,
 .chat .tabs-scroll::-webkit-scrollbar,
+.chat .user .bubble::-webkit-scrollbar,
 .chat .bubble pre::-webkit-scrollbar,
+.chat .md-table-scroll::-webkit-scrollbar,
 .chat .composer-input::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -36,7 +40,9 @@
 .chat .messages::-webkit-scrollbar-track,
 .chat .history-panel::-webkit-scrollbar-track,
 .chat .tabs-scroll::-webkit-scrollbar-track,
+.chat .user .bubble::-webkit-scrollbar-track,
 .chat .bubble pre::-webkit-scrollbar-track,
+.chat .md-table-scroll::-webkit-scrollbar-track,
 .chat .composer-input::-webkit-scrollbar-track {
   background: var(--scrollbar-track);
 }
@@ -44,7 +50,9 @@
 .chat .messages::-webkit-scrollbar-thumb,
 .chat .history-panel::-webkit-scrollbar-thumb,
 .chat .tabs-scroll::-webkit-scrollbar-thumb,
+.chat .user .bubble::-webkit-scrollbar-thumb,
 .chat .bubble pre::-webkit-scrollbar-thumb,
+.chat .md-table-scroll::-webkit-scrollbar-thumb,
 .chat .composer-input::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 4px;
@@ -55,7 +63,9 @@
 .chat .messages::-webkit-scrollbar-thumb:hover,
 .chat .history-panel::-webkit-scrollbar-thumb:hover,
 .chat .tabs-scroll::-webkit-scrollbar-thumb:hover,
+.chat .user .bubble::-webkit-scrollbar-thumb:hover,
 .chat .bubble pre::-webkit-scrollbar-thumb:hover,
+.chat .md-table-scroll::-webkit-scrollbar-thumb:hover,
 .chat .composer-input::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
   background-clip: padding-box;
@@ -64,7 +74,9 @@
 .chat .messages::-webkit-scrollbar-corner,
 .chat .history-panel::-webkit-scrollbar-corner,
 .chat .tabs-scroll::-webkit-scrollbar-corner,
+.chat .user .bubble::-webkit-scrollbar-corner,
 .chat .bubble pre::-webkit-scrollbar-corner,
+.chat .md-table-scroll::-webkit-scrollbar-corner,
 .chat .composer-input::-webkit-scrollbar-corner {
   background: var(--scrollbar-track);
 }
@@ -436,6 +448,7 @@
 .bubble-shell {
   position: relative;
   max-width: 88%;
+  min-width: 0;
   --bubble-border: rgba(98, 94, 90, 0.34);
 
   filter: drop-shadow(0 0 0 1px var(--bubble-border));
@@ -444,12 +457,18 @@
 .bubble {
   position: relative;
   max-width: 100%;
+  min-width: 0;
   padding: 12px 13px;
   border-radius: 18px;
   border: none;
   background: var(--bubble-bg);
   font-size: 13px;
   line-height: 1.55;
+}
+
+.message-text {
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .agent .bubble-shell {
@@ -482,6 +501,10 @@
   border-style: solid;
   border-width: 5.5px 0 5.5px 7px;
   border-color: transparent transparent transparent var(--bubble-bg);
+}
+
+.user .bubble {
+  overflow-x: auto;
 }
 
 .tool-card {
@@ -604,11 +627,23 @@
   color: var(--muted);
 }
 
-.md-preview table {
-  width: 100%;
+.md-table-scroll {
+  max-width: 100%;
   margin: 0.65em 0;
+  overflow-x: auto;
+}
+
+.md-table-scroll table {
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 12px;
+}
+
+.md-table-scroll th,
+.md-table-scroll td {
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .md-preview th,

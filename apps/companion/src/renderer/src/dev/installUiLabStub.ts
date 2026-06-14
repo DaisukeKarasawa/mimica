@@ -163,6 +163,7 @@ export function installUiLabStub(): void {
         UI_LAB_SESSION_IDS.bug,
         UI_LAB_SESSION_IDS.review,
         UI_LAB_SESSION_IDS.askQuestions,
+        UI_LAB_SESSION_IDS.chatOverflow,
       ]),
     );
   }
