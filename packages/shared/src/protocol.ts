@@ -53,6 +53,12 @@ export type AgentEventMessage =
   | { type: "agent_warning"; sessionId: string; message: string }
   | { type: "agent_perf"; sessionId: string; runId: string; t0EpochMs: number }
   | {
+      type: "agent_readout";
+      sessionId: string;
+      runId: string;
+      phase: "start" | "end";
+    }
+  | {
       type: "agent_question";
       sessionId: string;
       runId: string;

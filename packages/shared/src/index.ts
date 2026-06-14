@@ -20,6 +20,7 @@ export {
   DEFAULT_WORKSPACE_FALLBACK,
   DEFAULT_SETTINGS,
   DEFAULT_SESSION_TITLE,
+  DEFAULT_TUTTI_BASE_URL,
   type AvatarState,
   type AgentRunState,
   type AgentMode,
