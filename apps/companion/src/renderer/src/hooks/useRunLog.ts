@@ -55,7 +55,7 @@ export function useRunLog() {
         entries = appendRunLogEntry(entries, {
           runId,
           kind: "state",
-          label: "Run started",
+          label: "実行開始",
         });
       }
 

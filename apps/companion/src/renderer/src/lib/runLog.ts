@@ -72,20 +72,20 @@ export function appendEditedFile(
 export function agentRunStateLabel(state: AgentRunState): string {
   switch (state) {
     case "thinking":
-      return "Thinking…";
+      return "考え中";
     case "streaming":
-      return "Generating response…";
+      return "応答を生成中";
     case "waiting":
-      return "Waiting for input…";
+      return "入力待ち";
     case "completed":
-      return "Completed";
+      return "完了";
     case "failed":
-      return "Failed";
+      return "失敗";
     case "cancelled":
-      return "Cancelled";
+      return "キャンセル";
     case "idle":
     default:
-      return "Idle";
+      return "待機";
   }
 }
 
@@ -127,27 +127,27 @@ export function runLogEntryFromAgentEvent(
       return {
         runId: "session",
         kind: "warning",
-        label: "Warning",
+        label: "警告",
         detail: event.message,
       };
     case "agent_complete":
       return {
         runId: event.runId,
         kind: "complete",
-        label: "Response finalized",
+        label: "応答を確定",
       };
     case "agent_error":
       return {
         runId: event.runId,
         kind: "error",
-        label: "Error",
+        label: "エラー",
         detail: event.message,
       };
     case "agent_question":
       return {
         runId: event.runId,
         kind: "question",
-        label: "Question",
+        label: "質問",
         detail: event.question.title ?? event.question.questions[0]?.prompt,
       };
     default:

@@ -39,12 +39,12 @@ export function ChatLogPanel({ entries, editedFiles, activeSessionId }: ChatLogP
   }, [entries, scrollToBottom]);
 
   return (
-    <div className="log-view" aria-label="Activity log">
+    <div className="log-view" aria-label="アクティビティログ">
       <div ref={containerRef} className="log-scroll">
         {!activeSessionId ? (
-          <p className="log-empty">Open a session to see the activity log here.</p>
+          <p className="log-empty">セッションを開くと、ここにアクティビティログを表示します。</p>
         ) : entries.length === 0 ? (
-          <p className="log-empty">No log entries yet.</p>
+          <p className="log-empty">ログはまだありません。</p>
         ) : (
           <ul className="log-list">
             {entries.map((entry) => (
@@ -71,7 +71,7 @@ export function ChatLogPanel({ entries, editedFiles, activeSessionId }: ChatLogP
             <span className="log-files-chevron" aria-hidden="true">
               {filesOpen ? "▾" : "▸"}
             </span>
-            Changed files ({editedFiles.length})
+            変更ファイル ({editedFiles.length})
           </button>
           {filesOpen ? (
             <ul className="log-files-list">

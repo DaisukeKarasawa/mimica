@@ -59,7 +59,7 @@ describe("runLogEntryFromAgentEvent", () => {
       {
         runId: "run-1",
         kind: "error",
-        label: "Error",
+        label: "エラー",
         detail: "boom",
       },
     );
