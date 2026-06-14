@@ -141,6 +141,13 @@ if (!gotLock) {
       if (typeof url !== "string") return false;
       return openAllowedExternalUrl(url);
     });
+    ipcMain.handle("clipboard:writeText", (_e, text: unknown) => {
+      if (typeof text !== "string") {
+        throw new Error("text must be a string");
+      }
+      const { clipboard } = electronApis;
+      clipboard.writeText(text);
+    });
     registerSlashMenuIpc(ipcMain, resolveWorkspacePath);
     registerAtMenuIpc(ipcMain, resolveWorkspacePath, {
       sessionStore,

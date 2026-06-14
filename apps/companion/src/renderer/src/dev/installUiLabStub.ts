@@ -141,6 +141,11 @@ export function installUiLabStub(): void {
     }),
     discardImageAttachment: async () => {},
     discardImageAttachments: async () => {},
+    writeClipboardText: async (text) => {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      }
+    },
   };
 
   window.mimica = api;

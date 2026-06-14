@@ -10,6 +10,23 @@ export function parseLanguageFromCodeClass(className?: string): string | null {
   return match?.[1] ?? null;
 }
 
+/** Whether a `pre` child is the fenced code element (native or react-markdown custom). */
+export function isPreCodeChild(child: ReactNode): child is CodeBlockElement {
+  if (!isValidReactElement(child)) return false;
+  if (child.type === "code") return true;
+  return "children" in child.props;
+}
+
+function isValidReactElement(child: ReactNode): child is CodeBlockElement {
+  return (
+    typeof child === "object" &&
+    child !== null &&
+    "type" in child &&
+    "props" in child &&
+    typeof (child as CodeBlockElement).props === "object"
+  );
+}
+
 /** Plain text from a fenced block's inner `code` element. */
 export function extractCodeBlockText(codeElement: CodeBlockElement | null | undefined): string {
   if (!codeElement) return "";

@@ -1,63 +1,107 @@
 .code-block-shell {
-  margin: 9px 0 0;
-  border-radius: 12px;
+  position: relative;
+  margin: 0.6em 0 0;
+  border: 1px solid var(--line-subtle);
+  border-radius: 8px;
   overflow: hidden;
-  background: rgba(13, 12, 12, 0.42);
+  background: rgba(13, 12, 12, 0.28);
   font-size: 12px;
+  user-select: text;
 }
 
 .code-block-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid rgba(98, 94, 90, 0.35);
-}
-
-.code-block-header--no-lang {
-  justify-content: flex-end;
+  min-height: 28px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line-subtle);
+  user-select: none;
 }
 
 .code-block-language {
-  font-size: 11px;
-  color: var(--muted);
+  font-size: 10px;
+  color: var(--subtle);
   text-transform: lowercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
 }
 
 .code-block-copy {
-  flex-shrink: 0;
-  border: 1px solid rgba(98, 94, 90, 0.55);
-  color: var(--text);
-  background: rgba(197, 201, 197, 0.08);
-  border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 11px;
-  line-height: 1.2;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: rgba(13, 12, 12, 0.55);
+  padding: 0;
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.code-block-shell:hover .code-block-copy,
+.code-block-copy:focus-visible,
+.code-block-copy.is-copied,
+.code-block-copy.is-failed {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.code-block-copy svg {
+  width: 14px;
+  height: 14px;
 }
 
 .code-block-copy:hover:not(:disabled) {
-  background: rgba(197, 201, 197, 0.14);
-  border-color: rgba(122, 131, 130, 0.55);
+  color: var(--text);
+  background: rgba(13, 12, 12, 0.78);
 }
 
 .code-block-copy:focus-visible {
-  outline: 2px solid rgba(135, 169, 135, 0.75);
-  outline-offset: 2px;
+  outline: 1px solid rgba(135, 169, 135, 0.55);
+  outline-offset: 1px;
 }
 
 .code-block-copy:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.code-block-shell:hover .code-block-copy:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.code-block-copy.is-copied {
+  color: var(--accent);
+}
+
+.code-block-copy.is-failed {
+  color: var(--error);
 }
 
 .code-block-shell pre {
   margin: 0;
-  padding: 10px;
+  padding: 10px 12px;
   border-radius: 0;
   overflow: auto;
   background: transparent;
   font-size: inherit;
+  line-height: 1.5;
+  user-select: text;
+  cursor: text;
+}
+
+.code-block-shell pre code {
+  user-select: text;
 }
