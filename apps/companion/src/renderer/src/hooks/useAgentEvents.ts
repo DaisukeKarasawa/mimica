@@ -51,7 +51,7 @@ function resolveBufferedContent(
 ): string {
   const buffered = buffers.get(backgroundBufferKey(sessionId, runId)) ?? "";
   buffers.delete(backgroundBufferKey(sessionId, runId));
-  return codePointCount(buffered) >= codePointCount(content) ? buffered : content;
+  return codePointCount(buffered) > codePointCount(content) ? buffered : content;
 }
 
 export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsResult {
@@ -198,6 +198,11 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           break;
         }
         case "agent_tool": {
+          if (event.runId) {
+            backgroundStreamTextRef.current.delete(
+              backgroundBufferKey(event.sessionId, event.runId),
+            );
+          }
           const streamId =
             (isActiveSession(event.sessionId) ? activeStreamIdRef.current : null) ??
             streamMessageId(event.runId, null);
