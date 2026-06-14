@@ -367,6 +367,7 @@ Kanagawa Dragon風
 - ユーザー側アイコン非表示
 - Markdown表示
 - コードブロック表示
+- **Mermaid 図プレビュー**（assistant の ` ```mermaid ` フェンスを SVG 表示。ストリーミング中はフェンス完結後に描画）
 - ストリーム待ちは Thinking インジケータ（旧モックの実行中バーは §7.3.2）
 - コンポーザーからキャンセル
 - セッション切り替え（タブ + 履歴パネル）
@@ -821,8 +822,10 @@ MainSplitLayout（ドラッグで幅変更、--chat-panel-width を永続化）
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | アイコン                  | Agent 側のみ（`icon.png`）。ユーザー側は非表示                                                                                                                                                                                                                                |
 | 表示名                    | チャットヘッダに `調月リオ`（`AGENT_DISPLAY_NAME`）。バブル内の名前行・小さな状態テキストは出さない                                                                                                                                                                           |
-| Markdown / コードブロック | 読みやすく表示する。横長のユーザーテキスト・GFM テーブル・コードブロックは**バブル内で横スクロール**し、チャットパネル外にはみ出さない                                                                                                                                        |
+| Markdown / コードブロック | 読みやすく表示する。横長のユーザーテキスト・GFM テーブル・コードブロックは**バブル内で横スクロール**し、チャットパネル外にはみ出さない。assistant の ` ```mermaid ` ブロックは **SVG 図**として表示する（`securityLevel: strict`、パース失敗時はソースをコードブロック表示）  |
 | コードブロックコピー      | フェンス付きブロックにコピーボタン（英語 chrome: `Copy` / `Copied` / `Copy failed`）。`navigator.clipboard` で本文をコピー。`aria-label` は日本語。インライン `` `code` `` は対象外                                                                                           |
+| Mermaid ストリーミング    | フェンス未閉じの間はプレースホルダー表示。閉じたあと 1 回だけレンダリングし、壊れた SVG のちらつきを出さない                                                                                                                                                                  |
+| Mermaid 対象外            | PlantUML / Graphviz / D2 / KaTeX 等は MVP 対象外                                                                                                                                                                                                                              |
 | ストリーム待ち            | `ThinkingIndicator`（内容のない assistant 行は一覧に出さない）                                                                                                                                                                                                                |
 | **ツール実行 UI**         | `agent_tool` → `ChatMessage.toolCalls` に蓄積し永続化可能。**チャットパネルではカード表示しない**（ミニマルシェル）。カード化の参照は `docs/ui-mock.html`、実装は後続スライス                                                                                                 |
 | **コンテキスト参照 UI**   | チップ表示しない。送信時の `editorContext` / `MessageContext` は維持                                                                                                                                                                                                          |
@@ -833,7 +836,17 @@ MainSplitLayout（ドラッグで幅変更、--chat-panel-width を永続化）
 - 初回 user 送信までは **draft**（メモリのみ。空 JSON は起動時に削除）
 - `maxChatSessions` は **永続履歴の上限** と **インメモリ空 draft タブの上限** の両方に使用
 
-開発用 **UI Lab**: `docs/ui-design-browser.md`。Design Mode で CSS/React を調整し、Electron で Agent・Spine を確認する。
+開発用 **UI Lab**: `docs/ui-design-browser.md`。Design Mode で CSS/React を調整し、Electron で Agent・Spine を確認する。`pnpm dev:ui-lab` の **Mermaid 図**タブで flowchart / sequenceDiagram サンプルを確認できる。
+
+**Mermaid 手動検証チェックリスト**（リリース前・退行確認）:
+
+- [ ] flowchart が SVG 表示される（UI Lab「Mermaid 図」タブ）
+- [ ] sequenceDiagram が SVG 表示される（同上）
+- [ ] 通常コードブロック（`ts` 等）は従来どおり `<pre><code>` 表示
+- [ ] ストリーミング中、未完結 ` ```mermaid ` はプレースホルダーのみ（壊れた図がちらつかない）
+- [ ] タブ切替・履歴再表示後も図が復元される
+- [ ] 外部リンク（`a`）の `openExternal` 動作に退行がない
+- [ ] 不正な Mermaid 文法でクラッシュせずソースが表示される
 
 ### 7.3.2 将来（モック寄せ）
 

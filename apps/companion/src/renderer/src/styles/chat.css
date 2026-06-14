@@ -681,6 +681,29 @@
   background: transparent;
 }
 
+.md-preview .mermaid-diagram {
+  margin: 0.65em 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(98, 94, 90, 0.45);
+  background: rgba(13, 12, 12, 0.35);
+  padding: 10px 12px;
+}
+
+.md-preview .mermaid-diagram svg {
+  display: block;
+  max-width: none;
+  height: auto;
+}
+
+.md-preview .mermaid-diagram--pending {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  border-style: dashed;
+}
+
 .composer {
   padding: 14px;
 }
