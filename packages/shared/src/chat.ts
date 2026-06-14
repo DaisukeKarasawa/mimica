@@ -138,6 +138,17 @@ export function hasSessionHistory(session: Pick<ChatSession, "messages">): boole
 
 export const DEFAULT_TUTTI_BASE_URL = "http://127.0.0.1:8787";
 
+/** tutti `/v1/speak` speaker ids supported by Mimica voice readout. */
+export const TUTTI_SPEAKER_IDS = ["rio", "mari", "mine"] as const;
+
+export type TuttiSpeakerId = (typeof TUTTI_SPEAKER_IDS)[number];
+
+const TUTTI_SPEAKER_ID_SET = new Set<string>(TUTTI_SPEAKER_IDS);
+
+export function resolveTuttiSpeakerId(speaker: string): TuttiSpeakerId {
+  return TUTTI_SPEAKER_ID_SET.has(speaker) ? (speaker as TuttiSpeakerId) : "rio";
+}
+
 export interface MimicaSettings {
   theme: "kanagawa-dragon";
   activeCharacterId: string;
