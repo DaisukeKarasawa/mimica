@@ -35,7 +35,7 @@ export function useMermaidSvg(
       return;
     }
 
-    let cancelled = false;
+    let idleKickCancelled = false;
 
     const drainQueue = async () => {
       if (drainingRef.current) {
@@ -47,7 +47,7 @@ export function useMermaidSvg(
         const mermaidApi = ensureMermaid();
 
         do {
-          while (!cancelled) {
+          while (true) {
             const nextSource = queuedSourceRef.current;
             if (!nextSource) {
               break;
@@ -65,12 +65,12 @@ export function useMermaidSvg(
 
             try {
               await yieldToMain();
-              if (cancelled || generation !== renderGenerationRef.current) {
+              if (generation !== renderGenerationRef.current) {
                 continue;
               }
               const elementId = `mermaid-${baseId}-${generation}`;
               const { svg: renderedSvg } = await mermaidApi.render(elementId, nextSource);
-              if (cancelled || generation !== renderGenerationRef.current) {
+              if (generation !== renderGenerationRef.current) {
                 continue;
               }
               lastRenderedSourceRef.current = nextSource;
@@ -79,7 +79,7 @@ export function useMermaidSvg(
                 setSvg(renderedSvg);
               });
             } catch (error) {
-              if (cancelled || generation !== renderGenerationRef.current) {
+              if (generation !== renderGenerationRef.current) {
                 continue;
               }
               console.warn("[MermaidDiagram] render failed", error);
@@ -89,10 +89,10 @@ export function useMermaidSvg(
               });
             }
           }
-        } while (!cancelled && queuedSourceRef.current);
+        } while (queuedSourceRef.current);
       } finally {
         drainingRef.current = false;
-        if (!cancelled && queuedSourceRef.current) {
+        if (queuedSourceRef.current) {
           scheduleIdleTask(() => {
             void drainQueue();
           });
@@ -101,14 +101,14 @@ export function useMermaidSvg(
     };
 
     const cancelSchedule = scheduleIdleTask(() => {
-      if (cancelled || drainingRef.current) {
+      if (idleKickCancelled || drainingRef.current) {
         return;
       }
       void drainQueue();
     });
 
     return () => {
-      cancelled = true;
+      idleKickCancelled = true;
       cancelSchedule();
     };
   }, [renderSource, renderable, baseId]);
