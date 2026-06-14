@@ -129,6 +129,9 @@ importers:
 
   packages/agent-orchestrator:
     dependencies:
+      '@connectrpc/connect':
+        specifier: ^1.7.0
+        version: 1.7.0(@bufbuild/protobuf@1.10.0)
       '@cursor/sdk':
         specifier: ^1.0.16
         version: 1.0.16

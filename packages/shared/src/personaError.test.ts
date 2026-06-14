@@ -33,6 +33,10 @@ describe("classifyAgentError", () => {
   it("classifies known raw messages", () => {
     assert.equal(classifyAgentError("CURSOR_API_KEY が設定されていません"), "auth_missing");
     assert.equal(classifyAgentError("Bridge auth timeout"), "connection");
+    assert.equal(
+      classifyAgentError("Stream closed with error code NGHTTP2_REFUSED_STREAM"),
+      "sdk_transport",
+    );
     assert.equal(classifyAgentError("Companion bridge timeout"), "connection");
     assert.equal(classifyAgentError("request timeout after 30s"), "agent_timeout");
     assert.equal(classifyAgentError("応答がタイムアウトしました"), "agent_timeout");
@@ -65,6 +69,7 @@ describe("buildPersonaErrorMessage", () => {
       "agent_timeout",
       "auth_missing",
       "connection",
+      "sdk_transport",
       "attachment",
       "session",
       "read_only_blocked",

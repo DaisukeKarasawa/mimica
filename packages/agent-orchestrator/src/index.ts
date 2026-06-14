@@ -1,4 +1,4 @@
-export { installAbortRejectionHandler } from "./abortError.js";
+export { installAbortRejectionHandler } from "./sdkRejectionHandler.js";
 export { mapRunStateToAvatar, buildContextPrompt } from "./eventMapper.js";
 export { AgentRunner, type AgentRunCallbacks, type RunChatParams } from "./agentRunner.js";
 export { resolveCursorApiKey } from "./resolveApiKey.js";

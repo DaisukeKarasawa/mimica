@@ -1,7 +1,7 @@
 import type { Run, SDKImage } from "@cursor/sdk";
-import type { AgentMode, ChatMessage, MessageContext } from "@mimica/shared";
-import { agentRunError, agentRunErrorFromUnknown } from "@mimica/shared";
-import { cancelRun, isAbortError } from "./abortError.js";
+import type { AgentMode, AgentRunError, ChatMessage, MessageContext } from "@mimica/shared";
+import { agentRunError } from "@mimica/shared";
+import { cancelRun, isIntentionalCancellationError } from "./abortError.js";
 import type { AgentRunCallbacks } from "./agentCallbacks.js";
 import { AgentSessionPool } from "./agentSessionPool.js";
 import { type CursorSdkConversationMode } from "./createCursorAgent.js";
@@ -13,6 +13,11 @@ import { ReadOnlyRunGuard } from "./readOnlyRunGuard.js";
 import { READ_ONLY_HOOK_INSTALL_WARNING } from "./readOnlyPolicy.js";
 import { AgentRunTimingTrace } from "./agentRunTiming.js";
 import { resolveCursorApiKey } from "./resolveApiKey.js";
+import {
+  classifySdkTransportError,
+  mapSdkTransportToAgentRunError,
+  shouldRetrySdkTransportError,
+} from "./sdkTransportError.js";
 
 export type { AgentRunCallbacks } from "./agentCallbacks.js";
 
@@ -39,6 +44,13 @@ interface SessionRunContext {
   /** Runs with generation <= this value were cancelled. */
   cancelledThroughGeneration: number;
 }
+
+type ChatTurnOutcome =
+  | { status: "completed" }
+  | { status: "cancelled" }
+  | { status: "blocked" }
+  | { status: "failed"; error: AgentRunError }
+  | { status: "transport_retry" };
 
 function sdkModeFor(mode: AgentMode): CursorSdkConversationMode {
   return mode === "plan" ? "plan" : "agent";
@@ -86,51 +98,132 @@ export class AgentRunner {
       return;
     }
 
-    const timing = params.timing;
-    let sessionHandle: Awaited<ReturnType<AgentSessionPool["acquire"]>>;
+    let transportRetried = false;
+
     try {
-      sessionHandle = await this.sessionPool.acquire({
-        sessionId: params.sessionId,
-        apiKey,
-        workspacePath: params.workspacePath,
-        mode: params.mode,
-        sdkMode,
-        personaFingerprint: params.personaSystemPrompt ?? "",
-      });
-      timing?.markOnce("T1_agent_ready");
-    } catch (err) {
-      timing?.report("failed");
-      params.callbacks.onState("failed");
-      params.callbacks.onError(agentRunErrorFromUnknown(err));
-      return;
-    }
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const outcome = await this.executeChatTurn({
+          params,
+          ctx,
+          runGen,
+          isRunCancelled,
+          enforceReadOnly,
+          sdkMode,
+          apiKey,
+          transportRetried,
+        });
 
-    if (isRunCancelled() || params.signal?.aborted) {
-      this.sessionPool.invalidateSession(params.sessionId);
-      timing?.report("cancelled");
-      params.callbacks.onState("cancelled");
-      return;
+        switch (outcome.status) {
+          case "completed":
+            return;
+          case "cancelled":
+            params.timing?.report("cancelled");
+            params.callbacks.onState("cancelled");
+            return;
+          case "blocked":
+            params.timing?.report("blocked");
+            return;
+          case "failed":
+            params.timing?.report("failed");
+            params.callbacks.onState("failed");
+            params.callbacks.onError(outcome.error);
+            return;
+          case "transport_retry":
+            transportRetried = true;
+            continue;
+          default: {
+            const never: never = outcome;
+            throw new Error(`Unexpected chat turn outcome: ${String(never)}`);
+          }
+        }
+      }
+    } finally {
+      if (ctx.runGeneration === runGen) {
+        this.sessionRuns.delete(params.sessionId);
+      }
     }
+  }
 
-    const { agent, isFollowUp } = sessionHandle;
-    if (timing) {
-      timing.meta.isFollowUp = isFollowUp;
+  private resolveTransportFailure(
+    sessionId: string,
+    err: unknown,
+    transportRetried: boolean,
+    allowTransportRetry: boolean,
+  ): ChatTurnOutcome {
+    const classified = classifySdkTransportError(err);
+    if (classified?.invalidatePool) {
+      this.sessionPool.invalidateSession(sessionId);
     }
-    const fullPrompt = this.buildFullPrompt(params, isFollowUp);
-    const callbacks = this.wrapCallbacksForTiming(params.callbacks, timing);
+    if (shouldRetrySdkTransportError(err, transportRetried, allowTransportRetry)) {
+      return { status: "transport_retry" };
+    }
+    return { status: "failed", error: mapSdkTransportToAgentRunError(err) };
+  }
+
+  private async executeChatTurn(args: {
+    params: RunChatParams;
+    ctx: SessionRunContext;
+    runGen: number;
+    isRunCancelled: () => boolean;
+    enforceReadOnly: boolean;
+    sdkMode: CursorSdkConversationMode;
+    apiKey: string;
+    transportRetried: boolean;
+  }): Promise<ChatTurnOutcome> {
+    const {
+      params,
+      ctx,
+      runGen,
+      isRunCancelled,
+      enforceReadOnly,
+      sdkMode,
+      apiKey,
+      transportRetried,
+    } = args;
+    const { sessionId, timing } = params;
     let streamRunId: string | undefined;
+    let runTrackedInPool = false;
+    let agentSendSucceeded = false;
 
     try {
+      let sessionHandle: Awaited<ReturnType<AgentSessionPool["acquire"]>>;
+      try {
+        sessionHandle = await this.sessionPool.acquire({
+          sessionId,
+          apiKey,
+          workspacePath: params.workspacePath,
+          mode: params.mode,
+          sdkMode,
+          personaFingerprint: params.personaSystemPrompt ?? "",
+        });
+        timing?.markOnce("T1_agent_ready");
+      } catch (err) {
+        return this.resolveTransportFailure(sessionId, err, transportRetried, true);
+      }
+
+      this.sessionPool.beginRun(sessionId);
+      runTrackedInPool = true;
+
+      if (isRunCancelled() || params.signal?.aborted) {
+        this.sessionPool.invalidateSession(sessionId);
+        return { status: "cancelled" };
+      }
+
+      const { agent, isFollowUp } = sessionHandle;
+      if (timing) {
+        timing.meta.isFollowUp = isFollowUp;
+      }
+      const fullPrompt = this.buildFullPrompt(params, isFollowUp);
+      const callbacks = this.wrapCallbacksForTiming(params.callbacks, timing);
+
       let readOnlyGuard: ReadOnlyRunGuard | undefined;
       if (enforceReadOnly) {
         readOnlyGuard = new ReadOnlyRunGuard(() => ctx.run, callbacks);
       }
 
       if (isRunCancelled() || params.signal?.aborted) {
-        this.sessionPool.invalidateSession(params.sessionId);
-        timing?.report("cancelled");
-        callbacks.onState("cancelled");
-        return;
+        this.sessionPool.invalidateSession(sessionId);
+        return { status: "cancelled" };
       }
 
       const message =
@@ -143,6 +236,7 @@ export class AgentRunner {
           await readOnlyGuard?.handleSendDelta(update, isRunCancelled, params.signal);
         },
       });
+      agentSendSucceeded = true;
       if (ctx.runGeneration === runGen) {
         ctx.run = run;
       }
@@ -159,44 +253,37 @@ export class AgentRunner {
       });
 
       if (readOnlyGuard?.isBlocked) {
-        this.sessionPool.invalidateSession(params.sessionId);
-        timing?.report("blocked");
-        return;
+        this.sessionPool.invalidateSession(sessionId);
+        return { status: "blocked" };
       }
 
       if (isRunCancelled() || params.signal?.aborted) {
-        this.sessionPool.invalidateSession(params.sessionId);
-        timing?.report("cancelled");
-        callbacks.onState("cancelled");
-        return;
+        this.sessionPool.invalidateSession(sessionId);
+        return { status: "cancelled" };
       }
 
       let result;
       try {
         result = await run.wait();
       } catch (err) {
-        if (isAbortError(err) || isRunCancelled()) {
-          this.sessionPool.invalidateSession(params.sessionId);
-          timing?.report("cancelled");
-          callbacks.onState("cancelled");
-          return;
+        if (isIntentionalCancellationError(err) || isRunCancelled()) {
+          this.sessionPool.invalidateSession(sessionId);
+          return { status: "cancelled" };
         }
         throw err;
       }
       timing?.markOnce("T4_run_wait");
 
       if (result.status === "cancelled") {
-        this.sessionPool.invalidateSession(params.sessionId);
-        timing?.report("cancelled");
-        callbacks.onState("cancelled");
-        return;
+        this.sessionPool.invalidateSession(sessionId);
+        return { status: "cancelled" };
       }
       if (result.status === "error") {
-        this.sessionPool.invalidateSession(params.sessionId);
-        timing?.report("failed");
-        callbacks.onState("failed");
-        callbacks.onError(agentRunError("agent_failed", result.result ?? undefined));
-        return;
+        this.sessionPool.invalidateSession(sessionId);
+        return {
+          status: "failed",
+          error: agentRunError("agent_failed", result.result ?? undefined),
+        };
       }
 
       const finalText = resolveFinalAssistantText(
@@ -206,29 +293,27 @@ export class AgentRunner {
         result.result,
       );
 
-      this.sessionPool.markTurnSent(params.sessionId);
+      this.sessionPool.markTurnSent(sessionId);
       timing?.markOnce("T4_complete");
       timing?.report("completed");
       callbacks.onState("completed");
       callbacks.onComplete(finalText);
+      return { status: "completed" };
     } catch (err) {
-      if (isAbortError(err) || isRunCancelled()) {
-        this.sessionPool.invalidateSession(params.sessionId);
-        timing?.report("cancelled");
-        callbacks.onState("cancelled");
-        return;
+      if (isIntentionalCancellationError(err) || isRunCancelled()) {
+        this.sessionPool.invalidateSession(sessionId);
+        return { status: "cancelled" };
       }
-      this.sessionPool.invalidateSession(params.sessionId);
-      timing?.report("failed");
-      callbacks.onState("failed");
-      callbacks.onError(agentRunErrorFromUnknown(err));
+      return this.resolveTransportFailure(sessionId, err, transportRetried, !agentSendSucceeded);
     } finally {
+      if (runTrackedInPool) {
+        this.sessionPool.endRun(sessionId);
+      }
       if (streamRunId) {
         releaseAskQuestionStreamRun(streamRunId);
       }
       if (ctx.runGeneration === runGen) {
         ctx.run = null;
-        this.sessionRuns.delete(params.sessionId);
       }
     }
   }
@@ -253,6 +338,10 @@ export class AgentRunner {
 
   closeAllSessions(): void {
     this.sessionPool.closeAll();
+  }
+
+  evictIdleSessions(): void {
+    this.sessionPool.evictIdleSessions();
   }
 
   private wrapCallbacksForTiming(

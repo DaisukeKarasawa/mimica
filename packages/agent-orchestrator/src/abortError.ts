@@ -1,4 +1,5 @@
 import type { Run } from "@cursor/sdk";
+import { isConnectCanceledError } from "./sdkTransportError.js";
 
 export function isAbortError(err: unknown): boolean {
   if (err instanceof DOMException && err.name === "AbortError") return true;
@@ -7,6 +8,11 @@ export function isAbortError(err: unknown): boolean {
     return true;
   }
   return false;
+}
+
+/** Intentional cancellation: AbortError or SDK Connect [canceled]. */
+export function isIntentionalCancellationError(err: unknown): boolean {
+  return isAbortError(err) || isConnectCanceledError(err);
 }
 
 const trackedCanceledPromises = new WeakSet<Promise<unknown>>();
@@ -30,6 +36,13 @@ export function trackIntentionalCancelPromise<T>(promise: Promise<T>): Promise<T
   return tracked;
 }
 
+export function shouldSuppressTrackedAbortRejection(
+  reason: unknown,
+  promise: Promise<unknown>,
+): boolean {
+  return isAbortError(reason) && trackedCanceledPromises.has(promise);
+}
+
 /** Cancel a run without surfacing SDK AbortError from intentional cancellation. */
 export async function cancelRun(run: Run | null | undefined): Promise<void> {
   if (!run) return;
@@ -37,21 +50,6 @@ export async function cancelRun(run: Run | null | undefined): Promise<void> {
     if (typeof run.supports === "function" && !run.supports("cancel")) return;
     await trackIntentionalCancelPromise(run.cancel());
   } catch (err) {
-    if (!isAbortError(err)) throw err;
+    if (!isIntentionalCancellationError(err)) throw err;
   }
-}
-
-let abortRejectionHandlerInstalled = false;
-
-/** Suppress orphan AbortError rejections from SDK cancel/close (internal promises). */
-export function installAbortRejectionHandler(): void {
-  if (abortRejectionHandlerInstalled) return;
-  abortRejectionHandlerInstalled = true;
-  process.on("unhandledRejection", (reason, promise) => {
-    if (isAbortError(reason) && trackedCanceledPromises.has(promise)) return;
-    console.error("Unhandled rejection:", promise, reason);
-    setImmediate(() => {
-      throw reason instanceof Error ? reason : new Error(String(reason));
-    });
-  });
 }

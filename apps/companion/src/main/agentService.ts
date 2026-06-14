@@ -193,6 +193,7 @@ export class AgentService {
 
     try {
       const runner = await this.getRunner();
+      runner.evictIdleSessions();
       if (!this.isRunActive(payload.sessionId, runId)) {
         this.emitCancelledWhenInactive(wc, payload.sessionId, runId);
         return;
