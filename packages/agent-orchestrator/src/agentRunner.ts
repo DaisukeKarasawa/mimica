@@ -32,6 +32,8 @@ export interface RunChatParams {
   apiKey?: string;
   /** Persona pack (SKILL.md + style). When set, 調月リオの口調ルールを適用 */
   personaSystemPrompt?: string;
+  /** When set, sent to the agent as-is (skips {@link buildAgentFullPrompt}). */
+  fullPromptOverride?: string;
   callbacks: AgentRunCallbacks;
   signal?: AbortSignal;
   /** When set (MIMICA_AGENT_PERF=1), emits `[mimica:agent-perf]` timing logs. */
@@ -213,7 +215,8 @@ export class AgentRunner {
       if (timing) {
         timing.meta.isFollowUp = isFollowUp;
       }
-      const fullPrompt = this.buildFullPrompt(params, isFollowUp);
+      const fullPrompt =
+        params.fullPromptOverride ?? this.buildFullPrompt(params, isFollowUp);
       const callbacks = this.wrapCallbacksForTiming(params.callbacks, timing);
 
       let readOnlyGuard: ReadOnlyRunGuard | undefined;
