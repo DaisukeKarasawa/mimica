@@ -135,6 +135,8 @@ When changing how Mimica loads or maps Spine assets:
 - When a path should clearly not be committed (e.g. `__pycache__/`, `*.py[cod]`), add the matching `.gitignore` entry directly instead of asking whether to add it.
 - Do not install or commit MVP read-only hooks (`mimica-read-only-guard.mjs`, `denied-hook-tools.mjs`) in the mimica dev workspace; dev `.cursor/hooks` allows `security-guard.mjs` and `format-on-edit.mjs` only (see `.cursor/hooks.json`).
 - For Ask-mode read-only hook testing, use a separate workspace directory—not the mimica monorepo dev root.
+- Development may outpace written requirements/docs. When review comments or requirements docs conflict with current code behavior, treat the code as the source of truth for intentional implementation unless the code embodies a dangerous requirement (security boundary regressions, data loss, etc.)—then fix the code.
+- When addressing PR review comments, default to coding and architecture fixes (cleanup, validation, tests, race conditions, maintainability). Do not automatically revert intentional product/code decisions that only conflict with lagging external docs unless the user asks or the change addresses real correctness/security risk.
 
 ## Learned Workspace Facts
 
