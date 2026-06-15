@@ -149,6 +149,9 @@ export class AgentService {
     if (this.activeRuns.has(payload.sessionId)) {
       throw new Error("Session already has an active agent run");
     }
+    if (answerDeliveryCoordinator.hasPending(payload.sessionId)) {
+      throw new Error("Session already has an active agent run");
+    }
 
     const session = this.sessionStore.get(payload.sessionId);
     if (!session) {

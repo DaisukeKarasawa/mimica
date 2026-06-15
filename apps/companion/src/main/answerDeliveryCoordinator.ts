@@ -42,6 +42,11 @@ export class AnswerDeliveryCoordinator {
       return;
     }
 
+    const existing = this.pending.get(input.sessionId);
+    if (existing && existing.runId !== input.runId) {
+      this.deliverOnce(input.sessionId, existing.runId);
+    }
+
     this.pending.set(input.sessionId, {
       runId: input.runId,
       content: input.content,
