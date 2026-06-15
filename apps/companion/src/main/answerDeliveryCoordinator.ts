@@ -42,6 +42,16 @@ export class AnswerDeliveryCoordinator {
       return;
     }
 
+    const superseded = this.pending.get(input.sessionId);
+    if (superseded && superseded.runId !== input.runId) {
+      this.emitComplete(
+        superseded.wc,
+        superseded.sessionId,
+        superseded.runId,
+        superseded.content,
+      );
+    }
+
     this.pending.set(input.sessionId, {
       runId: input.runId,
       content: input.content,

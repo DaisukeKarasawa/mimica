@@ -166,7 +166,10 @@ export class TuttiVoiceService {
     try {
       const jobId = await this.requestSpeak(config.baseUrl, text, speaker, abort.signal);
       const state = this.sessions.get(sessionId);
-      if (!state || state.abort !== abort) return;
+      if (!state || state.abort !== abort) {
+        this.finishReadout(callbacks, "failure");
+        return;
+      }
       state.jobId = jobId;
 
       const ready = await this.waitForJob(config.baseUrl, jobId, abort.signal);
