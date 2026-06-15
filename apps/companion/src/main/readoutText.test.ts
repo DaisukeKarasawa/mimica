@@ -43,6 +43,12 @@ describe("summarizeForReadout", () => {
     assert.doesNotMatch(text, /長い続き/);
   });
 
+  it("splits on reverse compound punctuation ！？", () => {
+    const tail = "長い続き。".repeat(40);
+    const text = summarizeForReadout(`え！？そんな${tail}`, 4);
+    assert.equal(text, "え！？");
+  });
+
   it("does not split decimal numbers on periods", () => {
     const text = summarizeForReadout("Version 3.14 is stable. Next topic follows here.");
     assert.match(text, /3\.14/);

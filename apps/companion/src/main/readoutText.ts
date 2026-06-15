@@ -63,6 +63,13 @@ function splitSentences(plain: string): string[] {
       continue;
     }
 
+    if (ch === "！" && next === "？") {
+      buf += next;
+      i++;
+      flush();
+      continue;
+    }
+
     if (ch === "。" || ch === "！" || ch === "？" || ch === "!" || ch === "?") {
       flush();
       continue;

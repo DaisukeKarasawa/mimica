@@ -22,7 +22,7 @@ function isLlmSummaryEnabled(): boolean {
 }
 
 function normalizeLlmReadout(text: string): string {
-  const plain = prepareReadoutText(text, MAX_SPEECH_CHARS);
+  const plain = prepareReadoutText(text);
   if (!plain) return "";
   if (plain.length <= MAX_SPEECH_CHARS) return plain;
   return summarizeForReadout(plain, MAX_SPEECH_CHARS);
