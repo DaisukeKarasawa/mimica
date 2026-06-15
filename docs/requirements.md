@@ -1,10 +1,10 @@
-# Mimica 要件定義 v0.3
+# Mimica 要件定義 v0.3.1
 
 ## 0. 概要
 
 **Mimica** は、Cursor 上の開発体験を、キャラクターエージェントとの会話体験として再構成する個人利用向けアプリケーションである。
 
-Cursor の標準チャットを将来的に置き換えることを目標としつつ、初期MVPでは「外部ウィンドウ上のキャラクター表示」「Agentチャット」「回答ストリーミング」「キャラクター状態連動」までを優先する。
+Cursor の標準チャットを将来的に置き換えることを目標としつつ、初期MVPでは「外部ウィンドウ上のキャラクター表示」「Agentチャット」「回答ストリーミング」「tutti による voice readout」「キャラクター状態連動」までを優先する。
 
 ---
 
@@ -138,6 +138,8 @@ Agentの状態に応じてキャラクターが動く
 - 実行中キャンセル
 - 現在ファイル/選択範囲コンテキスト
 - Agent状態に応じたキャラクター状態連動
+- tutti による回答 voice readout（localhost HTTP + macOS `afplay` 再生）
+- voice readout 完了までの回答表示延期（無効時は即時表示）
 - チャットセッション単位の履歴保存
 - LINE/Slack風チャットUI
 - Agent側のみキャラクターアイコン表示
@@ -166,8 +168,7 @@ Agentの状態に応じてキャラクターが動く
 ```txt
 - VS Code汎用対応
 - 音声入力
-- 音声合成
-- 実音声再生
+- voice readout 以外の汎用 TTS / 実音声再生（任意クラウド TTS、ナレーション、BGM 等）
 - 公開 Git / 公開 Release による Spine 素材・persona バイナリの配布
 - Marketplace公開
 - 商用利用
@@ -486,7 +487,11 @@ Mimica: Open Settings
 - チャットセッション保存
 - セッション切り替え
 - AgentイベントからAvatarStateへの変換
-- 回答中talkingモーション
+- tutti voice readout（`voiceReadoutEnabled` / `MIMICA_VOICE_READOUT_ENABLED`、デフォルト有効）
+- 回答読み上げ用 LLM 要約 sidecar（失敗時は機械的 excerpt にフォールバック）
+- `agent_readout` イベント（preparing / start / end）と readout 完了後の answer reveal
+- macOS `afplay` による WAV 再生（tutti `/v1/speak` → job poll → audio fetch）
+- 回答中talkingモーション（voice readout 再生中）
 - 完了時successモーション
 - エラー時errorモーション
 - thinking/searching時thinkingモーション
@@ -504,7 +509,16 @@ file/context read
 → thinking
 
 assistant response streaming
+→ thinking（voice readout 有効時。LLM ストリーム中は talking にしない）
+
+voice readout preparing
+→ thinking
+
+voice readout playback
 → talking
+
+answer reveal animation
+→ idle（表示中）
 
 waiting for user action
 → waiting
@@ -517,6 +531,23 @@ cancelled
 
 failed
 → error → idle
+```
+
+voice readout 無効時:
+
+```txt
+assistant response streaming
+→ thinking
+
+answer complete / reveal
+→ success → idle（従来どおり即時表示）
+```
+
+旧マッピング（voice readout 導入前）:
+
+```txt
+assistant response streaming
+→ talking
 ```
 
 初期チャットセッション要件:
@@ -557,7 +588,10 @@ type ChatMessage = {
 
 - MimicaからAgentに質問できる
 - 回答がストリーミング表示される
-- 回答中に調月リオがtalking状態になる
+- voice readout 有効時、読み上げ音声再生中に調月リオが talking 状態になる
+- voice readout 有効時、読み上げ完了後に回答本文が reveal 表示される
+- voice readout 失敗時も回答は表示される（フォールバック）
+- voice readout 無効時は回答を即時表示する
 - 完了時にsuccess/idleへ戻る
 - エラー時にerror/idleへ戻る
 - 実行中キャンセルできる
@@ -1120,6 +1154,8 @@ OSごとの保存パスはElectronの `app.getPath("userData")` を使う。
 - window position
 - defaultAgentMode
 - saveChatHistory
+- voiceReadoutEnabled
+- tuttiBaseUrl
 ```
 
 ## 12.2 初期設定例
@@ -1134,7 +1170,9 @@ OSごとの保存パスはElectronの `app.getPath("userData")` を使う。
   "chatIconPath": "~/MimicaAssets/characters/rio/icon.png",
   "maxChatSessions": 5,
   "saveChatHistory": true,
-  "defaultAgentMode": "ask"
+  "defaultAgentMode": "ask",
+  "voiceReadoutEnabled": true,
+  "tuttiBaseUrl": "http://127.0.0.1:8787"
 }
 ```
 
