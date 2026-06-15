@@ -5,6 +5,7 @@ import { MAX_SPEECH_CHARS, prepareReadoutText, summarizeForReadout } from "./rea
 
 const READOUT_SUMMARY_TIMEOUT_MS = 60_000;
 const LOG_PREFIX = "[readoutSummary]";
+const ABORT_ERROR_MESSAGE = "readout summary aborted";
 
 export interface GenerateReadoutSummaryParams {
   runner: AgentRunner;
@@ -31,48 +32,52 @@ async function runLlmReadoutSummary(params: GenerateReadoutSummaryParams): Promi
   const ephemeralSessionId = `${params.sessionId}__readout__${params.runId}`;
   let latest = "";
 
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const finish = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      fn();
-    };
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const finish = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        fn();
+      };
 
-    void params.runner
-      .runChat({
-        sessionId: ephemeralSessionId,
-        workspacePath: params.workspacePath,
-        mode: "ask",
-        prompt: "",
-        fullPromptOverride: buildReadoutSummaryPrompt(params.answerMarkdown, params.speaker),
-        signal: params.signal,
-        callbacks: {
-          onState: () => {},
-          onDelta: (chunk) => {
-            latest += chunk;
+      void params.runner
+        .runChat({
+          sessionId: ephemeralSessionId,
+          workspacePath: params.workspacePath,
+          mode: "ask",
+          prompt: "",
+          fullPromptOverride: buildReadoutSummaryPrompt(params.answerMarkdown, params.speaker),
+          signal: params.signal,
+          callbacks: {
+            onState: () => {},
+            onDelta: (chunk) => {
+              latest += chunk;
+            },
+            onComplete: (content) => {
+              latest = content;
+              finish(resolve);
+            },
+            onError: (error) => {
+              finish(() => reject(new Error(error.detail ?? error.kind)));
+            },
           },
-          onComplete: (content) => {
-            latest = content;
-            finish(resolve);
-          },
-          onError: (error) => {
-            finish(() => reject(new Error(error.detail ?? error.kind)));
-          },
-        },
-      })
-      .catch((error: unknown) => {
-        finish(() => reject(error));
-      });
-  });
+        })
+        .catch((error: unknown) => {
+          finish(() => reject(error));
+        });
+    });
 
-  return normalizeLlmReadout(latest);
+    return normalizeLlmReadout(latest);
+  } finally {
+    await params.runner.closeSession(ephemeralSessionId);
+  }
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, signal?: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("readout summary timed out")), ms);
-    const onAbort = () => reject(new Error("readout summary aborted"));
+    const onAbort = () => reject(new Error(ABORT_ERROR_MESSAGE));
     if (signal) {
       if (signal.aborted) {
         clearTimeout(timer);
@@ -118,7 +123,7 @@ export async function generateReadoutSummary(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message !== "readout summary aborted") {
+    if (message !== ABORT_ERROR_MESSAGE) {
       console.warn(`${LOG_PREFIX} LLM failed, using mechanical excerpt:`, message);
     }
   }

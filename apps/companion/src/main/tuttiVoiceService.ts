@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { resolve, sep } from "node:path";
 import type { AgentRunner } from "@mimica/agent-orchestrator";
 import type { MimicaSettings } from "@mimica/shared";
 import { resolveTuttiSpeakerId } from "@mimica/shared";
@@ -9,7 +9,7 @@ import { type TuttiVoiceConfig } from "./tuttiVoiceConfig.js";
 import { userDataJoin } from "./userDataPaths.js";
 
 const POLL_INTERVAL_MS = 750;
-const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const POLL_TIMEOUT_MS = 2 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 15_000;
 
 type SpeakJobResponse = {
@@ -165,6 +165,9 @@ export class TuttiVoiceService {
 
     try {
       const jobId = await this.requestSpeak(config.baseUrl, text, speaker, abort.signal);
+      const cacheDir = userDataJoin("tts-cache");
+      await mkdir(cacheDir, { recursive: true });
+      const cachePath = resolveSafeTtsCachePath(cacheDir, jobId);
       const state = this.sessions.get(sessionId);
       if (!state || state.abort !== abort) return;
       state.jobId = jobId;
@@ -181,9 +184,6 @@ export class TuttiVoiceService {
         return;
       }
 
-      const cacheDir = userDataJoin("tts-cache");
-      await mkdir(cacheDir, { recursive: true });
-      const cachePath = join(cacheDir, `${jobId}.wav`);
       await writeFile(cachePath, audio);
 
       callbacks.onPlaybackStart?.();
@@ -326,6 +326,18 @@ export class TuttiVoiceService {
       });
     });
   }
+}
+
+function resolveSafeTtsCachePath(cacheDir: string, jobId: string): string {
+  if (!jobId || !/^[a-zA-Z0-9_-]+$/.test(jobId)) {
+    throw new Error("Invalid jobId format from tutti service");
+  }
+  const resolvedCacheDir = resolve(cacheDir);
+  const cachePath = resolve(resolvedCacheDir, `${jobId}.wav`);
+  if (cachePath !== resolvedCacheDir && !cachePath.startsWith(`${resolvedCacheDir}${sep}`)) {
+    throw new Error("Invalid jobId path from tutti service");
+  }
+  return cachePath;
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {

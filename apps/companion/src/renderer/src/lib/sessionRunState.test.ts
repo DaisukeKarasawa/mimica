@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isSessionRunActive, mapSessionRunToAvatar, runStatusFromAgentState, shouldShowAssistantPendingIndicator } from "./sessionRunState.js";
+import {
+  isSessionRunActive,
+  mapSessionRunToAvatar,
+  runStatusFromAgentState,
+  shouldShowAssistantPendingIndicator,
+} from "./sessionRunState.js";
 
 describe("runStatusFromAgentState", () => {
   it("maps agent states to renderer run status", () => {
@@ -28,6 +33,7 @@ describe("mapSessionRunToAvatar", () => {
     assert.equal(mapSessionRunToAvatar("streaming"), "thinking");
     assert.equal(mapSessionRunToAvatar("thinking"), "thinking");
     assert.equal(mapSessionRunToAvatar("revealing"), "idle");
+    assert.equal(mapSessionRunToAvatar("error"), "error");
   });
 });
 
@@ -36,9 +42,7 @@ describe("shouldShowAssistantPendingIndicator", () => {
     id: "s1",
     title: "t",
     workspacePath: "/w",
-    messages: [
-      { id: "u1", role: "user" as const, content: "hi", createdAt: "" },
-    ],
+    messages: [{ id: "u1", role: "user" as const, content: "hi", createdAt: "" }],
   };
 
   it("shows during thinking, streaming, and readout until answer text exists", () => {

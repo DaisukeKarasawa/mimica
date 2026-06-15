@@ -1,5 +1,3 @@
-import type { WebContents } from "electron";
-import type { AgentRunner } from "@mimica/agent-orchestrator";
 import { resolveTuttiSpeakerId, type TuttiSpeakerId } from "@mimica/shared";
 import { MAX_SPEECH_CHARS } from "./readoutText.js";
 

@@ -12,10 +12,7 @@ import {
 } from "../lib/agentSessionUpdate";
 import { shouldApplyAgentStateToSessionRun } from "../lib/agentSessionRunState";
 import { codePointCount } from "../lib/streamReveal";
-import {
-  StreamRevealController,
-  type PendingStreamComplete,
-} from "../lib/streamRevealController";
+import { StreamRevealController, type PendingStreamComplete } from "../lib/streamRevealController";
 import { runStatusFromAgentState, type SessionRunState } from "../lib/sessionRunState";
 
 export type AvatarMomentKind = "success" | "error";
@@ -178,12 +175,13 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     (sessionId: string) => {
       setSessionRunRef.current(sessionId, { status: "thinking" });
       if (isActiveSession(sessionId)) {
+        reveal.reset();
         activeStreamIdRef.current = uuidv4();
         return activeStreamIdRef.current;
       }
       return streamMessageId(`pending-${sessionId}`, null);
     },
-    [isActiveSession],
+    [isActiveSession, reveal],
   );
 
   const updateSessionRunFromAgentState = useCallback(
@@ -283,11 +281,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             event.runId,
             event.content,
           );
-          clearBufferedStreamForRun(
-            backgroundStreamTextRef.current,
-            event.sessionId,
-            event.runId,
-          );
+          clearBufferedStreamForRun(backgroundStreamTextRef.current, event.sessionId, event.runId);
           if (isActiveSession(event.sessionId)) {
             reveal.setContext({
               sessionId: event.sessionId,
