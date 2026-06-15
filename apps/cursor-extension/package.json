@@ -2,7 +2,7 @@
   "name": "mimica-cursor-extension",
   "displayName": "Mimica",
   "description": "Cursor Agent Companion — launch Mimica external window",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "private": true,
   "publisher": "mimica-local",
   "engines": {
