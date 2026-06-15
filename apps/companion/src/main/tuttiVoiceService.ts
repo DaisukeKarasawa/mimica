@@ -51,14 +51,9 @@ export class TuttiVoiceService {
   private readonly sessions = new Map<string, SessionVoiceState>();
   private activePlayer: ChildProcess | null = null;
   private activePlayerSessionId: string | null = null;
-  private queue: Promise<void> = Promise.resolve();
+  private playbackQueue: Promise<void> = Promise.resolve();
 
   speakReadout(input: SpeakReadoutInput): void {
-    if (!input.config.enabled) {
-      input.onFailure?.();
-      return;
-    }
-
     if (!input.text.trim()) {
       input.onFailure?.();
       return;
@@ -70,12 +65,10 @@ export class TuttiVoiceService {
     const abort = new AbortController();
     this.sessions.set(input.sessionId, { abort });
 
-    this.queue = this.queue
-      .then(() => this.prepareAndRunReadout({ ...input, speaker, abort }))
-      .catch((error: unknown) => {
-        console.warn("[tuttiVoice] readout failed:", error);
-        input.onFailure?.();
-      });
+    void this.prepareAndRunReadout({ ...input, speaker, abort }).catch((error: unknown) => {
+      console.warn("[tuttiVoice] readout failed:", error);
+      input.onFailure?.();
+    });
   }
 
   private async prepareAndRunReadout(
@@ -138,6 +131,19 @@ export class TuttiVoiceService {
     }
   }
 
+  cancelAllSessions(): void {
+    for (const sessionId of [...this.sessions.keys()]) {
+      this.cancelForSession(sessionId);
+    }
+    this.stopPlayback();
+  }
+
+  private runQueuedPlayback(task: () => Promise<void>): Promise<void> {
+    const next = this.playbackQueue.then(task);
+    this.playbackQueue = next.catch(() => {});
+    return next;
+  }
+
   private stopPlayback(): void {
     const player = this.activePlayer;
     if (!player) return;
@@ -193,7 +199,9 @@ export class TuttiVoiceService {
       await writeFile(cachePath, audio);
 
       callbacks.onPlaybackStart?.();
-      await this.playAudio(cachePath, abort.signal, sessionId);
+      await this.runQueuedPlayback(async () => {
+        await this.playAudio(cachePath, abort.signal, sessionId);
+      });
       if (abort.signal.aborted) {
         this.finishReadout(callbacks, "failure");
         return;

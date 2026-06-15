@@ -21,6 +21,7 @@ describe("runStatusFromAgentState", () => {
 
 describe("isSessionRunActive", () => {
   it("includes readout and revealing", () => {
+    assert.equal(isSessionRunActive({ status: "preparing" }), true);
     assert.equal(isSessionRunActive({ status: "readout" }), true);
     assert.equal(isSessionRunActive({ status: "revealing" }), true);
     assert.equal(isSessionRunActive({ status: "idle" }), false);
@@ -28,7 +29,8 @@ describe("isSessionRunActive", () => {
 });
 
 describe("mapSessionRunToAvatar", () => {
-  it("uses talking only during readout", () => {
+  it("uses talking only during readout playback", () => {
+    assert.equal(mapSessionRunToAvatar("preparing"), "thinking");
     assert.equal(mapSessionRunToAvatar("readout"), "talking");
     assert.equal(mapSessionRunToAvatar("streaming"), "thinking");
     assert.equal(mapSessionRunToAvatar("thinking"), "thinking");
@@ -45,9 +47,10 @@ describe("shouldShowAssistantPendingIndicator", () => {
     messages: [{ id: "u1", role: "user" as const, content: "hi", createdAt: "" }],
   };
 
-  it("shows during thinking, streaming, and readout until answer text exists", () => {
+  it("shows during thinking, streaming, preparing, and readout until answer text exists", () => {
     assert.equal(shouldShowAssistantPendingIndicator("thinking", session, "run-1"), true);
     assert.equal(shouldShowAssistantPendingIndicator("streaming", session, "run-1"), true);
+    assert.equal(shouldShowAssistantPendingIndicator("preparing", session, "run-1"), true);
     assert.equal(shouldShowAssistantPendingIndicator("readout", session, "run-1"), true);
     assert.equal(shouldShowAssistantPendingIndicator("revealing", session, "run-1"), false);
   });

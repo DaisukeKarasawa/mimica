@@ -263,7 +263,12 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
         }
         case "agent_readout": {
           if (!isActiveSession(event.sessionId)) break;
-          if (event.phase === "start") {
+          if (event.phase === "preparing") {
+            setSessionRunRef.current(event.sessionId, {
+              status: "preparing",
+              runId: event.runId,
+            });
+          } else if (event.phase === "start") {
             setSessionRunRef.current(event.sessionId, {
               status: "readout",
               runId: event.runId,

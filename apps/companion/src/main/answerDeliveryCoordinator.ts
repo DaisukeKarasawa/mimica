@@ -12,7 +12,7 @@ export interface DeliverAnswerInput {
   content: string;
   workspacePath: string;
   getRunner: () => Promise<AgentRunner>;
-  /** Fired once this run's answer is delivered to the renderer (`agent_complete`). */
+  /** @deprecated Prefer awaiting the Promise returned by {@link deliver}. */
   onDelivered?: () => void;
 }
 
@@ -27,6 +27,7 @@ type PendingDelivery = {
 export type VoiceReadoutPort = {
   speakReadout(input: SpeakReadoutInput): void;
   cancelForSession(sessionId: string): void;
+  cancelAllSessions?(): void;
 };
 
 /**
@@ -42,65 +43,73 @@ export class AnswerDeliveryCoordinator {
     return this.pending.has(sessionId);
   }
 
-  deliver(input: DeliverAnswerInput): void {
-    const settings = getActiveMimicaSettings();
-    const voiceConfig = resolveTuttiVoiceConfig(settings);
+  /** Returns a promise that resolves once this run's answer reaches the renderer. */
+  deliver(input: DeliverAnswerInput): Promise<void> {
+    return new Promise((resolve) => {
+      const notifyDelivered = (): void => {
+        input.onDelivered?.();
+        resolve();
+      };
 
-    if (!voiceConfig.enabled) {
-      this.emitComplete(input.wc, input.sessionId, input.runId, input.content);
-      input.onDelivered?.();
-      return;
-    }
+      const settings = getActiveMimicaSettings();
+      const voiceConfig = resolveTuttiVoiceConfig(settings);
 
-    const superseded = this.pending.get(input.sessionId);
-    if (superseded && superseded.runId !== input.runId) {
-      this.deliverOnce(input.sessionId, superseded.runId);
-    }
+      if (!voiceConfig.enabled) {
+        this.emitComplete(input.wc, input.sessionId, input.runId, input.content);
+        notifyDelivered();
+        return;
+      }
 
-    this.pending.set(input.sessionId, {
-      runId: input.runId,
-      content: input.content,
-      wc: input.wc,
-      sessionId: input.sessionId,
-      onDelivered: input.onDelivered,
-    });
+      const superseded = this.pending.get(input.sessionId);
+      if (superseded && superseded.runId !== input.runId) {
+        this.deliverOnce(input.sessionId, superseded.runId);
+      }
 
-    emitAgentEvent(input.wc, {
-      type: "agent_state",
-      sessionId: input.sessionId,
-      runId: input.runId,
-      state: "thinking",
-    });
+      this.pending.set(input.sessionId, {
+        runId: input.runId,
+        content: input.content,
+        wc: input.wc,
+        sessionId: input.sessionId,
+        onDelivered: notifyDelivered,
+      });
 
-    this.voiceService.speakReadout({
-      text: input.content,
-      speaker: settings.activeCharacterId,
-      sessionId: input.sessionId,
-      runId: input.runId,
-      workspacePath: input.workspacePath,
-      getRunner: input.getRunner,
-      settings,
-      config: voiceConfig,
-      onPlaybackStart: () => {
-        emitAgentEvent(input.wc, {
-          type: "agent_readout",
-          sessionId: input.sessionId,
-          runId: input.runId,
-          phase: "start",
-        });
-      },
-      onPlaybackEnd: () => {
-        emitAgentEvent(input.wc, {
-          type: "agent_readout",
-          sessionId: input.sessionId,
-          runId: input.runId,
-          phase: "end",
-        });
-        this.deliverOnce(input.sessionId, input.runId);
-      },
-      onFailure: () => {
-        this.deliverOnce(input.sessionId, input.runId);
-      },
+      emitAgentEvent(input.wc, {
+        type: "agent_readout",
+        sessionId: input.sessionId,
+        runId: input.runId,
+        phase: "preparing",
+      });
+
+      this.voiceService.speakReadout({
+        text: input.content,
+        speaker: settings.activeCharacterId,
+        sessionId: input.sessionId,
+        runId: input.runId,
+        workspacePath: input.workspacePath,
+        getRunner: input.getRunner,
+        settings,
+        config: voiceConfig,
+        onPlaybackStart: () => {
+          emitAgentEvent(input.wc, {
+            type: "agent_readout",
+            sessionId: input.sessionId,
+            runId: input.runId,
+            phase: "start",
+          });
+        },
+        onPlaybackEnd: () => {
+          emitAgentEvent(input.wc, {
+            type: "agent_readout",
+            sessionId: input.sessionId,
+            runId: input.runId,
+            phase: "end",
+          });
+          this.deliverOnce(input.sessionId, input.runId);
+        },
+        onFailure: () => {
+          this.deliverOnce(input.sessionId, input.runId);
+        },
+      });
     });
   }
 
@@ -111,6 +120,13 @@ export class AnswerDeliveryCoordinator {
     if (pending) {
       this.deliverOnce(sessionId, pending.runId);
     }
+  }
+
+  cancelAll(): void {
+    for (const sessionId of [...this.pending.keys()]) {
+      this.cancelSession(sessionId);
+    }
+    this.voiceService.cancelAllSessions?.();
   }
 
   private deliverOnce(sessionId: string, runId: string): void {

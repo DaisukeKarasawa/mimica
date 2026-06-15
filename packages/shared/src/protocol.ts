@@ -56,7 +56,7 @@ export type AgentEventMessage =
       type: "agent_readout";
       sessionId: string;
       runId: string;
-      phase: "start" | "end";
+      phase: "preparing" | "start" | "end";
     }
   | {
       type: "agent_question";

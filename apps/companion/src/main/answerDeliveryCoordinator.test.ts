@@ -145,6 +145,18 @@ describe("AnswerDeliveryCoordinator", () => {
 
     try {
       coordinator.deliver(deliverInput("r1", "first answer"));
+
+      const preparing = events.find(
+        (event) =>
+          typeof event === "object" &&
+          event !== null &&
+          "type" in event &&
+          event.type === "agent_readout" &&
+          "phase" in event &&
+          event.phase === "preparing",
+      );
+      assert.ok(preparing);
+
       assert.equal(coordinator.hasPending("s1"), true);
       assert.equal(speakCalls.length, 1);
       assert.equal(speakCalls[0]?.text, "first answer");

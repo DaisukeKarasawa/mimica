@@ -5,6 +5,7 @@ export type SessionRunStatus =
   | "idle"
   | "thinking"
   | "streaming"
+  | "preparing"
   | "readout"
   | "revealing"
   | "error";
@@ -20,6 +21,7 @@ export function isSessionRunActive(state: SessionRunState | undefined): boolean 
   return (
     state?.status === "thinking" ||
     state?.status === "streaming" ||
+    state?.status === "preparing" ||
     state?.status === "readout" ||
     state?.status === "revealing"
   );
@@ -50,6 +52,7 @@ export function mapSessionRunToAvatar(status: SessionRunStatus): AvatarState {
   switch (status) {
     case "readout":
       return "talking";
+    case "preparing":
     case "streaming":
     case "thinking":
       return "thinking";
@@ -72,7 +75,12 @@ export function shouldShowAssistantPendingIndicator(
   runId: string | null | undefined,
 ): boolean {
   if (!session || !runId) return false;
-  if (status !== "thinking" && status !== "streaming" && status !== "readout") {
+  if (
+    status !== "thinking" &&
+    status !== "streaming" &&
+    status !== "preparing" &&
+    status !== "readout"
+  ) {
     return false;
   }
   const hasVisibleAnswer = session.messages.some(

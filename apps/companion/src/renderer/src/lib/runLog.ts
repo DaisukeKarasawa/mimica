@@ -140,7 +140,12 @@ export function runLogEntryFromAgentEvent(
       return {
         runId: event.runId,
         kind: "tool",
-        label: event.phase === "start" ? "Readout playback" : "Readout ended",
+        label:
+          event.phase === "preparing"
+            ? "Readout preparing"
+            : event.phase === "start"
+              ? "Readout playback"
+              : "Readout ended",
       };
     case "agent_error":
       return {
