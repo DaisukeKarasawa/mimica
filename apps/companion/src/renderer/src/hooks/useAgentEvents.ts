@@ -175,13 +175,18 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     (sessionId: string) => {
       setSessionRunRef.current(sessionId, { status: "thinking" });
       if (isActiveSession(sessionId)) {
+        const pending = reveal.drainPendingComplete();
+        if (pending) {
+          finalizeComplete(pending.sessionId, pending.runId, pending.streamId, pending.content);
+        }
+        reveal.stop();
         reveal.reset();
         activeStreamIdRef.current = uuidv4();
         return activeStreamIdRef.current;
       }
       return streamMessageId(`pending-${sessionId}`, null);
     },
-    [isActiveSession, reveal],
+    [finalizeComplete, isActiveSession, reveal],
   );
 
   const updateSessionRunFromAgentState = useCallback(

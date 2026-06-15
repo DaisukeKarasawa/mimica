@@ -362,7 +362,12 @@ export class AgentService {
       if (!runSucceeded) {
         settle(false);
       } else {
-        void (delivery ?? Promise.resolve()).then(() => settle(true));
+        void (delivery ?? Promise.resolve())
+          .then(() => settle(true))
+          .catch((err: unknown) => {
+            console.error("[agentService] deferred delivery failed:", err);
+            settle(false);
+          });
       }
     }
   }
