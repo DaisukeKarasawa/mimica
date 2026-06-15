@@ -1,9 +1,8 @@
 import type { WebContents } from "electron";
 import type { AgentRunner } from "@mimica/agent-orchestrator";
-import type { MimicaSettings } from "@mimica/shared";
 import { getActiveMimicaSettings } from "./characterPack.js";
 import { emitAgentEvent } from "./agentRunEmitter.js";
-import { resolveTuttiVoiceConfig, type TuttiVoiceConfig } from "./tuttiVoiceConfig.js";
+import { resolveTuttiVoiceConfig } from "./tuttiVoiceConfig.js";
 import { tuttiVoiceService } from "./tuttiVoiceService.js";
 
 export interface DeliverAnswerInput {

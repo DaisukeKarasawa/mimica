@@ -124,7 +124,6 @@ export function ChatPanel({
 
   const showChat = panelMode === "chat";
   const showHistory = panelMode === "history";
-  const showLog = panelMode === "log";
   const showAssistantPendingIndicator = shouldShowAssistantPendingIndicator(
     activeSessionRunStatus,
     activeSession,
