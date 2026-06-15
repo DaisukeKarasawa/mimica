@@ -32,7 +32,12 @@ export interface RunChatParams {
   apiKey?: string;
   /** Persona pack (SKILL.md + style). When set, 調月リオの口調ルールを適用 */
   personaSystemPrompt?: string;
-  /** When set, sent to the agent as-is (skips {@link buildAgentFullPrompt}). */
+  /**
+   * When set, sent to the agent as-is instead of {@link buildAgentFullPrompt}.
+   * Intended for ephemeral sidecar runs that must not inherit chat history, @-context,
+   * or persona wrapping — e.g. companion readout summary (`sessionId__readout__${runId}`)
+   * where only a TTS-oriented excerpt prompt should reach the model.
+   */
   fullPromptOverride?: string;
   callbacks: AgentRunCallbacks;
   signal?: AbortSignal;
