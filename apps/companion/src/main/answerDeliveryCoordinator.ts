@@ -3,7 +3,7 @@ import type { AgentRunner } from "@mimica/agent-orchestrator";
 import { getActiveMimicaSettings } from "./characterPack.js";
 import { emitAgentEvent } from "./agentRunEmitter.js";
 import { resolveTuttiVoiceConfig } from "./tuttiVoiceConfig.js";
-import { tuttiVoiceService } from "./tuttiVoiceService.js";
+import { tuttiVoiceService, type SpeakReadoutInput } from "./tuttiVoiceService.js";
 
 export interface DeliverAnswerInput {
   wc: WebContents | undefined;
@@ -21,12 +21,19 @@ type PendingDelivery = {
   sessionId: string;
 };
 
+export type VoiceReadoutPort = {
+  speakReadout(input: SpeakReadoutInput): void;
+  cancelForSession(sessionId: string): void;
+};
+
 /**
  * Delays `agent_complete` until tutti readout finishes (when voice is enabled).
  * Tracks pending deliveries so cancel works after the agent run ends.
  */
 export class AnswerDeliveryCoordinator {
   private readonly pending = new Map<string, PendingDelivery>();
+
+  constructor(private readonly voiceService: VoiceReadoutPort = tuttiVoiceService) {}
 
   hasPending(sessionId: string): boolean {
     return this.pending.has(sessionId);
@@ -60,7 +67,7 @@ export class AnswerDeliveryCoordinator {
       state: "thinking",
     });
 
-    tuttiVoiceService.speakReadout({
+    this.voiceService.speakReadout({
       text: input.content,
       speaker: settings.activeCharacterId,
       sessionId: input.sessionId,
@@ -94,7 +101,7 @@ export class AnswerDeliveryCoordinator {
 
   /** Stop voice/readout and show the answer immediately (user cancel or session close). */
   cancelSession(sessionId: string): void {
-    tuttiVoiceService.cancelForSession(sessionId);
+    this.voiceService.cancelForSession(sessionId);
     const pending = this.pending.get(sessionId);
     if (pending) {
       this.deliverOnce(sessionId, pending.runId);

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DEFAULT_SETTINGS } from "@mimica/shared";
 import { AnswerDeliveryCoordinator } from "./answerDeliveryCoordinator.js";
+import type { SpeakReadoutInput } from "./tuttiVoiceService.js";
 
 function mockWebContents(events: unknown[]) {
   return {
@@ -9,6 +10,19 @@ function mockWebContents(events: unknown[]) {
       events.push(event);
     },
   } as never;
+}
+
+function mockVoiceService() {
+  const speakCalls: SpeakReadoutInput[] = [];
+  return {
+    speakCalls,
+    service: {
+      speakReadout(input: SpeakReadoutInput) {
+        speakCalls.push(input);
+      },
+      cancelForSession(_sessionId: string) {},
+    },
+  };
 }
 
 describe("AnswerDeliveryCoordinator", () => {
@@ -52,7 +66,8 @@ describe("AnswerDeliveryCoordinator", () => {
     process.env.MIMICA_READOUT_LLM_SUMMARY = "0";
     const events: unknown[] = [];
     const wc = mockWebContents(events);
-    const coordinator = new AnswerDeliveryCoordinator();
+    const { service, speakCalls } = mockVoiceService();
+    const coordinator = new AnswerDeliveryCoordinator(service);
     const deliverInput = (runId: string, content: string) => ({
       wc,
       sessionId: "s1",
@@ -65,6 +80,10 @@ describe("AnswerDeliveryCoordinator", () => {
     try {
       coordinator.deliver(deliverInput("r1", "first answer"));
       assert.equal(coordinator.hasPending("s1"), true);
+      assert.equal(speakCalls.length, 1);
+      assert.equal(speakCalls[0]?.text, "first answer");
+      assert.equal(speakCalls[0]?.runId, "r1");
+      assert.equal(speakCalls[0]?.workspacePath, "/tmp/ws");
 
       coordinator.deliver(deliverInput("r2", "second answer"));
 
@@ -80,6 +99,9 @@ describe("AnswerDeliveryCoordinator", () => {
       assert.ok(firstComplete);
       assert.equal((firstComplete as { content: string }).content, "first answer");
       assert.equal(coordinator.hasPending("s1"), true);
+      assert.equal(speakCalls.length, 2);
+      assert.equal(speakCalls[1]?.text, "second answer");
+      assert.equal(speakCalls[1]?.runId, "r2");
     } finally {
       if (previousVoice === undefined) delete process.env.MIMICA_VOICE_READOUT_ENABLED;
       else process.env.MIMICA_VOICE_READOUT_ENABLED = previousVoice;

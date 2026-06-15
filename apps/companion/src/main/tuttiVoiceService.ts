@@ -269,8 +269,7 @@ export class TuttiVoiceService {
     if (!response.ok) {
       throw new Error(`audio fetch failed (${response.status})`);
     }
-    const data = new Uint8Array(await response.arrayBuffer());
-    return Buffer.from(data);
+    return Buffer.from(await response.arrayBuffer());
   }
 
   private async fetchJson<T>(url: string, init: RequestInit): Promise<T> {

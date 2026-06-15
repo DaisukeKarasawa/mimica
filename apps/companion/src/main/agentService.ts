@@ -331,7 +331,7 @@ export class AgentService {
               sessionId: payload.sessionId,
               runId,
               content,
-              workspacePath: payload.workspacePath,
+              workspacePath: cwd,
               getRunner: () => this.getRunner(),
             });
           },
