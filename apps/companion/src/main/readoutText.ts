@@ -20,6 +20,67 @@ export function prepareReadoutText(markdown: string, maxLength = MAX_STRIP_INPUT
   return text;
 }
 
+function splitSentences(plain: string): string[] {
+  const sentences: string[] = [];
+  let buf = "";
+
+  const flush = () => {
+    const trimmed = buf.trim();
+    if (trimmed) sentences.push(trimmed);
+    buf = "";
+  };
+
+  for (let i = 0; i < plain.length; i++) {
+    const ch = plain[i];
+    const next = plain[i + 1];
+    const prev = plain[i - 1];
+
+    buf += ch;
+
+    if (ch === "…") {
+      flush();
+      continue;
+    }
+
+    if (ch === "？" && next === "！") {
+      buf += next;
+      i++;
+      flush();
+      continue;
+    }
+
+    if (ch === "?" && next === "!") {
+      buf += next;
+      i++;
+      flush();
+      continue;
+    }
+
+    if (ch === "!" && next === "?") {
+      buf += next;
+      i++;
+      flush();
+      continue;
+    }
+
+    if (ch === "。" || ch === "！" || ch === "？" || ch === "!" || ch === "?") {
+      flush();
+      continue;
+    }
+
+    if (ch === ".") {
+      if (prev?.match(/\d/) && next?.match(/\d/)) continue;
+      if (prev?.match(/[A-Za-z]/) && next === " " && plain[i + 2]?.match(/[a-z]/)) continue;
+      if (next === undefined || next === "\n" || next === " " || next.match(/[A-Z\u3000-\u9fff]/)) {
+        flush();
+      }
+    }
+  }
+
+  flush();
+  return sentences;
+}
+
 /**
  * Short Japanese-friendly excerpt for readout (first sentences, capped).
  * Full answer stays in chat; only this text is sent to tutti.
@@ -29,8 +90,8 @@ export function summarizeForReadout(markdown: string, maxChars = MAX_SPEECH_CHAR
   if (!plain) return "";
   if (plain.length <= maxChars) return plain;
 
-  const parts = plain.match(/[^。！？!?.\n]+[。！？!?]?/g);
-  if (!parts?.length) {
+  const parts = splitSentences(plain);
+  if (!parts.length) {
     return plain.slice(0, maxChars).trim();
   }
 

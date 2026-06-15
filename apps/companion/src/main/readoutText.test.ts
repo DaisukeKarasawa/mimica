@@ -34,4 +34,17 @@ describe("summarizeForReadout", () => {
     assert.match(text, /結論として/);
     assert.doesNotMatch(text, /print/);
   });
+
+  it("splits on ellipsis and compound punctuation", () => {
+    const tail = "長い続き。".repeat(40);
+    const text = summarizeForReadout(`待って…本当にそうなの？！${tail}`, 17);
+    assert.match(text, /待って…/);
+    assert.match(text, /本当にそうなの？！/);
+    assert.doesNotMatch(text, /長い続き/);
+  });
+
+  it("does not split decimal numbers on periods", () => {
+    const text = summarizeForReadout("Version 3.14 is stable. Next topic follows here.");
+    assert.match(text, /3\.14/);
+  });
 });
