@@ -194,6 +194,12 @@ export class AgentService {
       this.isRunActive(payload.sessionId, runId),
     );
     let runSucceeded = false;
+    let settled = false;
+    const settle = (success: boolean): void => {
+      if (settled) return;
+      settled = true;
+      options?.onSettled?.(success);
+    };
 
     try {
       const runner = await this.getRunner();
@@ -333,6 +339,7 @@ export class AgentService {
               content,
               workspacePath: cwd,
               getRunner: () => this.getRunner(),
+              onDelivered: () => settle(true),
             });
           },
           onError: (error) => {
@@ -350,7 +357,11 @@ export class AgentService {
       if (this.isRunActive(payload.sessionId, runId)) {
         this.activeRuns.delete(payload.sessionId);
       }
-      options?.onSettled?.(runSucceeded);
+      if (!runSucceeded) {
+        settle(false);
+      } else if (!answerDeliveryCoordinator.hasPending(payload.sessionId)) {
+        settle(true);
+      }
     }
   }
 

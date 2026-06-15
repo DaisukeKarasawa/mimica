@@ -50,6 +50,7 @@ type ReadoutCallbacks = Pick<SpeakReadoutInput, "onPlaybackStart" | "onPlaybackE
 export class TuttiVoiceService {
   private readonly sessions = new Map<string, SessionVoiceState>();
   private activePlayer: ChildProcess | null = null;
+  private activePlayerSessionId: string | null = null;
   private queue: Promise<void> = Promise.resolve();
 
   speakReadout(input: SpeakReadoutInput): void {
@@ -129,17 +130,19 @@ export class TuttiVoiceService {
 
   cancelForSession(sessionId: string): void {
     const state = this.sessions.get(sessionId);
-    if (state) {
-      state.abort.abort();
-      this.sessions.delete(sessionId);
+    if (!state) return;
+    state.abort.abort();
+    this.sessions.delete(sessionId);
+    if (this.activePlayerSessionId === sessionId) {
+      this.stopPlayback();
     }
-    this.stopPlayback();
   }
 
   private stopPlayback(): void {
     const player = this.activePlayer;
     if (!player) return;
     this.activePlayer = null;
+    this.activePlayerSessionId = null;
     player.kill("SIGTERM");
   }
 
@@ -190,7 +193,7 @@ export class TuttiVoiceService {
       await writeFile(cachePath, audio);
 
       callbacks.onPlaybackStart?.();
-      await this.playAudio(cachePath, abort.signal);
+      await this.playAudio(cachePath, abort.signal, sessionId);
       if (abort.signal.aborted) {
         this.finishReadout(callbacks, "failure");
         return;
@@ -296,7 +299,7 @@ export class TuttiVoiceService {
     }
   }
 
-  private playAudio(path: string, signal: AbortSignal): Promise<void> {
+  private playAudio(path: string, signal: AbortSignal, sessionId: string): Promise<void> {
     return new Promise((resolve, reject) => {
       if (signal.aborted) {
         resolve();
@@ -304,18 +307,25 @@ export class TuttiVoiceService {
       }
       const player = spawn("afplay", [path], { stdio: "ignore" });
       this.activePlayer = player;
+      this.activePlayerSessionId = sessionId;
       const onAbort = () => {
         player.kill("SIGTERM");
       };
       signal.addEventListener("abort", onAbort, { once: true });
       player.on("error", (error) => {
         signal.removeEventListener("abort", onAbort);
-        if (this.activePlayer === player) this.activePlayer = null;
+        if (this.activePlayer === player) {
+          this.activePlayer = null;
+          this.activePlayerSessionId = null;
+        }
         reject(error);
       });
       player.on("close", (code, sig) => {
         signal.removeEventListener("abort", onAbort);
-        if (this.activePlayer === player) this.activePlayer = null;
+        if (this.activePlayer === player) {
+          this.activePlayer = null;
+          this.activePlayerSessionId = null;
+        }
         if (signal.aborted || sig === "SIGTERM") {
           resolve();
           return;

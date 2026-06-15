@@ -12,6 +12,8 @@ export interface DeliverAnswerInput {
   content: string;
   workspacePath: string;
   getRunner: () => Promise<AgentRunner>;
+  /** Fired once this run's answer is delivered to the renderer (`agent_complete`). */
+  onDelivered?: () => void;
 }
 
 type PendingDelivery = {
@@ -19,6 +21,7 @@ type PendingDelivery = {
   content: string;
   wc: WebContents | undefined;
   sessionId: string;
+  onDelivered?: () => void;
 };
 
 export type VoiceReadoutPort = {
@@ -45,12 +48,13 @@ export class AnswerDeliveryCoordinator {
 
     if (!voiceConfig.enabled) {
       this.emitComplete(input.wc, input.sessionId, input.runId, input.content);
+      input.onDelivered?.();
       return;
     }
 
     const superseded = this.pending.get(input.sessionId);
     if (superseded && superseded.runId !== input.runId) {
-      this.emitComplete(superseded.wc, superseded.sessionId, superseded.runId, superseded.content);
+      this.deliverOnce(input.sessionId, superseded.runId);
     }
 
     this.pending.set(input.sessionId, {
@@ -58,6 +62,7 @@ export class AnswerDeliveryCoordinator {
       content: input.content,
       wc: input.wc,
       sessionId: input.sessionId,
+      onDelivered: input.onDelivered,
     });
 
     emitAgentEvent(input.wc, {
@@ -113,6 +118,7 @@ export class AnswerDeliveryCoordinator {
     if (!pending || pending.runId !== runId) return;
     this.pending.delete(sessionId);
     this.emitComplete(pending.wc, pending.sessionId, pending.runId, pending.content);
+    pending.onDelivered?.();
   }
 
   private emitComplete(
