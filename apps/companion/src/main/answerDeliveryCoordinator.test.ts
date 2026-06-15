@@ -20,7 +20,7 @@ function mockVoiceService() {
       speakReadout(input: SpeakReadoutInput) {
         speakCalls.push(input);
       },
-      cancelForSession(_sessionId: string) {},
+      cancelForSession() {},
     },
   };
 }
