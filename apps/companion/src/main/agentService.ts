@@ -146,7 +146,10 @@ export class AgentService {
   private assertSubmitAllowed(
     payload: AgentSubmitPayload,
   ): NonNullable<ReturnType<SessionStore["get"]>> {
-    if (this.activeRuns.has(payload.sessionId)) {
+    if (
+      this.activeRuns.has(payload.sessionId) ||
+      answerDeliveryCoordinator.hasPending(payload.sessionId)
+    ) {
       throw new Error("Session already has an active agent run");
     }
 
@@ -386,7 +389,10 @@ export class AgentService {
       return session;
     }
 
-    if (this.activeRuns.has(input.sessionId)) {
+    if (
+      this.activeRuns.has(input.sessionId) ||
+      answerDeliveryCoordinator.hasPending(input.sessionId)
+    ) {
       throw new Error("Cannot answer while an agent run is in progress");
     }
 
