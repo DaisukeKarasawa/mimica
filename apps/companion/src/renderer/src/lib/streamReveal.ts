@@ -2,7 +2,7 @@
  * チャット吹き出しの表示速度（受信ストリームとは独立）。
  * 表示開始（TTFB）は agent 側のまま。ここは話している感のためのタイプライター速度のみ。
  */
-export const STREAM_REVEAL_CHARS_PER_SECOND = 60;
+export const STREAM_REVEAL_CHARS_PER_SECOND = 72;
 
 /** 1フレームあたりの進めすぎ防止（タブ切替などで delta が飛ぶ場合） */
 export const STREAM_REVEAL_MAX_DELTA_MS = 100;

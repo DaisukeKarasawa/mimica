@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
-import type { MimicaSettings } from "./chat.js";
+import { DEFAULT_TUTTI_BASE_URL, type MimicaSettings } from "./chat.js";
 import type { CharacterMetadata } from "./avatar.js";
 
 export const DEFAULT_ACTIVE_CHARACTER_ID = "rio";
@@ -131,6 +131,8 @@ export function buildSettingsForPackRoot(
     maxChatSessions: 5,
     saveChatHistory: true,
     defaultAgentMode: "agent",
+    voiceReadoutEnabled: true,
+    tuttiBaseUrl: DEFAULT_TUTTI_BASE_URL,
   };
 }
 

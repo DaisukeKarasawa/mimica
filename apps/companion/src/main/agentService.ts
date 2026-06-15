@@ -44,6 +44,7 @@ import {
 import { debugLogSlashResolution, resolveSlashInput } from "./cursorSlash/index.js";
 import { debugLogAtResolution, resolveAtInput } from "./cursorAt/index.js";
 import { MAX_IMAGE_ATTACHMENTS, readAttachmentBase64 } from "./imageAttachments.js";
+import { answerDeliveryCoordinator } from "./answerDeliveryCoordinator.js";
 
 export type { AgentQuestionAnswerInput, AgentQuestionDismissInput };
 
@@ -128,6 +129,11 @@ export class AgentService {
     return this.activeRuns.get(sessionId)?.runId === runId;
   }
 
+  /** True while an SDK run or deferred answer delivery is in flight. */
+  private isSessionBusy(sessionId: string): boolean {
+    return this.activeRuns.has(sessionId) || answerDeliveryCoordinator.hasPending(sessionId);
+  }
+
   private emitCancelledWhenInactive(
     wc: WebContents | undefined,
     sessionId: string,
@@ -145,7 +151,7 @@ export class AgentService {
   private assertSubmitAllowed(
     payload: AgentSubmitPayload,
   ): NonNullable<ReturnType<SessionStore["get"]>> {
-    if (this.activeRuns.has(payload.sessionId)) {
+    if (this.isSessionBusy(payload.sessionId)) {
       throw new Error("Session already has an active agent run");
     }
 
@@ -190,6 +196,13 @@ export class AgentService {
       this.isRunActive(payload.sessionId, runId),
     );
     let runSucceeded = false;
+    let delivery: Promise<void> | undefined;
+    let settled = false;
+    const settle = (success: boolean): void => {
+      if (settled) return;
+      settled = true;
+      options?.onSettled?.(success);
+    };
 
     try {
       const runner = await this.getRunner();
@@ -321,7 +334,15 @@ export class AgentService {
             if (current) {
               this.sessionStore.save(appendAssistantMessage(current, content, runId));
             }
-            emitter.complete(content);
+
+            delivery = answerDeliveryCoordinator.deliver({
+              wc,
+              sessionId: payload.sessionId,
+              runId,
+              content,
+              workspacePath: cwd,
+              getRunner: () => this.getRunner(),
+            });
           },
           onError: (error) => {
             this.persistAgentRunError(payload.sessionId, runId, error, emitter);
@@ -338,17 +359,26 @@ export class AgentService {
       if (this.isRunActive(payload.sessionId, runId)) {
         this.activeRuns.delete(payload.sessionId);
       }
-      options?.onSettled?.(runSucceeded);
+      if (!runSucceeded) {
+        settle(false);
+      } else {
+        void (delivery ?? Promise.resolve())
+          .then(() => settle(true))
+          .catch((err: unknown) => {
+            console.error("[agentService] deferred delivery failed:", err);
+            settle(false);
+          });
+      }
     }
   }
 
   async cancel(payload: AgentCancelPayload): Promise<void> {
     const active = this.activeRuns.get(payload.sessionId);
-    if (!active) {
+    if (!this.isSessionBusy(payload.sessionId)) {
       console.warn(`[agentService] cancel ignored: no active run for session ${payload.sessionId}`);
       return;
     }
-    if (payload.runId && active.runId !== payload.runId) {
+    if (active && payload.runId && active.runId !== payload.runId) {
       console.warn("[agentService] cancel ignored: stale runId");
       return;
     }
@@ -356,10 +386,13 @@ export class AgentService {
       console.warn(`[agentService] cancel ignored: unknown session ${payload.sessionId}`);
       return;
     }
-    if (this.runner) {
+    if (active && this.runner) {
       await this.runner.cancel(payload.sessionId);
     }
-    this.activeRuns.delete(payload.sessionId);
+    answerDeliveryCoordinator.cancelSession(payload.sessionId);
+    if (active) {
+      this.activeRuns.delete(payload.sessionId);
+    }
   }
 
   async answerQuestion(input: AgentQuestionAnswerInput): Promise<ChatSession> {
@@ -373,7 +406,7 @@ export class AgentService {
       return session;
     }
 
-    if (this.activeRuns.has(input.sessionId)) {
+    if (this.isSessionBusy(input.sessionId)) {
       throw new Error("Cannot answer while an agent run is in progress");
     }
 
@@ -438,7 +471,7 @@ export class AgentService {
   }
 
   async closeSession(sessionId: string): Promise<void> {
-    if (this.activeRuns.has(sessionId)) {
+    if (this.isSessionBusy(sessionId)) {
       await this.cancel({ sessionId });
     }
     if (this.runner) {
@@ -447,6 +480,7 @@ export class AgentService {
   }
 
   async dispose(): Promise<void> {
+    answerDeliveryCoordinator.cancelAll();
     const runner = this.runner;
     this.runner = null;
     this.runnerReady = null;

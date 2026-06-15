@@ -32,6 +32,18 @@ export interface RunChatParams {
   apiKey?: string;
   /** Persona pack (SKILL.md + style). When set, 調月リオの口調ルールを適用 */
   personaSystemPrompt?: string;
+  /**
+   * When set, sent to the agent as-is instead of {@link buildAgentFullPrompt}.
+   * Intended for ephemeral sidecar runs that must not inherit chat history, @-context,
+   * or persona wrapping — e.g. companion readout summary (`sessionId__readout__${runId}`)
+   * where only a TTS-oriented excerpt prompt should reach the model.
+   */
+  fullPromptOverride?: string;
+  /**
+   * With ask mode, skip persisting read-only hooks into the workspace.
+   * Use for ephemeral sidecar runs (e.g. readout summary) that still need in-process ReadOnlyRunGuard.
+   */
+  skipWorkspaceReadOnlyHooks?: boolean;
   callbacks: AgentRunCallbacks;
   signal?: AbortSignal;
   /** When set (MIMICA_AGENT_PERF=1), emits `[mimica:agent-perf]` timing logs. */
@@ -85,7 +97,7 @@ export class AgentRunner {
 
     params.callbacks.onState("thinking");
 
-    if (enforceReadOnly) {
+    if (enforceReadOnly && !params.skipWorkspaceReadOnlyHooks) {
       const hooksResult = await ensureReadOnlyHooks(params.workspacePath);
       if (!hooksResult.ok) {
         params.callbacks.onWarning?.(`${READ_ONLY_HOOK_INSTALL_WARNING} (${hooksResult.message})`);
@@ -213,7 +225,7 @@ export class AgentRunner {
       if (timing) {
         timing.meta.isFollowUp = isFollowUp;
       }
-      const fullPrompt = this.buildFullPrompt(params, isFollowUp);
+      const fullPrompt = params.fullPromptOverride ?? this.buildFullPrompt(params, isFollowUp);
       const callbacks = this.wrapCallbacksForTiming(params.callbacks, timing);
 
       let readOnlyGuard: ReadOnlyRunGuard | undefined;

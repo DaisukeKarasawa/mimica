@@ -1,8 +1,8 @@
 # Mimica プロジェクト開始ガイド
 
-要件定義 v0.3（`docs/requirements.md`）とキックオフ時 Q&A に基づく、**確定方針・開始前タスク・実装順序**のまとめ。
+要件定義 v0.3.1（`docs/requirements.md`）とキックオフ時 Q&A に基づく、**確定方針・開始前タスク・実装順序**のまとめ。
 
-最終更新: 2026-05-31
+最終更新: 2026-06-15
 
 ---
 
@@ -13,7 +13,7 @@
 | プロダクト名     | Mimica                                                                                                                                   |
 | 対象エディタ     | Cursor 専用                                                                                                                              |
 | 初期キャラクター | 調月リオ                                                                                                                                 |
-| 初期 MVP         | Phase 4 まで（Agent チャット + ストリーミング + キャンセル + コンテキスト + Avatar 連動 + セッション保存）                               |
+| 初期 MVP         | Phase 4 まで（Agent チャット + ストリーミング + キャンセル + コンテキスト + Avatar 連動 + tutti voice readout + セッション保存）         |
 | 対象 OS          | **macOS のみ**（他 OS 向けの考慮・実装は不要）                                                                                           |
 | UI 言語          | **二層** — プロダクト文言は日本語、Chrome 風 chrome（タブ・履歴・コンポーザー placeholder 等）は英語（§7.3.1）                           |
 | 配布             | 個人利用のみ。Marketplace 公開なし（`requirements.md` §13.3: 公開 Release に素材なし / プライベート DMG のみ同梱可 / VSIX はコードのみ） |
@@ -161,14 +161,14 @@ wiki から取得したセリフを、以下のような形式で共有する。
 
 ### Phase 対応
 
-| Phase   | 状態              | 内容                               |
-| ------- | ----------------- | ---------------------------------- |
-| Phase 0 | ほぼ完了          | 要件定義、UI モック、方針確定      |
-| Phase 1 | 次                | キャラ素材・アニメーション検証     |
-| Phase 2 | —                 | 外部ウィンドウ UI                  |
-| Phase 3 | —                 | Cursor 拡張・連携                  |
-| Phase 4 | **初期 MVP 完了** | Agent チャット + Avatar 連動       |
-| Phase 5 | 次フェーズ        | コード編集、差分、Accept/Reject 等 |
+| Phase   | 状態              | 内容                                         |
+| ------- | ----------------- | -------------------------------------------- |
+| Phase 0 | ほぼ完了          | 要件定義、UI モック、方針確定                |
+| Phase 1 | 次                | キャラ素材・アニメーション検証               |
+| Phase 2 | —                 | 外部ウィンドウ UI                            |
+| Phase 3 | —                 | Cursor 拡張・連携                            |
+| Phase 4 | **初期 MVP 完了** | Agent チャット + Avatar 連動 + voice readout |
+| Phase 5 | 次フェーズ        | コード編集、差分、Accept/Reject 等           |
 
 ---
 
@@ -178,12 +178,17 @@ wiki から取得したセリフを、以下のような形式で共有する。
 user submitted prompt     → thinking
 agent started               → thinking
 file/context read           → thinking
-assistant response streaming → talking
+assistant response streaming → thinking（voice readout 有効時）
+voice readout preparing     → thinking
+voice readout playback      → talking
+answer reveal animation     → idle
 waiting for user action     → waiting
 completed                   → success → idle
 cancelled                   → idle
 failed                      → error → idle
 ```
+
+voice readout 無効時は assistant response streaming も thinking のまま。回答完了後に success → idle。
 
 ---
 
@@ -199,7 +204,9 @@ failed                      → error → idle
   "chatIconPath": "~/MimicaAssets/characters/rio/icon.png",
   "maxChatSessions": 5,
   "saveChatHistory": true,
-  "defaultAgentMode": "agent"
+  "defaultAgentMode": "agent",
+  "voiceReadoutEnabled": true,
+  "tuttiBaseUrl": "http://127.0.0.1:8787"
 }
 ```
 

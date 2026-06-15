@@ -4,6 +4,7 @@ import type { AgentEventMessage, AgentRunState, ChatSession } from "@mimica/shar
 import { sessionHasPendingQuestion } from "@mimica/shared";
 import {
   applyAgentComplete,
+  applyAgentDelta,
   applyAgentQuestion,
   applyAgentQuestionResolved,
   applyAgentTool,
@@ -11,6 +12,7 @@ import {
 } from "../lib/agentSessionUpdate";
 import { shouldApplyAgentStateToSessionRun } from "../lib/agentSessionRunState";
 import { codePointCount } from "../lib/streamReveal";
+import { StreamRevealController, type PendingStreamComplete } from "../lib/streamRevealController";
 import { runStatusFromAgentState, type SessionRunState } from "../lib/sessionRunState";
 
 export type AvatarMomentKind = "success" | "error";
@@ -82,12 +84,38 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
   const activeSessionIdRef = useRef(activeSessionId);
   const onRunSettledRef = useRef(onRunSettled);
   const onAvatarMomentRef = useRef(onAvatarMoment);
+  const finalizeCompleteRef = useRef<
+    (sessionId: string, runId: string, streamId: string, content: string) => void
+  >(() => {});
   setAllSessionsRef.current = setAllSessions;
   setSessionRunRef.current = setSessionRun;
   clearSessionRunRef.current = clearSessionRun;
   activeSessionIdRef.current = activeSessionId;
   onRunSettledRef.current = onRunSettled;
   onAvatarMomentRef.current = onAvatarMoment;
+
+  const revealRef = useRef<StreamRevealController | null>(null);
+  if (!revealRef.current) {
+    revealRef.current = new StreamRevealController({
+      onFrame: (ctx, content) => {
+        setAllSessionsRef.current((prev) =>
+          applyAgentDelta(prev, ctx.sessionId, ctx.runId, ctx.streamId, content),
+        );
+      },
+      onFinalize: (pending: PendingStreamComplete) => {
+        if (activeStreamIdRef.current === pending.streamId) {
+          activeStreamIdRef.current = null;
+        }
+        finalizeCompleteRef.current(
+          pending.sessionId,
+          pending.runId,
+          pending.streamId,
+          pending.content,
+        );
+      },
+    });
+  }
+  const reveal = revealRef.current;
 
   const isActiveSession = useCallback(
     (sessionId: string) => sessionId === activeSessionIdRef.current,
@@ -122,6 +150,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
     },
     [isActiveSession, notifyRunSettled],
   );
+  finalizeCompleteRef.current = finalizeComplete;
 
   const appendBackgroundDelta = useCallback(
     (event: AgentEventMessage & { runId: string; content: string }) => {
@@ -135,21 +164,29 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
   const resetStream = useCallback(
     (sessionId?: string) => {
       if (sessionId && !isActiveSession(sessionId)) return;
+      reveal.stop();
+      reveal.reset();
       activeStreamIdRef.current = null;
     },
-    [isActiveSession],
+    [isActiveSession, reveal],
   );
 
   const beginStream = useCallback(
     (sessionId: string) => {
       setSessionRunRef.current(sessionId, { status: "thinking" });
       if (isActiveSession(sessionId)) {
+        const pending = reveal.drainPendingComplete();
+        if (pending) {
+          finalizeComplete(pending.sessionId, pending.runId, pending.streamId, pending.content);
+        }
+        reveal.stop();
+        reveal.reset();
         activeStreamIdRef.current = uuidv4();
         return activeStreamIdRef.current;
       }
       return streamMessageId(`pending-${sessionId}`, null);
     },
-    [isActiveSession],
+    [finalizeComplete, isActiveSession, reveal],
   );
 
   const updateSessionRunFromAgentState = useCallback(
@@ -176,6 +213,8 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             updateSessionRunFromAgentState(event.sessionId, event.state, event.runId);
           }
           if (event.state === "failed" || event.state === "cancelled") {
+            reveal.stop();
+            reveal.reset();
             clearBufferedStreamForRun(
               backgroundStreamTextRef.current,
               event.sessionId,
@@ -227,6 +266,21 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
           );
           break;
         }
+        case "agent_readout": {
+          if (!isActiveSession(event.sessionId)) break;
+          if (event.phase === "preparing") {
+            setSessionRunRef.current(event.sessionId, {
+              status: "preparing",
+              runId: event.runId,
+            });
+          } else if (event.phase === "start") {
+            setSessionRunRef.current(event.sessionId, {
+              status: "readout",
+              runId: event.runId,
+            });
+          }
+          break;
+        }
         case "agent_complete": {
           const streamId =
             (isActiveSession(event.sessionId) ? activeStreamIdRef.current : null) ??
@@ -237,10 +291,33 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
             event.runId,
             event.content,
           );
+          clearBufferedStreamForRun(backgroundStreamTextRef.current, event.sessionId, event.runId);
+          if (isActiveSession(event.sessionId)) {
+            reveal.setContext({
+              sessionId: event.sessionId,
+              runId: event.runId,
+              streamId,
+            });
+            reveal.setReceivedIfLonger(content);
+            reveal.queueComplete({
+              sessionId: event.sessionId,
+              runId: event.runId,
+              streamId,
+              content,
+            });
+            setSessionRunRef.current(event.sessionId, {
+              status: "revealing",
+              runId: event.runId,
+            });
+            reveal.start();
+            break;
+          }
           finalizeComplete(event.sessionId, event.runId, streamId, content);
           break;
         }
         case "agent_error": {
+          reveal.stop();
+          reveal.reset();
           const streamId =
             (isActiveSession(event.sessionId) ? activeStreamIdRef.current : null) ??
             streamMessageId(event.runId, null);
@@ -291,6 +368,7 @@ export function useAgentEvents(options: UseAgentEventsOptions): UseAgentEventsRe
       finalizeComplete,
       isActiveSession,
       notifyRunSettled,
+      reveal,
       updateSessionRunFromAgentState,
     ],
   );
