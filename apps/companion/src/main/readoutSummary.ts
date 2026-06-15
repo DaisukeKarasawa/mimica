@@ -46,6 +46,7 @@ async function runLlmReadoutSummary(params: GenerateReadoutSummaryParams): Promi
           sessionId: ephemeralSessionId,
           workspacePath: params.workspacePath,
           mode: "ask",
+          skipWorkspaceReadOnlyHooks: true,
           prompt: "",
           fullPromptOverride: buildReadoutSummaryPrompt(params.answerMarkdown, params.speaker),
           signal: params.signal,
