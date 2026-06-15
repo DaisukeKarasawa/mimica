@@ -215,8 +215,7 @@ export class AgentRunner {
       if (timing) {
         timing.meta.isFollowUp = isFollowUp;
       }
-      const fullPrompt =
-        params.fullPromptOverride ?? this.buildFullPrompt(params, isFollowUp);
+      const fullPrompt = params.fullPromptOverride ?? this.buildFullPrompt(params, isFollowUp);
       const callbacks = this.wrapCallbacksForTiming(params.callbacks, timing);
 
       let readOnlyGuard: ReadOnlyRunGuard | undefined;
