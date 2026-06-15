@@ -1176,6 +1176,12 @@ OSごとの保存パスはElectronの `app.getPath("userData")` を使う。
 }
 ```
 
+## 12.3 tutti voice readout（セキュリティ境界）
+
+- `tuttiBaseUrl` / `MIMICA_TUTTI_URL` は **loopback のみ**（`127.0.0.1` / `::1` / `localhost`）。Companion main process が起動時に検証し、非 loopback は拒否してデフォルト URL にフォールバックする
+- 送信データは読み上げ用に要約した回答 excerpt のみ（フルチャット履歴や workspace ファイル本体は tutti に送らない）
+- tutti 無効時（`voiceReadoutEnabled: false` / `MIMICA_VOICE_READOUT_ENABLED=0`）は HTTP outbound なし
+
 ---
 
 # 13. 非機能要件
