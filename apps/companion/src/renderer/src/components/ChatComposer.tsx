@@ -185,19 +185,21 @@ export function ChatComposer({
       <AtMentionMenu
         open={atMenu.open}
         workspaceLinked={atMenu.workspaceLinked}
-        sections={atMenu.sections}
-        filteredItems={atMenu.filteredItems}
+        rows={atMenu.rows}
+        navigableEntries={atMenu.navigableEntries}
         highlightedIndex={atMenu.highlightedIndex}
         onHighlightChange={atMenu.setHighlightedIndex}
-        onSelect={selectAtItem}
+        onSelectItem={selectAtItem}
+        onExpandSection={atMenu.expandSection}
       />
       <SlashCommandMenu
         open={slashMenu.open}
-        filteredSections={slashMenu.filteredSections}
-        filteredItems={slashMenu.filteredItems}
+        rows={slashMenu.rows}
+        navigableEntries={slashMenu.navigableEntries}
         highlightedIndex={slashMenu.highlightedIndex}
         onHighlightChange={slashMenu.setHighlightedIndex}
-        onSelect={(item) => void selectSlashItem(item.name, item.kind)}
+        onSelectItem={(item) => void selectSlashItem(item.name, item.kind)}
+        onExpandSection={slashMenu.expandSection}
       />
       {sessionId ? (
         <ComposerAttachments
@@ -239,10 +241,16 @@ export function ChatComposer({
             if (
               handleComposerMenuKeyDown(e, {
                 open: slashMenu.open,
-                filteredItems: slashMenu.filteredItems,
+                filteredItems: slashMenu.navigableEntries,
                 highlightedIndex: slashMenu.highlightedIndex,
                 setHighlightedIndex: slashMenu.setHighlightedIndex,
-                onSelect: (item) => void selectSlashItem(item.name, item.kind),
+                onSelect: (entry) => {
+                  if (entry.type === "showMore") {
+                    slashMenu.expandSection(entry.sectionKey);
+                    return;
+                  }
+                  void selectSlashItem(entry.item.name, entry.item.kind);
+                },
                 onEscape: () => onChange(""),
               })
             ) {
@@ -252,10 +260,16 @@ export function ChatComposer({
             if (
               handleComposerMenuKeyDown(e, {
                 open: atMenu.open,
-                filteredItems: atMenu.filteredItems,
+                filteredItems: atMenu.navigableEntries,
                 highlightedIndex: atMenu.highlightedIndex,
                 setHighlightedIndex: atMenu.setHighlightedIndex,
-                onSelect: selectAtItem,
+                onSelect: (entry) => {
+                  if (entry.type === "showMore") {
+                    atMenu.expandSection(entry.sectionKey);
+                    return;
+                  }
+                  selectAtItem(entry.item);
+                },
                 onEscape: () => onChange(value.replace(/@([^\s@]*)$/, "")),
               })
             ) {

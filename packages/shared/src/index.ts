@@ -169,6 +169,13 @@ export {
 } from "./mimicaPathConstants.js";
 
 export {
+  MENU_SECTION_COLLAPSED_LIMIT,
+  type MenuShowMoreEntry,
+  menuShowMoreLabel,
+  sectionVisibleItems,
+} from "./menuTruncation.js";
+
+export {
   type ErrorKind,
   type AgentRunError,
   type PersonaReactionState,

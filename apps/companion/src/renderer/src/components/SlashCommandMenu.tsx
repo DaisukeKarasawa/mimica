@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentMode, SlashMenuItem, SlashMenuSection } from "@mimica/shared";
-import { isSlashMenuOpen, slashMenuFilterQuery } from "@mimica/shared";
+import {
+  isSlashMenuOpen,
+  menuShowMoreLabel,
+  sectionVisibleItems,
+  slashMenuFilterQuery,
+} from "@mimica/shared";
 
 type SlashMenuRow =
   | { type: "header"; label: string; key: string }
-  | { type: "item"; item: SlashMenuItem; flatIndex: number; key: string };
+  | { type: "item"; item: SlashMenuItem; flatIndex: number; key: string }
+  | { type: "showMore"; sectionKey: string; hiddenCount: number; flatIndex: number; key: string };
+
+export type SlashMenuNavEntry =
+  | { type: "item"; item: SlashMenuItem }
+  | { type: "showMore"; sectionKey: string; hiddenCount: number };
 
 export function filterSlashMenuSections(
   sections: SlashMenuSection[],
@@ -26,6 +36,57 @@ export function filterSlashMenuSections(
 
 export function flattenSlashMenuItems(sections: SlashMenuSection[]): SlashMenuItem[] {
   return sections.flatMap((section) => section.items);
+}
+
+function buildSlashMenuRows(
+  sections: SlashMenuSection[],
+  expandedSections: ReadonlySet<string>,
+  filterQuery: string,
+): { rows: SlashMenuRow[]; navigableEntries: SlashMenuNavEntry[] } {
+  const rows: SlashMenuRow[] = [];
+  const navigableEntries: SlashMenuNavEntry[] = [];
+
+  for (const section of sections) {
+    if (section.items.length === 0) continue;
+
+    const { visible, hiddenCount } = sectionVisibleItems(
+      section.items,
+      section.category,
+      expandedSections,
+      filterQuery,
+    );
+
+    rows.push({ type: "header", label: section.label, key: `header-${section.category}` });
+
+    for (const item of visible) {
+      const flatIndex = navigableEntries.length;
+      navigableEntries.push({ type: "item", item });
+      rows.push({
+        type: "item",
+        item,
+        flatIndex,
+        key: `${item.kind}-${item.name}`,
+      });
+    }
+
+    if (hiddenCount > 0) {
+      const flatIndex = navigableEntries.length;
+      navigableEntries.push({
+        type: "showMore",
+        sectionKey: section.category,
+        hiddenCount,
+      });
+      rows.push({
+        type: "showMore",
+        sectionKey: section.category,
+        hiddenCount,
+        flatIndex,
+        key: `show-more-${section.category}`,
+      });
+    }
+  }
+
+  return { rows, navigableEntries };
 }
 
 export function useSlashMenuSections(
@@ -55,50 +116,47 @@ export function useSlashMenuState(value: string, sections: SlashMenuSection[], d
     () => filterSlashMenuSections(sections, query),
     [sections, query],
   );
-  const filteredItems = useMemo(() => flattenSlashMenuItems(filteredSections), [filteredSections]);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => new Set());
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
   useEffect(() => {
-    if (open) setHighlightedIndex(0);
+    if (open) {
+      setHighlightedIndex(0);
+      setExpandedSections(new Set());
+    }
   }, [open, query]);
 
+  const { rows, navigableEntries } = useMemo(
+    () => buildSlashMenuRows(filteredSections, expandedSections, query),
+    [expandedSections, filteredSections, query],
+  );
+
   useEffect(() => {
-    if (!open || filteredItems.length === 0) return;
-    if (highlightedIndex >= filteredItems.length) {
-      setHighlightedIndex(Math.max(0, filteredItems.length - 1));
+    if (!open || navigableEntries.length === 0) return;
+    if (highlightedIndex >= navigableEntries.length) {
+      setHighlightedIndex(Math.max(0, navigableEntries.length - 1));
     }
-  }, [open, highlightedIndex, filteredItems.length]);
+  }, [open, highlightedIndex, navigableEntries.length]);
+
+  const expandSection = (sectionKey: string) => {
+    setExpandedSections((prev) => {
+      if (prev.has(sectionKey)) return prev;
+      const next = new Set(prev);
+      next.add(sectionKey);
+      return next;
+    });
+  };
 
   return {
     open,
+    query,
     filteredSections,
-    filteredItems,
+    rows,
+    navigableEntries,
     highlightedIndex,
     setHighlightedIndex,
+    expandSection,
   };
-}
-
-function buildMenuRows(sections: SlashMenuSection[]): {
-  rows: SlashMenuRow[];
-  items: SlashMenuItem[];
-} {
-  const rows: SlashMenuRow[] = [];
-  const items: SlashMenuItem[] = [];
-  for (const section of sections) {
-    if (section.items.length === 0) continue;
-    rows.push({ type: "header", label: section.label, key: `header-${section.category}` });
-    for (const item of section.items) {
-      const flatIndex = items.length;
-      items.push(item);
-      rows.push({
-        type: "item",
-        item,
-        flatIndex,
-        key: `${item.kind}-${item.name}`,
-      });
-    }
-  }
-  return { rows, items };
 }
 
 function itemLabel(item: SlashMenuItem): string {
@@ -109,36 +167,37 @@ function itemLabel(item: SlashMenuItem): string {
 
 interface SlashCommandMenuProps {
   open: boolean;
-  filteredSections: SlashMenuSection[];
-  filteredItems: SlashMenuItem[];
+  rows: SlashMenuRow[];
+  navigableEntries: SlashMenuNavEntry[];
   highlightedIndex: number;
   onHighlightChange: (index: number) => void;
-  onSelect: (item: SlashMenuItem) => void;
+  onSelectItem: (item: SlashMenuItem) => void;
+  onExpandSection: (sectionKey: string) => void;
 }
 
 export function SlashCommandMenu({
   open,
-  filteredSections,
-  filteredItems,
+  rows,
+  navigableEntries,
   highlightedIndex,
   onHighlightChange,
-  onSelect,
+  onSelectItem,
+  onExpandSection,
 }: SlashCommandMenuProps) {
-  const { rows, items } = useMemo(() => buildMenuRows(filteredSections), [filteredSections]);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
-    if (!open || items.length === 0) return;
+    if (!open || navigableEntries.length === 0) return;
     itemRefs.current[highlightedIndex]?.scrollIntoView({ block: "nearest" });
-  }, [highlightedIndex, items.length, open]);
+  }, [highlightedIndex, navigableEntries.length, open]);
 
   if (!open) return null;
 
-  itemRefs.current.length = items.length;
+  itemRefs.current.length = navigableEntries.length;
 
   return (
     <div className="slash-menu" role="listbox" aria-label="Slash menu">
-      {filteredItems.length === 0 ? (
+      {navigableEntries.length === 0 ? (
         <p className="slash-menu-empty">一致する項目がありません</p>
       ) : (
         <div className="slash-menu-list">
@@ -150,6 +209,31 @@ export function SlashCommandMenu({
                 </div>
               );
             }
+
+            if (row.type === "showMore") {
+              return (
+                <button
+                  key={row.key}
+                  ref={(node) => {
+                    itemRefs.current[row.flatIndex] = node;
+                  }}
+                  type="button"
+                  role="option"
+                  aria-selected={row.flatIndex === highlightedIndex}
+                  className={`slash-menu-item slash-menu-show-more ${row.flatIndex === highlightedIndex ? "is-highlighted" : ""}`}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    onExpandSection(row.sectionKey);
+                  }}
+                  onMouseEnter={() => onHighlightChange(row.flatIndex)}
+                >
+                  <span className="slash-menu-show-more-label">
+                    {menuShowMoreLabel(row.hiddenCount)}
+                  </span>
+                </button>
+              );
+            }
+
             const { item, flatIndex } = row;
             return (
               <button
@@ -163,7 +247,7 @@ export function SlashCommandMenu({
                 className={`slash-menu-item ${flatIndex === highlightedIndex ? "is-highlighted" : ""}`}
                 onMouseDown={(event) => {
                   event.preventDefault();
-                  onSelect(item);
+                  onSelectItem(item);
                 }}
                 onMouseEnter={() => onHighlightChange(flatIndex)}
               >
