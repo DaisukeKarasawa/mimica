@@ -43,7 +43,12 @@ export function MermaidDiagramModal({ svg, onClose }: MermaidDiagramModalProps) 
   }, [onClose]);
 
   return createPortal(
-    <div className="mermaid-diagram-modal" role="dialog" aria-modal="true" aria-label="Mermaid diagram">
+    <div
+      className="mermaid-diagram-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mermaid diagram"
+    >
       <button
         type="button"
         className="mermaid-diagram-modal__backdrop"

@@ -84,11 +84,7 @@ export function CodeBlockPre({ children, ...preProps }: CodeBlockPreProps) {
   }, [blockText]);
 
   const ariaLabel =
-    copyState === "copied"
-      ? "Copied"
-      : copyState === "failed"
-        ? "Copy failed"
-        : "Copy code";
+    copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy code";
 
   return (
     <div className="code-block-shell">

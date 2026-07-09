@@ -222,8 +222,8 @@ export function ChatPanel({
                 <p className="chat-empty">
                   {workspacePath ? (
                     <>
-                      No tabs open. With the Mimica window focused, press ⌘T (Ctrl+T on Windows)
-                      to open New Chat, ⌘Y (Ctrl+Y) for history, or ⌘J (Ctrl+J) for the run log.
+                      No tabs open. With the Mimica window focused, press ⌘T (Ctrl+T on Windows) to
+                      open New Chat, ⌘Y (Ctrl+Y) for history, or ⌘J (Ctrl+J) for the run log.
                     </>
                   ) : (
                     <>

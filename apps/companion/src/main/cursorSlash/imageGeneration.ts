@@ -36,8 +36,7 @@ export function resolveSlashImageGeneration(
   if (!normalized) {
     return {
       expanded: "/image",
-      warning:
-        "Image generation requires a linked workspace. Open a folder in the Extension.",
+      warning: "Image generation requires a linked workspace. Open a folder in the Extension.",
     };
   }
 
