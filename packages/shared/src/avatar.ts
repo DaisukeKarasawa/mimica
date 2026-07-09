@@ -4,13 +4,13 @@ export type { AvatarState };
 
 /** Single source for avatar UI copy (status bar vs stage badge). */
 export const AVATAR_STATE_LABELS: Record<AvatarState, { status: string; badge: string }> = {
-  idle: { status: "待機中", badge: "待機" },
-  thinking: { status: "考え中…", badge: "考え中" },
-  talking: { status: "回答中", badge: "回答中" },
-  success: { status: "完了", badge: "完了" },
-  error: { status: "エラー", badge: "エラー" },
-  waiting: { status: "確認待ち", badge: "確認待ち" },
-  cancelled: { status: "中断", badge: "中断" },
+  idle: { status: "Idle", badge: "Idle" },
+  thinking: { status: "Thinking…", badge: "Thinking" },
+  talking: { status: "Responding", badge: "Responding" },
+  success: { status: "Done", badge: "Done" },
+  error: { status: "Error", badge: "Error" },
+  waiting: { status: "Awaiting input", badge: "Awaiting" },
+  cancelled: { status: "Cancelled", badge: "Cancelled" },
 };
 
 export function avatarStatusLabel(state: AvatarState): string {

@@ -43,19 +43,24 @@ export function MermaidDiagramModal({ svg, onClose }: MermaidDiagramModalProps) 
   }, [onClose]);
 
   return createPortal(
-    <div className="mermaid-diagram-modal" role="dialog" aria-modal="true" aria-label="Mermaid図">
+    <div
+      className="mermaid-diagram-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mermaid diagram"
+    >
       <button
         type="button"
         className="mermaid-diagram-modal__backdrop"
         onClick={handleBackdropClick}
-        aria-label="図を閉じる"
+        aria-label="Close diagram"
       />
       <button
         type="button"
         className="mermaid-diagram-modal__close"
         onClick={onClose}
-        aria-label="図を閉じる"
-        title="図を閉じる"
+        aria-label="Close diagram"
+        title="Close diagram"
       >
         <CloseIcon />
       </button>

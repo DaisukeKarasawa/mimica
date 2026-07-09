@@ -139,7 +139,7 @@ export function SlashCommandMenu({
   return (
     <div className="slash-menu" role="listbox" aria-label="Slash menu">
       {filteredItems.length === 0 ? (
-        <p className="slash-menu-empty">一致する項目がありません</p>
+        <p className="slash-menu-empty">No matching items</p>
       ) : (
         <div className="slash-menu-list">
           {rows.map((row) => {

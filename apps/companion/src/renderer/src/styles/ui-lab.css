@@ -1,6 +1,6 @@
 /* Visible only when running `pnpm dev:ui-lab` (see installUiLabStub). */
 html[data-ui-lab="true"] body::before {
-  content: "UI Lab — Design Mode 用プレビュー（変更は CSS/React を Apply で反映）";
+  content: "UI Lab — Design Mode preview (apply CSS/React changes to update)";
   position: fixed;
   top: 0;
   left: 50%;

@@ -25,7 +25,7 @@ export function MainSplitLayout({ stage, chat, onSplitReady }: MainSplitLayoutPr
         className="main-split-handle"
         role="separator"
         aria-orientation="vertical"
-        aria-label="チャットパネル幅の調整"
+        aria-label="Resize chat panel width"
         aria-valuemin={CHAT_PANEL_MIN_WIDTH}
         aria-valuenow={chatWidth ?? undefined}
         onPointerDown={onHandlePointerDown}

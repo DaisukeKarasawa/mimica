@@ -3,13 +3,13 @@ import type { ErrorKind } from "@mimica/shared";
 /** IPC and preload errors arrive as pre-formatted persona copy from main. */
 export function ipcErrorMessage(error: unknown): string {
   if (error instanceof Error) {
-    return error.message.trim() || "エラーが発生しました。";
+    return error.message.trim() || "An error occurred.";
   }
   const message = String(error).trim();
-  return message || "エラーが発生しました。";
+  return message || "An error occurred.";
 }
 
-const CLIENT_PERSONA_ERROR_FALLBACK = "エラーが発生しました。";
+const CLIENT_PERSONA_ERROR_FALLBACK = "An error occurred.";
 
 export async function formatClientPersonaError(kind: ErrorKind, detail?: string): Promise<string> {
   try {

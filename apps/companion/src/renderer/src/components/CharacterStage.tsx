@@ -102,13 +102,13 @@ export function CharacterStage({ avatarState, assets, layoutReady = true }: Char
 
   const showPlaceholder = !assets?.ready || !spineReady;
   const statusMessage = (() => {
-    if (!assets) return "キャラクター素材を確認しています…";
+    if (!assets) return "Checking character assets…";
     if (!assets.ready) {
       const missing =
         assets.missing.length > 0 ? assets.missing.join(", ") : "metadata / motion-map";
-      return `Spine 素材が見つかりません: ${missing}`;
+      return `Spine assets not found: ${missing}`;
     }
-    if (mountError) return `Spine の読み込みに失敗しました: ${mountError}`;
+    if (mountError) return `Failed to load Spine: ${mountError}`;
     return null;
   })();
 
@@ -122,7 +122,7 @@ export function CharacterStage({ avatarState, assets, layoutReady = true }: Char
     .join(" ");
 
   return (
-    <section className={stageClassName} aria-label="キャラクターステージ">
+    <section className={stageClassName} aria-label="Character stage">
       {showPlaceholder && (
         <>
           <div className="window-glow" />
