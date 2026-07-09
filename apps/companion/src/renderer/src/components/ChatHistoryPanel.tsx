@@ -110,7 +110,7 @@ export function ChatHistoryPanel({
   }, []);
 
   return (
-    <div ref={panelRef} className="history-panel" aria-label="チャット履歴">
+    <div ref={panelRef} className="history-panel" aria-label="Chat history">
       <div className="history-search">
         <input
           ref={searchRef}
@@ -118,7 +118,7 @@ export function ChatHistoryPanel({
           placeholder="Search sessions…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          aria-label="履歴検索"
+          aria-label="Search history"
         />
       </div>
       {groups.length === 0 ? (
@@ -149,8 +149,8 @@ export function ChatHistoryPanel({
                     <button
                       type="button"
                       className="history-item-delete"
-                      title="履歴から削除"
-                      aria-label={`${session.title} を削除`}
+                      title="Remove from history"
+                      aria-label={`Delete ${session.title}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onDelete(session.id);

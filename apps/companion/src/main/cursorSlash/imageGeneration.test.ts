@@ -16,7 +16,7 @@ describe("slash image generation", () => {
   it("warns when workspace is not linked", () => {
     const result = resolveSlashImageGeneration(null, "flat icon");
     assert.ok(result);
-    assert.match(result.warning ?? "", /ワークスペース/);
+    assert.match(result.warning ?? "", /linked workspace/i);
     assert.equal(result.expanded, "/image");
   });
 

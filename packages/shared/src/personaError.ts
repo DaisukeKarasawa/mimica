@@ -58,21 +58,21 @@ const ERROR_KINDS: ErrorKind[] = [
   "generic",
 ];
 
-const GENERIC_FACT_FALLBACK = "エラーが発生しました。";
+const GENERIC_FACT_FALLBACK = "An error occurred.";
 const GENERIC_INTRO_FALLBACK = "……想定外ね。";
 
 const ERROR_FACT_TEMPLATES: Record<ErrorKind, string> = {
-  agent_failed: "Agent の実行に失敗しました。",
-  agent_timeout: "応答がタイムアウトしました。",
+  agent_failed: "Agent run failed.",
+  agent_timeout: "The response timed out.",
   auth_missing:
-    "Cursor API キーが設定されていません。.env または環境変数 CURSOR_API_KEY を確認してください。",
-  connection: "接続を確立できませんでした。Companion と Cursor の接続を確認してください。",
+    "Cursor API key is not configured. Check .env or the CURSOR_API_KEY environment variable.",
+  connection: "Could not establish a connection. Check the link between Companion and Cursor.",
   sdk_transport:
-    "Agent との通信で問題が発生しました。しばらく待ってから再送信してください。改善しない場合は Mimica を再起動してください。",
-  attachment: "画像の添付に失敗しました。",
-  session: "チャットセッションが見つかりません。",
-  read_only_blocked: "Ask モードでは書き込みツールは利用できません。",
-  cancelled: "処理が中断されました。",
+    "A communication error occurred with the Agent. Wait a moment and try again. If it persists, restart Mimica.",
+  attachment: "Failed to attach the image.",
+  session: "Chat session not found.",
+  read_only_blocked: "Write tools are not available in Ask mode.",
+  cancelled: "The operation was cancelled.",
   generic: GENERIC_FACT_FALLBACK,
 };
 
@@ -162,6 +162,7 @@ export function classifyAgentError(raw: string, errorName?: string): ErrorKind {
   }
   if (
     /read-only mode/i.test(message) ||
+    /Write tools are not available in Ask mode/i.test(message) ||
     /書き込みツール/i.test(message) ||
     /MVP では利用できません/.test(message)
   ) {
@@ -173,10 +174,10 @@ export function classifyAgentError(raw: string, errorName?: string): ErrorKind {
   ) {
     return "connection";
   }
-  if (/timeout|タイムアウト/i.test(message)) {
+  if (/timeout|タイムアウト|timed out/i.test(message)) {
     return "agent_timeout";
   }
-  if (/Session is required/i.test(message)) {
+  if (/Session is required/i.test(message) || /Chat session not found/i.test(message)) {
     return "session";
   }
   if (/Maximum \d+ images/i.test(message)) {
@@ -191,7 +192,7 @@ export function classifyAgentError(raw: string, errorName?: string): ErrorKind {
   if (/Unsupported image|too large|exceeds.*\d+MB/i.test(message)) {
     return "attachment";
   }
-  if (/Agent.*失敗|run failed|status.*error/i.test(message)) {
+  if (/Agent.*失敗|Agent run failed|run failed|status.*error/i.test(message)) {
     return "agent_failed";
   }
 

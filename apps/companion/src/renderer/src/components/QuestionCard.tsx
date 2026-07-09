@@ -69,7 +69,7 @@ export function QuestionCard({
   return (
     <section
       className={`question-card ${readOnly ? "is-resolved" : ""}`}
-      aria-label="確認質問"
+      aria-label="Confirmation question"
       aria-describedby={showFallbackBadge ? `question-card-hint-${question.id}` : undefined}
     >
       <header className="question-card-head">
@@ -78,9 +78,9 @@ export function QuestionCard({
           <span
             id={`question-card-hint-${question.id}`}
             className="question-card-badge"
-            title="回答は follow-up として送信されます（同一 run 続行ではありません）"
+            title="Answers are sent as a follow-up (not continuing the same run)"
           >
-            確認待ち
+            Awaiting input
           </span>
         ) : null}
       </header>
@@ -109,12 +109,12 @@ export function QuestionCard({
               })}
             </div>
             <label className="question-card-freeform">
-              <span className="question-card-freeform-label">自由記述（任意）</span>
+              <span className="question-card-freeform-label">Additional details (optional)</span>
               <textarea
                 rows={2}
                 value={freeformByQuestion[item.id] ?? ""}
                 disabled={readOnly}
-                placeholder="補足があれば入力"
+                placeholder="Add any details here"
                 onChange={(event) =>
                   setFreeformByQuestion((prev) => ({
                     ...prev,
@@ -135,7 +135,7 @@ export function QuestionCard({
             disabled={disabled}
             onClick={onDismiss}
           >
-            スキップ
+            Skip
           </button>
           <button
             type="button"
@@ -143,17 +143,17 @@ export function QuestionCard({
             disabled={disabled || !canSubmit}
             onClick={handleSubmit}
           >
-            回答を送信
+            Submit answer
           </button>
         </footer>
       ) : (
         <p className="question-card-status" aria-live="polite">
           {question.status === "answered"
-            ? "回答済み"
+            ? "Answered"
             : question.status === "dismissed"
-              ? "スキップ済み"
+              ? "Skipped"
               : question.status === "expired"
-                ? "期限切れ"
+                ? "Expired"
                 : null}
         </p>
       )}

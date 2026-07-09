@@ -156,7 +156,7 @@ export function ChatPanel({
   };
 
   return (
-    <aside className="chat" aria-label="チャットパネル">
+    <aside className="chat" aria-label="Chat panel">
       <div className="chat-head">
         <div className="chat-title">
           <h2>{AGENT_DISPLAY_NAME}</h2>
@@ -198,7 +198,7 @@ export function ChatPanel({
                     <button
                       type="button"
                       className="tab-close"
-                      aria-label={`${session.title} のタブを閉じる`}
+                      aria-label={`Close tab for ${session.title}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onCloseTab(session.id);
@@ -222,13 +222,13 @@ export function ChatPanel({
                 <p className="chat-empty">
                   {workspacePath ? (
                     <>
-                      タブがありません。Mimica ウィンドウを選択した状態で ⌘T（Windows は Ctrl+T）で
-                      New Chat を開くか、⌘Y（Ctrl+Y）で履歴、⌘J（Ctrl+J）でログを開いてください。
+                      No tabs open. With the Mimica window focused, press ⌘T (Ctrl+T on Windows)
+                      to open New Chat, ⌘Y (Ctrl+Y) for history, or ⌘J (Ctrl+J) for the run log.
                     </>
                   ) : (
                     <>
-                      Cursor でフォルダを開き、コマンドパレットから「Mimica: Open
-                      Companion」を実行してください。接続後、最初のチャットが自動で開きます。
+                      Open a folder in Cursor and run “Mimica: Open Companion” from the command
+                      palette. After connecting, your first chat will open automatically.
                     </>
                   )}
                 </p>
@@ -268,7 +268,7 @@ export function ChatPanel({
                     {chatIconUrl ? (
                       <img src={chatIconUrl} alt="" className="agent-icon" title="調月リオ" />
                     ) : (
-                      <div className="agent-icon" title="キャラクターアイコン（未配置）" />
+                      <div className="agent-icon" title="Character icon (not set)" />
                     )}
                     <div className="bubble-shell">
                       <div className="bubble">

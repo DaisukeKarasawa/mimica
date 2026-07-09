@@ -150,7 +150,7 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
           await persistUserTurn(session, userMsg, next.workspacePath, setAllSessions);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          setSubmitError(`セッション保存失敗: ${message}`);
+          setSubmitError(`Failed to save session: ${message}`);
           return;
         }
 
@@ -214,7 +214,7 @@ export function useAgentSubmitQueue(options: UseAgentSubmitQueueOptions) {
           await persistUserTurn(session, userMsg, workspacePath, setAllSessions);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          setSubmitError(`セッション保存失敗: ${message}`);
+          setSubmitError(`Failed to save session: ${message}`);
           return;
         }
 

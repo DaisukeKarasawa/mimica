@@ -6,13 +6,13 @@ import { normalizeWorkspacePath } from "./discovery.js";
 export const IMAGE_GENERATE_MENU_ITEM: SlashMenuItem = {
   kind: "image",
   name: "image",
-  description: "テキスト指示で画像を生成（GenerateImage）",
+  description: "Generate an image from a text prompt (GenerateImage)",
 };
 
 export const IMAGE_ATTACH_MENU_ITEM: SlashMenuItem = {
   kind: "image",
   name: "attach",
-  description: "既存画像を添付（PNG / JPEG / WebP / GIF）",
+  description: "Attach an existing image (PNG / JPEG / WebP / GIF)",
 };
 
 export function defaultGeneratedImageDir(workspacePath: string): string {
@@ -37,7 +37,7 @@ export function resolveSlashImageGeneration(
     return {
       expanded: "/image",
       warning:
-        "画像生成にはワークスペースのリンクが必要です。Extension でフォルダを開いてください。",
+        "Image generation requires a linked workspace. Open a folder in the Extension.",
     };
   }
 
@@ -45,7 +45,7 @@ export function resolveSlashImageGeneration(
   if (!prompt) {
     return {
       expanded: "/image",
-      warning: "画像生成の指示を `/image` の後に入力してください。",
+      warning: "Enter an image generation prompt after `/image`.",
     };
   }
 

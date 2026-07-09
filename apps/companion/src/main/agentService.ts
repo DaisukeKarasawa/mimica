@@ -277,7 +277,7 @@ export class AgentService {
           sdkImages.push(readAttachmentBase64(payload.sessionId, attachment));
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          emitter.warning(`画像を読み取れませんでした (${attachment.fileName}): ${message}`);
+          emitter.warning(`Could not read image (${attachment.fileName}): ${message}`);
         }
       }
 

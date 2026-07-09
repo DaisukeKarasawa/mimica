@@ -2,7 +2,7 @@ import { hasResolvableAtTokens } from "@mimica/shared";
 import { resolveSlashWorkspaceOrNull } from "./cursorSlash/discovery.js";
 
 export const UNLINKED_AT_EXPANSION_WARNING =
-  "ワークスペースがリンクされていないため、@ メンションは展開されません。";
+  "@ mentions will not be expanded because no workspace is linked.";
 
 export interface AgentSubmitWorkspaceResolution {
   slashWorkspace: string | null;

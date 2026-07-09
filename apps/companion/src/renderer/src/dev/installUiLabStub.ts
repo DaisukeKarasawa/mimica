@@ -85,7 +85,7 @@ export function installUiLabStub(): void {
     formatPersonaError: async (kind, detail) => {
       void kind;
       void detail;
-      return "……想定外ね。\n\nエラーが発生しました。";
+      return "……想定外ね。\n\nAn error occurred.";
     },
 
     submitAgent: async (payload: AgentSubmitPayload) => {

@@ -147,11 +147,11 @@ export function AtMentionMenu({
   itemRefs.current.length = items.length;
 
   return (
-    <div className="slash-menu at-menu" role="listbox" aria-label="@メンションメニュー">
+    <div className="slash-menu at-menu" role="listbox" aria-label="@ mention menu">
       {!workspaceLinked ? (
-        <p className="slash-menu-empty">workspace をリンクすると @ でファイルを参照できます</p>
+        <p className="slash-menu-empty">Link a workspace to reference files with @</p>
       ) : filteredItems.length === 0 ? (
-        <p className="slash-menu-empty">一致する項目がありません</p>
+        <p className="slash-menu-empty">No matching items</p>
       ) : (
         <div className="slash-menu-list">
           {rows.map((row) => {

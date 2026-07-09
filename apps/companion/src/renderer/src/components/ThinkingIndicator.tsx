@@ -4,11 +4,11 @@ interface ThinkingIndicatorProps {
 
 export function ThinkingIndicator({ chatIconUrl }: ThinkingIndicatorProps) {
   return (
-    <div className="msg agent thinking-msg" aria-label="考え中" aria-live="polite">
+    <div className="msg agent thinking-msg" aria-label="Thinking" aria-live="polite">
       {chatIconUrl ? (
         <img src={chatIconUrl} alt="" className="agent-icon" title="調月リオ" />
       ) : (
-        <div className="agent-icon" title="キャラクターアイコン（未配置）" />
+        <div className="agent-icon" title="Character icon (not set)" />
       )}
       <div className="bubble-shell">
         <div className="bubble thinking-bubble">

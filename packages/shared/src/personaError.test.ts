@@ -81,7 +81,7 @@ describe("buildPersonaErrorMessage", () => {
       const message = buildPersonaErrorMessage(kind, undefined, SAMPLE_REACTIONS);
       assert.ok(message.length > 0);
       assert.match(message, /\n\n/);
-      assert.doesNotMatch(message, /^エラーが発生しました。$/);
+      assert.doesNotMatch(message, /^An error occurred\.$/);
     }
   });
 
@@ -93,14 +93,14 @@ describe("buildPersonaErrorMessage", () => {
   it("uses kind fact template instead of raw technical detail", () => {
     const detail = "x".repeat(200);
     const message = buildPersonaErrorMessage("generic", detail, SAMPLE_REACTIONS);
-    assert.match(message, /エラーが発生しました。/);
+    assert.match(message, /An error occurred/);
     assert.doesNotMatch(message, /x{10}/);
   });
 
   it("falls back safely without reactions", () => {
     const message = buildPersonaErrorMessage("auth_missing", "CURSOR_API_KEY missing");
     assert.match(message, /想定外/);
-    assert.match(message, /Cursor API キーが設定されていません/);
+    assert.match(message, /Cursor API key is not configured/);
     assert.doesNotMatch(message, /CURSOR_API_KEY missing/);
   });
 });

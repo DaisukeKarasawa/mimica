@@ -149,8 +149,8 @@ export function ChatComposer({
       type="button"
       className="composer-send"
       disabled={!canSend}
-      title="Shift+Enter で送信"
-      aria-label="送信"
+      title="Send (Shift+Enter)"
+      aria-label="Send"
       onClick={onSubmit}
     >
       <svg viewBox="0 0 16 16" aria-hidden>
@@ -170,8 +170,8 @@ export function ChatComposer({
     <button
       type="button"
       className="composer-send composer-stop"
-      title="停止"
-      aria-label="停止"
+      title="Stop"
+      aria-label="Stop"
       onClick={onCancel}
     >
       <svg className="composer-stop-icon" viewBox="0 0 16 16" aria-hidden>

@@ -17,7 +17,7 @@ export function ComposerAttachments({
   if (attachments.length === 0) return null;
 
   return (
-    <div className="composer-attachments" aria-label="添付画像">
+    <div className="composer-attachments" aria-label="Attached images">
       {attachments.map((attachment) => (
         <div key={attachment.id} className="composer-attachment">
           <img
@@ -29,7 +29,7 @@ export function ComposerAttachments({
             <button
               type="button"
               className="composer-attachment-remove"
-              aria-label={`${attachment.fileName} を削除`}
+              aria-label={`Remove ${attachment.fileName}`}
               onClick={() => onRemove(attachment.id)}
             >
               ×
