@@ -5,27 +5,45 @@ import {
   atMenuItemDisplayLabel,
   isAtMenuOpen,
   isSlashMenuOpen,
+  menuShowMoreLabel,
   replaceAtMenuSelection,
+  sectionVisibleItems,
 } from "@mimica/shared";
 
 const SEARCH_DEBOUNCE_MS = 200;
 
 type AtMenuRow =
   | { type: "header"; label: string; key: string }
-  | { type: "item"; item: AtMenuItem; flatIndex: number; key: string };
+  | { type: "item"; item: AtMenuItem; flatIndex: number; key: string }
+  | { type: "showMore"; sectionKey: string; hiddenCount: number; flatIndex: number; key: string };
 
-function flattenAtMenuSections(sections: AtMenuSection[]): {
-  rows: AtMenuRow[];
-  items: AtMenuItem[];
-} {
+export type AtMenuNavEntry =
+  | { type: "item"; item: AtMenuItem }
+  | { type: "showMore"; sectionKey: string; hiddenCount: number };
+
+function buildAtMenuRows(
+  sections: AtMenuSection[],
+  expandedSections: ReadonlySet<string>,
+  filterQuery: string,
+): { rows: AtMenuRow[]; navigableEntries: AtMenuNavEntry[] } {
   const rows: AtMenuRow[] = [];
-  const items: AtMenuItem[] = [];
+  const navigableEntries: AtMenuNavEntry[] = [];
+
   for (const section of sections) {
     if (section.items.length === 0) continue;
+
+    const { visible, hiddenCount } = sectionVisibleItems(
+      section.items,
+      section.category,
+      expandedSections,
+      filterQuery,
+    );
+
     rows.push({ type: "header", label: section.label, key: `header-${section.category}` });
-    for (const item of section.items) {
-      const flatIndex = items.length;
-      items.push(item);
+
+    for (const item of visible) {
+      const flatIndex = navigableEntries.length;
+      navigableEntries.push({ type: "item", item });
       rows.push({
         type: "item",
         item,
@@ -33,8 +51,25 @@ function flattenAtMenuSections(sections: AtMenuSection[]): {
         key: `${item.kind}-${item.path}-${item.name}`,
       });
     }
+
+    if (hiddenCount > 0) {
+      const flatIndex = navigableEntries.length;
+      navigableEntries.push({
+        type: "showMore",
+        sectionKey: section.category,
+        hiddenCount,
+      });
+      rows.push({
+        type: "showMore",
+        sectionKey: section.category,
+        hiddenCount,
+        flatIndex,
+        key: `show-more-${section.category}`,
+      });
+    }
   }
-  return { rows, items };
+
+  return { rows, navigableEntries };
 }
 
 function atMenuItemDescription(item: AtMenuItem): string {
@@ -90,27 +125,45 @@ export function useAtMenuState(
   const open = !disabled && !slashActive && isAtMenuOpen(value);
   const query = atMenuFilterQuery(value);
   const sections = useAtMenuSections(workspacePath, sessionId, query, open && !!workspacePath);
-  const filteredItems = useMemo(() => sections.flatMap((section) => section.items), [sections]);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => new Set());
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
   useEffect(() => {
-    if (open) setHighlightedIndex(0);
+    if (open) {
+      setHighlightedIndex(0);
+      setExpandedSections(new Set());
+    }
   }, [open, query]);
 
+  const { rows, navigableEntries } = useMemo(
+    () => buildAtMenuRows(sections, expandedSections, query),
+    [expandedSections, query, sections],
+  );
+
   useEffect(() => {
-    if (!open || filteredItems.length === 0) return;
-    if (highlightedIndex >= filteredItems.length) {
-      setHighlightedIndex(Math.max(0, filteredItems.length - 1));
+    if (!open || navigableEntries.length === 0) return;
+    if (highlightedIndex >= navigableEntries.length) {
+      setHighlightedIndex(Math.max(0, navigableEntries.length - 1));
     }
-  }, [open, highlightedIndex, filteredItems.length]);
+  }, [open, highlightedIndex, navigableEntries.length]);
+
+  const expandSection = (sectionKey: string) => {
+    setExpandedSections((prev) => {
+      if (prev.has(sectionKey)) return prev;
+      const next = new Set(prev);
+      next.add(sectionKey);
+      return next;
+    });
+  };
 
   return {
     open,
     query,
-    sections,
-    filteredItems,
+    rows,
+    navigableEntries,
     highlightedIndex,
     setHighlightedIndex,
+    expandSection,
     workspaceLinked: !!workspacePath,
   };
 }
@@ -118,39 +171,40 @@ export function useAtMenuState(
 interface AtMentionMenuProps {
   open: boolean;
   workspaceLinked: boolean;
-  sections: AtMenuSection[];
-  filteredItems: AtMenuItem[];
+  rows: AtMenuRow[];
+  navigableEntries: AtMenuNavEntry[];
   highlightedIndex: number;
   onHighlightChange: (index: number) => void;
-  onSelect: (item: AtMenuItem) => void;
+  onSelectItem: (item: AtMenuItem) => void;
+  onExpandSection: (sectionKey: string) => void;
 }
 
 export function AtMentionMenu({
   open,
   workspaceLinked,
-  sections,
-  filteredItems,
+  rows,
+  navigableEntries,
   highlightedIndex,
   onHighlightChange,
-  onSelect,
+  onSelectItem,
+  onExpandSection,
 }: AtMentionMenuProps) {
-  const { rows, items } = useMemo(() => flattenAtMenuSections(sections), [sections]);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
-    if (!open || items.length === 0) return;
+    if (!open || navigableEntries.length === 0) return;
     itemRefs.current[highlightedIndex]?.scrollIntoView({ block: "nearest" });
-  }, [highlightedIndex, items.length, open]);
+  }, [highlightedIndex, navigableEntries.length, open]);
 
   if (!open) return null;
 
-  itemRefs.current.length = items.length;
+  itemRefs.current.length = navigableEntries.length;
 
   return (
     <div className="slash-menu at-menu" role="listbox" aria-label="@メンションメニュー">
       {!workspaceLinked ? (
         <p className="slash-menu-empty">workspace をリンクすると @ でファイルを参照できます</p>
-      ) : filteredItems.length === 0 ? (
+      ) : navigableEntries.length === 0 ? (
         <p className="slash-menu-empty">一致する項目がありません</p>
       ) : (
         <div className="slash-menu-list">
@@ -162,6 +216,31 @@ export function AtMentionMenu({
                 </div>
               );
             }
+
+            if (row.type === "showMore") {
+              return (
+                <button
+                  key={row.key}
+                  ref={(node) => {
+                    itemRefs.current[row.flatIndex] = node;
+                  }}
+                  type="button"
+                  role="option"
+                  aria-selected={row.flatIndex === highlightedIndex}
+                  className={`slash-menu-item slash-menu-show-more ${row.flatIndex === highlightedIndex ? "is-highlighted" : ""}`}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    onExpandSection(row.sectionKey);
+                  }}
+                  onMouseEnter={() => onHighlightChange(row.flatIndex)}
+                >
+                  <span className="slash-menu-show-more-label">
+                    {menuShowMoreLabel(row.hiddenCount)}
+                  </span>
+                </button>
+              );
+            }
+
             const { item, flatIndex } = row;
             return (
               <button
@@ -175,7 +254,7 @@ export function AtMentionMenu({
                 className={`slash-menu-item ${flatIndex === highlightedIndex ? "is-highlighted" : ""}`}
                 onMouseDown={(event) => {
                   event.preventDefault();
-                  onSelect(item);
+                  onSelectItem(item);
                 }}
                 onMouseEnter={() => onHighlightChange(flatIndex)}
               >
