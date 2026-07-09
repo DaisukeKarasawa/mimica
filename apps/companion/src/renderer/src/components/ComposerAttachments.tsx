@@ -4,16 +4,24 @@ import { chatAttachmentUrl } from "@mimica/shared";
 interface ComposerAttachmentsProps {
   sessionId: string;
   attachments: ChatAttachment[];
-  disabled?: boolean;
   onRemove: (attachmentId: string) => void;
 }
 
-export function ComposerAttachments({
-  sessionId,
-  attachments,
-  disabled,
-  onRemove,
-}: ComposerAttachmentsProps) {
+function AttachmentRemoveIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden>
+      <path
+        d="M4 4l8 8M12 4l-8 8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function ComposerAttachments({ sessionId, attachments, onRemove }: ComposerAttachmentsProps) {
   if (attachments.length === 0) return null;
 
   return (
@@ -25,16 +33,14 @@ export function ComposerAttachments({
             alt={attachment.fileName}
             className="composer-attachment-thumb"
           />
-          {!disabled ? (
-            <button
-              type="button"
-              className="composer-attachment-remove"
-              aria-label={`${attachment.fileName} を削除`}
-              onClick={() => onRemove(attachment.id)}
-            >
-              ×
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="composer-attachment-remove"
+            aria-label={`${attachment.fileName} を削除`}
+            onClick={() => onRemove(attachment.id)}
+          >
+            <AttachmentRemoveIcon />
+          </button>
         </div>
       ))}
     </div>
