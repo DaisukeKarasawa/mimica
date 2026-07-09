@@ -9,18 +9,31 @@
 
 .composer-attachments {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 10px 0;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 10px 12px 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.composer-attachments::-webkit-scrollbar {
+  height: 6px;
+}
+
+.composer-attachments::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
 }
 
 .composer-attachment {
   position: relative;
-  width: 52px;
-  height: 52px;
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-subtle);
   background: rgba(13, 12, 12, 0.5);
 }
 
@@ -31,19 +44,57 @@
   object-fit: cover;
 }
 
+.composer-attachment::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+
+.composer-attachment:hover::after,
+.composer-attachment:focus-within::after {
+  opacity: 1;
+}
+
 .composer-attachment-remove {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 18px;
-  height: 18px;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
   border: 0;
   border-radius: 999px;
-  color: var(--bg);
-  background: rgba(0, 0, 0, 0.62);
-  font-size: 12px;
-  line-height: 1;
+  color: #f2f0eb;
+  background: rgba(13, 12, 12, 0.82);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  opacity: 0;
   cursor: pointer;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.composer-attachment:hover .composer-attachment-remove,
+.composer-attachment-remove:focus-visible {
+  opacity: 1;
+}
+
+.composer-attachment-remove:hover {
+  color: #fff;
+  background: rgba(196, 116, 110, 0.92);
+}
+
+.composer-attachment-remove:focus-visible {
+  outline: 2px solid rgba(196, 116, 110, 0.55);
+  outline-offset: 1px;
 }
 
 .message-text {
@@ -54,17 +105,19 @@
 .message-attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   margin-top: 8px;
 }
 
 .message-attachment {
   display: block;
-  width: 96px;
-  height: 96px;
+  width: 120px;
+  max-width: min(120px, 100%);
+  aspect-ratio: 1;
   border-radius: 10px;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-subtle);
+  background: rgba(13, 12, 12, 0.35);
 }
 
 .message-attachment-thumb {

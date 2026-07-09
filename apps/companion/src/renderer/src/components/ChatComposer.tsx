@@ -203,13 +203,16 @@ export function ChatComposer({
         <ComposerAttachments
           sessionId={sessionId}
           attachments={attachments}
-          disabled={inputLocked}
           onRemove={(attachmentId) => {
             const removed = attachments.find((item) => item.id === attachmentId);
+            if (!removed) return;
             onAttachmentsChange((prev) => prev.filter((item) => item.id !== attachmentId));
-            if (sessionId && removed) {
-              void window.mimica.discardImageAttachment(sessionId, removed);
-            }
+            void window.mimica.discardImageAttachment(sessionId, removed).catch((error) => {
+              onAttachmentsChange((prev) =>
+                prev.some((item) => item.id === removed.id) ? prev : [...prev, removed],
+              );
+              reportComposerError(error);
+            });
           }}
         />
       ) : null}
